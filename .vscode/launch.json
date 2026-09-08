@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "Run calc-for-garmin",
+            "program": "${workspaceFolder}/bin/optimized/${workspaceFolderBasename}.prg",
+            "compilerOptions": "-l 3",
+            "manifest": "${workspaceFolder}/manifest.xml",
+            "jungles": "${workspaceFolder}/monkey.jungle"
+        }
+    ]
+}
