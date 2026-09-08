@@ -1,9 +1,11 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 
-// Handles both touchscreen taps and physical-button navigation (up/down to
-// move the highlight, select to press, back to leave the scientific pad),
-// so the calculator works the same on button watches and touch watches.
+// Swipe to move the highlight between buttons, tap anywhere to confirm the
+// highlighted one - this avoids depending on precise touch-coordinate
+// hit-testing (which doesn't reliably line up with drawn button positions
+// on every device), and mirrors physical-button navigation (up/down to
+// move the highlight, select to press) so button watches work the same way.
 class calc_for_garminDelegate extends WatchUi.BehaviorDelegate {
 
     private var view as calc_for_garminView;
@@ -14,13 +16,7 @@ class calc_for_garminDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onSelect() as Boolean {
-        var buttons = view.getButtons();
-        if (buttons.size() == 0) {
-            return false;
-        }
-        view.activate(buttons[view.selectedIndex]);
-        WatchUi.requestUpdate();
-        return true;
+        return pressSelected();
     }
 
     function onNextPage() as Boolean {
@@ -44,26 +40,36 @@ class calc_for_garminDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
+    // A tap anywhere on the screen confirms the currently highlighted
+    // button - swipe up/down first to move the highlight onto it.
     function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
-        var coords = clickEvent.getCoordinates();
-        return handleTapAt(coords[0], coords[1]);
+        return pressSelected();
     }
 
-    // Some devices report a quick press as a hold rather than a tap; handle
-    // both the same way so a tap always registers.
     function onHold(clickEvent as WatchUi.ClickEvent) as Boolean {
-        var coords = clickEvent.getCoordinates();
-        return handleTapAt(coords[0], coords[1]);
+        return pressSelected();
     }
 
-    private function handleTapAt(x as Number, y as Number) as Boolean {
-        var idx = view.buttonAt(x, y);
-        if (idx == null) {
+    function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
+        var dir = swipeEvent.getDirection();
+        if (dir == WatchUi.SWIPE_DOWN) {
+            view.moveSelection(1);
+            WatchUi.requestUpdate();
+            return true;
+        } else if (dir == WatchUi.SWIPE_UP) {
+            view.moveSelection(-1);
+            WatchUi.requestUpdate();
+            return true;
+        }
+        return false;
+    }
+
+    private function pressSelected() as Boolean {
+        var buttons = view.getButtons();
+        if (buttons.size() == 0) {
             return false;
         }
-        var i = idx as Number;
-        view.selectedIndex = i;
-        view.activate(view.getButtons()[i]);
+        view.activate(buttons[view.selectedIndex]);
         WatchUi.requestUpdate();
         return true;
     }
