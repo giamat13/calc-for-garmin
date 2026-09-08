@@ -1,10 +1,9 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 
-// Multi-input support:
-// - Physical buttons: up/down to navigate, select to activate, back to exit scientific
-// - Touch with buttons: tap to activate, up/down/select for navigation
-// - Touch only (no buttons): swipe up/down to navigate, tap to activate
+// Handles both touchscreen taps and physical-button navigation (up/down to
+// move the highlight, select to press, back to leave the scientific pad),
+// so the calculator works the same on button watches and touch watches.
 class calc_for_garminDelegate extends WatchUi.BehaviorDelegate {
 
     private var view as calc_for_garminView;
@@ -55,21 +54,6 @@ class calc_for_garminDelegate extends WatchUi.BehaviorDelegate {
     function onHold(clickEvent as WatchUi.ClickEvent) as Boolean {
         var coords = clickEvent.getCoordinates();
         return handleTapAt(coords[0], coords[1]);
-    }
-
-    // Swipe navigation for touch-only watches: swipe down = next, swipe up = previous.
-    function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
-        var dir = swipeEvent.getDirection();
-        if (dir == WatchUi.SWIPE_DOWN) {
-            view.moveSelection(1);
-            WatchUi.requestUpdate();
-            return true;
-        } else if (dir == WatchUi.SWIPE_UP) {
-            view.moveSelection(-1);
-            WatchUi.requestUpdate();
-            return true;
-        }
-        return false;
     }
 
     private function handleTapAt(x as Number, y as Number) as Boolean {

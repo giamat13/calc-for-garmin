@@ -195,7 +195,10 @@ class calc_for_garminView extends WatchUi.View {
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         var text = engine.displayText();
-        var font = text.length() > 10 ? Graphics.FONT_SMALL : Graphics.FONT_NUMBER_MEDIUM;
+        // Regular text fonts, not FONT_NUMBER_*: the expression can contain
+        // letters and symbols (X, =, sin, etc.), and the digit-only number
+        // fonts have no glyphs for those.
+        var font = text.length() > 10 ? Graphics.FONT_TINY : (text.length() > 6 ? Graphics.FONT_SMALL : Graphics.FONT_LARGE);
         var headerH = (safeH * 0.24).toNumber();
         dc.drawText(safeX + safeW / 2, safeY + headerH / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
