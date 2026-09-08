@@ -1,67 +1,69 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 
-// Swipe to move the highlight between buttons, tap anywhere to confirm the
-// highlighted one - this avoids depending on precise touch-coordinate
-// hit-testing (which doesn't reliably line up with drawn button positions
-// on every device), and mirrors physical-button navigation (up/down to
-// move the highlight, select to press) so button watches work the same way.
-class calc_for_garminDelegate extends WatchUi.BehaviorDelegate {
+// Extends the low-level WatchUi.InputDelegate rather than BehaviorDelegate.
+// On several touch+button devices, BehaviorDelegate silently converts any
+// screen touch into a generic "select" behavior (activating whatever button
+// is currently highlighted, ignoring where you actually tapped) before
+// onTap ever runs - that's what made direct taps on numbers seem to do
+// nothing. InputDelegate skips that translation, so onTap's own coordinate
+// hit-test is what decides which button gets pressed. Physical buttons are
+// handled directly via onKey() instead of BehaviorDelegate's onSelect/
+// onBack/onNextPage/onPreviousPage.
+class calc_for_garminDelegate extends WatchUi.InputDelegate {
 
     private var view as calc_for_garminView;
 
     function initialize(view as calc_for_garminView) {
-        BehaviorDelegate.initialize();
+        InputDelegate.initialize();
         me.view = view;
     }
 
-    function onSelect() as Boolean {
-        return pressSelected();
-    }
-
-    function onNextPage() as Boolean {
-        view.moveSelection(1);
-        WatchUi.requestUpdate();
-        return true;
-    }
-
-    function onPreviousPage() as Boolean {
-        view.moveSelection(-1);
-        WatchUi.requestUpdate();
-        return true;
-    }
-
-    function onBack() as Boolean {
-        if (view.scientific) {
-            view.switchScreen(false);
-            WatchUi.requestUpdate();
-            return true;
-        }
-        return false;
-    }
-
-    // A tap anywhere on the screen confirms the currently highlighted
-    // button - swipe up/down first to move the highlight onto it.
     function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
-        return pressSelected();
+        var coords = clickEvent.getCoordinates();
+        return handleTapAt(coords[0], coords[1]);
     }
 
+    // Some devices report a quick press as a hold rather than a tap; handle
+    // both the same way so a tap always registers.
     function onHold(clickEvent as WatchUi.ClickEvent) as Boolean {
-        return pressSelected();
+        var coords = clickEvent.getCoordinates();
+        return handleTapAt(coords[0], coords[1]);
     }
 
-    function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
-        var dir = swipeEvent.getDirection();
-        if (dir == WatchUi.SWIPE_DOWN) {
+    function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
+        var key = keyEvent.getKey();
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            return pressSelected();
+        } else if (key == WatchUi.KEY_DOWN) {
             view.moveSelection(1);
             WatchUi.requestUpdate();
             return true;
-        } else if (dir == WatchUi.SWIPE_UP) {
+        } else if (key == WatchUi.KEY_UP) {
             view.moveSelection(-1);
             WatchUi.requestUpdate();
             return true;
+        } else if (key == WatchUi.KEY_ESC) {
+            if (view.scientific) {
+                view.switchScreen(false);
+                WatchUi.requestUpdate();
+                return true;
+            }
+            return false;
         }
         return false;
+    }
+
+    private function handleTapAt(x as Number, y as Number) as Boolean {
+        var idx = view.buttonAt(x, y);
+        if (idx == null) {
+            return false;
+        }
+        var i = idx as Number;
+        view.selectedIndex = i;
+        view.activate(view.getButtons()[i]);
+        WatchUi.requestUpdate();
+        return true;
     }
 
     private function pressSelected() as Boolean {
