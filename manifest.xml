@@ -5,7 +5,7 @@
         Use "Monkey C: Edit Application" from the Visual Studio Code command palette
         to update the application attributes.
     -->
-    <iq:application id="34c4efeb-f4b6-42a7-ac33-2c1375286479" type="watch-app" name="@Strings.AppName" entry="calc_for_garminApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="3.2.0">
+    <iq:application id="64d4a7d3-a844-450e-9f70-14af9e79e162" type="widget" name="@Strings.AppName" entry="calc_for_garminApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="3.2.0">
         <!--
             Use the following from the Visual Studio Code comand palette to edit
             the build targets:
@@ -48,6 +48,7 @@
             <iq:product id="epix2pro47mm"/>
             <iq:product id="epix2pro51mm"/>
             <iq:product id="etrextouch"/>
+            <iq:product id="fenix5plus"/>
             <iq:product id="fenix5splus"/>
             <iq:product id="fenix5xplus"/>
             <iq:product id="fenix6"/>
@@ -68,6 +69,13 @@
             <iq:product id="fenix8pro47mm"/>
             <iq:product id="fenix8solar47mm"/>
             <iq:product id="fenix8solar51mm"/>
+            <iq:product id="fenix943mm"/>
+            <iq:product id="fenix947mm"/>
+            <iq:product id="fenix9pro43mm"/>
+            <iq:product id="fenix9pro47mm"/>
+            <iq:product id="fenix9pro51mm"/>
+            <iq:product id="fenix9prosolar47mm"/>
+            <iq:product id="fenix9prosolar51mm"/>
             <iq:product id="fenixe"/>
             <iq:product id="fr165"/>
             <iq:product id="fr165m"/>

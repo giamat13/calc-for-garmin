@@ -61,6 +61,45 @@ class CalculatorEngine {
         justEvaluated = false;
     }
 
+    function wrapCube() as Void {
+        if (errorState || expr.length() == 0) {
+            return;
+        }
+        expr = "(" + expr + ")^3";
+        justEvaluated = false;
+    }
+
+    function wrapInverse() as Void {
+        if (errorState || expr.length() == 0) {
+            return;
+        }
+        expr = "1/(" + expr + ")";
+        justEvaluated = false;
+    }
+
+    function wrapPow10() as Void {
+        if (errorState || expr.length() == 0) {
+            return;
+        }
+        expr = "10^(" + expr + ")";
+        justEvaluated = false;
+    }
+
+    function wrapFactorial() as Void {
+        if (errorState || expr.length() == 0) {
+            return;
+        }
+        expr = "fact(" + expr + ")";
+        justEvaluated = false;
+    }
+
+    // Raw text insertion for things like the "×10^" scientific-notation
+    // shortcut, which don't fit the digit/operator/function/constant shapes.
+    function appendRaw(text as String) as Void {
+        resetIfNeeded(true);
+        expr = expr + text;
+    }
+
     function backspace() as Void {
         if (errorState) {
             clear();

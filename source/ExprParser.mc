@@ -79,6 +79,14 @@ class ExprParser {
                 } else {
                     v = v * rhs;
                 }
+            } else if (matchKeyword("mod")) {
+                pos += 3;
+                var rhs = parseUnary();
+                if (rhs == 0.0d) {
+                    error = true;
+                    return 0.0d;
+                }
+                v = v - Math.floor(v / rhs) * rhs;
             } else if (startsPrimary(c)) {
                 // Implicit multiplication: "2X", "2π", "3(1+1)", "2sin(30)".
                 v = v * parseUnary();
@@ -87,6 +95,22 @@ class ExprParser {
             }
         }
         return v;
+    }
+
+    // True if the keyword's letters sit at pos and aren't part of a longer
+    // identifier (so "mod" matches but "mode" would not, if that ever came up).
+    private function matchKeyword(kw as String) as Boolean {
+        var kwLen = kw.length();
+        if (pos + kwLen > len) {
+            return false;
+        }
+        if (!(s.substring(pos, pos + kwLen) as String).equals(kw)) {
+            return false;
+        }
+        if (pos + kwLen < len && isAlphaCh(s.substring(pos + kwLen, pos + kwLen + 1) as String)) {
+            return false;
+        }
+        return true;
     }
 
     private function startsPrimary(c as String) as Boolean {
@@ -218,8 +242,52 @@ class ExprParser {
                 return 0.0d;
             }
             return Math.log(arg, E) as Double;
+        } else if (name.equals("asin")) {
+            if (arg < -1.0d || arg > 1.0d) {
+                error = true;
+                return 0.0d;
+            }
+            return (Math.asin(arg) as Double) * 180.0d / Math.PI;
+        } else if (name.equals("acos")) {
+            if (arg < -1.0d || arg > 1.0d) {
+                error = true;
+                return 0.0d;
+            }
+            return (Math.acos(arg) as Double) * 180.0d / Math.PI;
+        } else if (name.equals("atan")) {
+            return (Math.atan(arg) as Double) * 180.0d / Math.PI;
+        } else if (name.equals("cbrt")) {
+            return arg < 0.0d ? -(Math.pow(-arg, 1.0d / 3.0d) as Double) : (Math.pow(arg, 1.0d / 3.0d) as Double);
+        } else if (name.equals("abs")) {
+            return arg < 0.0d ? -arg : arg;
+        } else if (name.equals("floor")) {
+            return Math.floor(arg) as Double;
+        } else if (name.equals("ceil")) {
+            return Math.ceil(arg) as Double;
+        } else if (name.equals("fact")) {
+            return factorial(arg);
         }
         error = true;
         return 0.0d;
+    }
+
+    // n! for a non-negative integer n. Rejects negatives, non-integers, and
+    // anything past 170 (170! is the last one that fits in a double).
+    private function factorial(arg as Double) as Double {
+        var rounded = Math.round(arg) as Double;
+        var diff = arg - rounded;
+        if (diff < 0.0d) {
+            diff = -diff;
+        }
+        if (diff > 0.0000001d || rounded < 0.0d || rounded > 170.0d) {
+            error = true;
+            return 0.0d;
+        }
+        var n = rounded.toNumber();
+        var result = 1.0d;
+        for (var i = 2; i <= n; i++) {
+            result = result * i;
+        }
+        return result;
     }
 }

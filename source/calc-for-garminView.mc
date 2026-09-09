@@ -23,8 +23,12 @@ class CalcButton {
 
 class calc_for_garminView extends WatchUi.View {
 
+    const SCREEN_BASIC = 0;
+    const SCREEN_SCIENTIFIC = 1;
+    const SCREEN_ADVANCED = 2;
+
     var engine as CalculatorEngine = new CalculatorEngine();
-    var scientific as Boolean = false;
+    var screen as Number = SCREEN_BASIC;
     var selectedIndex as Number = 0;
     private var buttons as Array<CalcButton> = [] as Array<CalcButton>;
 
@@ -80,20 +84,41 @@ class calc_for_garminView extends WatchUi.View {
         ] as Array<CalcButton>;
     }
 
-    // Scientific screen: functions, parentheses and general powers, 4 cols x 4 rows.
+    // Scientific screen: functions, parentheses and general powers, 4 cols x 5 rows.
     private function scientificButtons() as Array<CalcButton> {
         return [
             new CalcButton("sin", "func:sin"), new CalcButton("cos", "func:cos"), new CalcButton("tan", "func:tan"), new CalcButton("sqrt", "func:sqrt"),
             new CalcButton("log", "func:log"), new CalcButton("ln", "func:ln"), new CalcButton("x2", "sqr"), new CalcButton("x", "const:X"),
             new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("^", "op:^"), new CalcButton("pi", "const:π"),
-            new CalcButton("e", "const:e"), new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("BACK", "basic"),
+            new CalcButton("e", "const:e"), new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("ADV", "adv"),
+            new CalcButton("BACK", "basic"),
+        ] as Array<CalcButton>;
+    }
+
+    // Advanced screen: inverse trig, roots, integer/rounding ops and the
+    // ×10^x shortcut for entering numbers in scientific notation, 4 cols x 4 rows.
+    private function advancedButtons() as Array<CalcButton> {
+        return [
+            new CalcButton("asin", "func:asin"), new CalcButton("acos", "func:acos"), new CalcButton("atan", "func:atan"), new CalcButton("x!", "fact"),
+            new CalcButton("1/x", "inv"), new CalcButton("cbrt", "func:cbrt"), new CalcButton("|x|", "func:abs"), new CalcButton("mod", "op:mod"),
+            new CalcButton("EE", "ee"), new CalcButton("x3", "cube"), new CalcButton("floor", "func:floor"), new CalcButton("ceil", "func:ceil"),
+            new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("10x", "pow10"), new CalcButton("BACK", "sci"),
         ] as Array<CalcButton>;
     }
 
     private function layoutButtons() as Void {
-        var defs = scientific ? scientificButtons() : basicButtons();
-        var cols = scientific ? 4 : 5;
+        var defs = basicButtons();
+        var cols = 5;
         var rows = 4;
+        if (screen == SCREEN_SCIENTIFIC) {
+            defs = scientificButtons();
+            cols = 4;
+            rows = 5;
+        } else if (screen == SCREEN_ADVANCED) {
+            defs = advancedButtons();
+            cols = 4;
+            rows = 4;
+        }
 
         var headerH = (safeH * 0.24).toNumber();
         var gridTop = safeY + headerH;
@@ -130,8 +155,8 @@ class calc_for_garminView extends WatchUi.View {
         return null;
     }
 
-    function switchScreen(sci as Boolean) as Void {
-        scientific = sci;
+    function switchScreen(newScreen as Number) as Void {
+        screen = newScreen;
         selectedIndex = 0;
         layoutButtons();
     }
@@ -155,10 +180,13 @@ class calc_for_garminView extends WatchUi.View {
             engine.evaluate();
             return;
         } else if (action.equals("sci")) {
-            switchScreen(true);
+            switchScreen(SCREEN_SCIENTIFIC);
             return;
         } else if (action.equals("basic")) {
-            switchScreen(false);
+            switchScreen(SCREEN_BASIC);
+            return;
+        } else if (action.equals("adv")) {
+            switchScreen(SCREEN_ADVANCED);
             return;
         } else if (action.equals("open")) {
             engine.openParen();
@@ -168,6 +196,21 @@ class calc_for_garminView extends WatchUi.View {
             return;
         } else if (action.equals("sqr")) {
             engine.wrapSquare();
+            return;
+        } else if (action.equals("cube")) {
+            engine.wrapCube();
+            return;
+        } else if (action.equals("inv")) {
+            engine.wrapInverse();
+            return;
+        } else if (action.equals("pow10")) {
+            engine.wrapPow10();
+            return;
+        } else if (action.equals("fact")) {
+            engine.wrapFactorial();
+            return;
+        } else if (action.equals("ee")) {
+            engine.appendRaw("*10^");
             return;
         }
 
@@ -202,7 +245,7 @@ class calc_for_garminView extends WatchUi.View {
         var headerH = (safeH * 0.24).toNumber();
         dc.drawText(safeX + safeW / 2, safeY + headerH / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        var buttonFont = scientific ? Graphics.FONT_SMALL : Graphics.FONT_MEDIUM;
+        var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : Graphics.FONT_SMALL;
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];
             var isSelected = i == selectedIndex;

@@ -12,7 +12,12 @@ function testBasicScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
 
 (:test)
 function testScientificScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
-    return checkAllButtonsTappable(logger, false, true) && checkAllButtonsTappable(logger, true, true);
+    return checkAllButtonsTappable(logger, false, 1) && checkAllButtonsTappable(logger, true, 1);
+}
+
+(:test)
+function testAdvancedScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
+    return checkAllButtonsTappable(logger, false, 2) && checkAllButtonsTappable(logger, true, 2);
 }
 
 (:test)
@@ -54,10 +59,10 @@ function testDigitButtonDispatchesToEngine(logger as Test.Logger) as Boolean {
     return v.engine.displayText().equals("7");
 }
 
-function checkAllButtonsTappable(logger as Test.Logger, round as Boolean, scientific as Boolean) as Boolean {
+function checkAllButtonsTappable(logger as Test.Logger, round as Boolean, screen as Number) as Boolean {
     var v = new calc_for_garminView();
-    if (scientific) {
-        v.switchScreen(true);
+    if (screen != 0) {
+        v.switchScreen(screen);
     }
     v.layoutForSize(260, 260, round);
     var buttons = v.getButtons();

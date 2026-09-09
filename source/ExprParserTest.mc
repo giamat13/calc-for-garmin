@@ -121,6 +121,49 @@ function testNonlinearEquationErrors(logger as Test.Logger) as Boolean {
     return true;
 }
 
+(:test)
+function testMod(logger as Test.Logger) as Boolean {
+    var p = new ExprParser("7mod3", 0.0d);
+    var v = p.parse();
+    return !p.error && near(v, 1.0d, logger);
+}
+
+(:test)
+function testInverseTrig(logger as Test.Logger) as Boolean {
+    var p = new ExprParser("asin(1)", 0.0d);
+    var v = p.parse();
+    return !p.error && near(v, 90.0d, logger);
+}
+
+(:test)
+function testCbrtAndAbs(logger as Test.Logger) as Boolean {
+    var p = new ExprParser("cbrt(-8)+abs(-3)", 0.0d);
+    var v = p.parse();
+    return !p.error && near(v, 1.0d, logger);
+}
+
+(:test)
+function testFloorCeil(logger as Test.Logger) as Boolean {
+    var p = new ExprParser("floor(2.7)+ceil(2.1)", 0.0d);
+    var v = p.parse();
+    return !p.error && near(v, 5.0d, logger);
+}
+
+(:test)
+function testFactorial(logger as Test.Logger) as Boolean {
+    var p = new ExprParser("fact(5)", 0.0d);
+    var v = p.parse();
+    return !p.error && near(v, 120.0d, logger);
+}
+
+(:test)
+function testScientificNotationEntry(logger as Test.Logger) as Boolean {
+    // What the "EE" button produces: 1.5*10^3 = 1500
+    var p = new ExprParser("1.5*10^3", 0.0d);
+    var v = p.parse();
+    return !p.error && near(v, 1500.0d, logger);
+}
+
 function near(a as Double, b as Double, logger as Test.Logger) as Boolean {
     var d = a - b;
     if (d < 0.0d) {
