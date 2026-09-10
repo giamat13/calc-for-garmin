@@ -192,25 +192,53 @@ class calc_for_garminView extends WatchUi.View {
         }
     }
 
+    // Maps one SeedConfig.basicLayout token to the button it represents.
+    private function basicButtonFor(token as String) as CalcButton {
+        if (token.equals("c")) {
+            return new CalcButton("C", "clear");
+        } else if (token.equals("del")) {
+            return new CalcButton("DEL", "back");
+        } else if (token.equals("pct")) {
+            return new CalcButton("%", "op:%");
+        } else if (token.equals("div")) {
+            return new CalcButton("/", "op:/");
+        } else if (token.equals("mul")) {
+            return new CalcButton("*", "op:*");
+        } else if (token.equals("sub")) {
+            return new CalcButton("-", "op:-");
+        } else if (token.equals("add")) {
+            return new CalcButton("+", "op:+");
+        } else if (token.equals("dot")) {
+            return new CalcButton(".", "digit:.");
+        } else if (token.equals("eq")) {
+            return new CalcButton("=", "equals");
+        } else if (token.equals("menu")) {
+            return new CalcButton("MENU", "menu");
+        }
+        return new CalcButton(token, "digit:" + token);
+    }
+
     // Home screen: a plain, familiar 4-function calculator - digits, the
     // four operators, %, C/DEL and "=". No cursor arrows, parens, Ans or
     // variables here; those live one tap away on the Scientific screen via
     // MENU, so someone who only ever wants basic arithmetic never sees them.
-    // 4 cols x 5 rows.
+    // Which button sits in which of the 20 cells comes from SeedConfig
+    // (set via the setup web page's SEED code). 4 cols x 5 rows.
     private function basicButtons() as Array<CalcButton> {
-        return [
-            new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("%", "op:%"), new CalcButton("/", "op:/"),
-            new CalcButton("1", "digit:1"), new CalcButton("2", "digit:2"), new CalcButton("3", "digit:3"), new CalcButton("*", "op:*"),
-            new CalcButton("4", "digit:4"), new CalcButton("5", "digit:5"), new CalcButton("6", "digit:6"), new CalcButton("-", "op:-"),
-            new CalcButton("7", "digit:7"), new CalcButton("8", "digit:8"), new CalcButton("9", "digit:9"), new CalcButton("+", "op:+"),
-            new CalcButton("MENU", "menu"), new CalcButton("0", "digit:0"), new CalcButton(".", "digit:."), new CalcButton("=", "equals"),
-        ] as Array<CalcButton>;
+        var tokens = SeedConfig.get().basicLayout;
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < tokens.size(); i++) {
+            defs.add(basicButtonFor(tokens[i]));
+        }
+        return defs;
     }
 
     // Tool hub: every advanced tool is one tap away from here instead of
     // paged through in sequence. Which tools appear and in what order
     // comes from SeedConfig (set via the setup web page's SEED code);
-    // "Setup" and "BACK" are always appended. 2 cols x 4 rows.
+    // "BACK" is always appended. Setup is NOT one of these - it's a small
+    // corner button laid out separately (see layoutButtons()) so it never
+    // competes for attention with the actual tools. 2 cols x 4 rows.
     private function menuButtons() as Array<CalcButton> {
         var items = SeedConfig.get().menuItems;
         var defs = [] as Array<CalcButton>;
@@ -228,7 +256,6 @@ class calc_for_garminView extends WatchUi.View {
                 defs.add(new CalcButton("VAR", "var"));
             }
         }
-        defs.add(new CalcButton("Setup", "setup"));
         defs.add(new CalcButton("BACK", "basic"));
         return defs;
     }
@@ -586,6 +613,18 @@ class calc_for_garminView extends WatchUi.View {
                 b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
             }
             others.add(b);
+        }
+        // Setup is a small, deliberately out-of-the-way corner button on
+        // the MENU screen (not a grid cell) so it never reads as one of
+        // the actual tools.
+        if (screen == SCREEN_MENU) {
+            var setupSize = (headerH * 0.5).toNumber();
+            var setupBtn = new CalcButton("SET", "setup");
+            setupBtn.x = safeX + 4;
+            setupBtn.y = safeY + 4;
+            setupBtn.w = setupSize;
+            setupBtn.h = setupSize;
+            others.add(setupBtn);
         }
         buttons = others;
         if (selectedIndex >= buttons.size()) {
@@ -1109,21 +1148,25 @@ class calc_for_garminView extends WatchUi.View {
     // you what kind of thing it does: digits are neutral, math operators
     // amber, destructive actions coral, "=" green, navigation/menu purple,
     // scientific functions teal, everything else utility blue.
-    // The 5 theme-able accents (digit/op/equals/destructive/nav) come from
-    // SeedConfig - the stock look until the setup web page's SEED code is
-    // pasted into this app's Connect IQ settings. See refreshTheme().
+    // The 6 theme-able colors (digit/op/equals/destructive/nav/background)
+    // come from SeedConfig - the stock look until the setup web page's
+    // SEED code is pasted into this app's Connect IQ settings. See
+    // refreshTheme().
     private var ACCENT_DIGIT = 0x23233A;
     private var ACCENT_OP = 0xFFB020;
     private var ACCENT_EQUALS = 0x00D68F;
     private var ACCENT_DESTRUCTIVE = 0xFF5470;
     private var ACCENT_NAV = 0x7C4DFF;
+    private var BG_TOP = 0x14141F;
     private const ACCENT_FUNC = 0x00BBD3;
     private const ACCENT_UTILITY = 0x4C6FFF;
     private const ACCENT_SELECT_RING = 0x00E5FF;
     private const ACCENT_FROM_UNIT = 0xFFD166;
-    private const BG_TOP = 0x14141F;
+    // Setup is a secondary/admin action, not a tool - deliberately muted
+    // so it doesn't compete with the actual tools in the MENU screen.
+    private const ACCENT_SETUP = 0x2A2A38;
 
-    // Re-reads the 5 accent colors from SeedConfig; call on launch and
+    // Re-reads the 6 theme colors from SeedConfig; call on launch and
     // whenever the phone's Settings UI may have changed the pasted SEED.
     function refreshTheme() as Void {
         var colors = SeedConfig.get().colors;
@@ -1132,6 +1175,7 @@ class calc_for_garminView extends WatchUi.View {
         ACCENT_EQUALS = colors[2];
         ACCENT_DESTRUCTIVE = colors[3];
         ACCENT_NAV = colors[4];
+        BG_TOP = colors[5];
     }
 
     private function buttonColor(action as String) as Number {
@@ -1139,6 +1183,8 @@ class calc_for_garminView extends WatchUi.View {
             return ACCENT_EQUALS;
         } else if (action.equals("clear") || action.equals("back") || action.equals("varClear")) {
             return ACCENT_DESTRUCTIVE;
+        } else if (action.equals("setup")) {
+            return ACCENT_SETUP;
         } else if (action.equals("menu") || action.find("Back") != null || action.equals("basic")) {
             return ACCENT_NAV;
         } else if (action.find("digit:") == 0) {
@@ -1255,7 +1301,8 @@ class calc_for_garminView extends WatchUi.View {
                 // Every other basic-screen button is a single character;
                 // "MENU" is the one long label there and needs its own
                 // smaller font so it doesn't overflow its cell.
-                var labelFont = (screen == SCREEN_BASIC && b.label.equals("MENU")) ? Graphics.FONT_XTINY : buttonFont;
+                var labelFont = (b.action.equals("setup") || (screen == SCREEN_BASIC && b.label.equals("MENU"))) ?
+                    Graphics.FONT_XTINY : buttonFont;
                 dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
                 dc.drawText(b.x + b.w / 2, b.y + b.h / 2, labelFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             }
