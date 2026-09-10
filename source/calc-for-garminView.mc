@@ -30,6 +30,8 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_ADVANCED = 2;
     const SCREEN_UNITS = 3;       // category picker: weight / distance / temp / ...
     const SCREEN_UNIT_PICK = 4;   // unit picker for the chosen category
+    const SCREEN_CUR_LETTER = 5;  // currency autocomplete: pick a first letter
+    const SCREEN_CUR_RESULTS = 6; // currency autocomplete: matching codes for that letter
 
     var engine as CalculatorEngine = new CalculatorEngine();
     var screen as Number = SCREEN_BASIC;
@@ -55,6 +57,10 @@ class calc_for_garminView extends WatchUi.View {
         "AUD" => 1.52d,
     } as Dictionary<String, Double>;
     private var currencyRates as Dictionary<String, Double> = DEFAULT_CURRENCY_RATES;
+
+    // Currency autocomplete: after picking a first letter, the matching
+    // codes for it are shown as buttons on SCREEN_CUR_RESULTS.
+    private var curMatches as Array<String> = [] as Array<String>;
 
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
@@ -93,9 +99,12 @@ class calc_for_garminView extends WatchUi.View {
             return;
         }
         rates = rates as Dictionary;
+        // Store every currency the API knows about, not just the quick-pick
+        // shortcuts, so "OTHER" autocomplete can reach any of them.
+        var rateKeys = (rates as Dictionary).keys();
         var fresh = {} as Dictionary<String, Double>;
-        for (var i = 0; i < CURRENCY_KEYS.size(); i++) {
-            var key = CURRENCY_KEYS[i];
+        for (var i = 0; i < rateKeys.size(); i++) {
+            var key = rateKeys[i] as String;
             var r = rates[key];
             if (r != null) {
                 fresh[key] = (r as Numeric).toDouble();
@@ -235,8 +244,70 @@ class calc_for_garminView extends WatchUi.View {
         for (var i = 0; i < keys.size(); i++) {
             defs.add(new CalcButton(unitLabel(keys[i]), "unit:" + keys[i]));
         }
+        // Currency has far more codes than fit on screen at once, so beyond
+        // the quick-pick shortcuts, OTHER opens a letter-narrowed search
+        // over every code the last successful rate fetch returned.
+        if (unitCategory.equals("cur")) {
+            defs.add(new CalcButton("OTHER", "curOther"));
+        }
         defs.add(new CalcButton("C", "clear"));
         defs.add(new CalcButton("BACK", "units"));
+        return defs;
+    }
+
+    // First letters of every known currency code, sorted, for the
+    // autocomplete letter screen.
+    private function currencyLetters() as Array<String> {
+        var seen = {} as Dictionary<String, Boolean>;
+        var letters = [] as Array<String>;
+        var keys = currencyRates.keys();
+        for (var i = 0; i < keys.size(); i++) {
+            var k = keys[i] as String;
+            if (k.length() == 0) {
+                continue;
+            }
+            var letter = k.substring(0, 1) as String;
+            if (!seen.hasKey(letter)) {
+                seen[letter] = true;
+                letters.add(letter);
+            }
+        }
+        letters.sort(null);
+        return letters;
+    }
+
+    private function curLetterButtons() as Array<CalcButton> {
+        var letters = currencyLetters();
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < letters.size(); i++) {
+            defs.add(new CalcButton(letters[i], "curletter:" + letters[i]));
+        }
+        defs.add(new CalcButton("BACK", "curLetterBack"));
+        return defs;
+    }
+
+    // Currency codes starting with the chosen letter; reuses the same
+    // "unit:" action as the quick-pick buttons, so selecting one feeds
+    // straight back into handleUnitTap()'s two-step FROM/TO flow.
+    private function currencyCodesStartingWith(prefix as String) as Array<String> {
+        var out = [] as Array<String>;
+        var keys = currencyRates.keys();
+        for (var i = 0; i < keys.size(); i++) {
+            var k = keys[i] as String;
+            if (k.find(prefix) == 0) {
+                out.add(k);
+            }
+        }
+        out.sort(null);
+        return out;
+    }
+
+    private function curResultButtons() as Array<CalcButton> {
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < curMatches.size(); i++) {
+            defs.add(new CalcButton(curMatches[i], "unit:" + curMatches[i]));
+        }
+        defs.add(new CalcButton("BACK", "curResultsBack"));
         return defs;
     }
 
@@ -258,6 +329,14 @@ class calc_for_garminView extends WatchUi.View {
             rows = 4;
         } else if (screen == SCREEN_UNIT_PICK) {
             defs = unitPickButtons();
+            cols = 2;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_CUR_LETTER) {
+            defs = curLetterButtons();
+            cols = 5;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_CUR_RESULTS) {
+            defs = curResultButtons();
             cols = 2;
             rows = (defs.size() + cols - 1) / cols;
         }
@@ -301,6 +380,15 @@ class calc_for_garminView extends WatchUi.View {
         screen = newScreen;
         selectedIndex = 0;
         fromUnitKey = null;
+        layoutButtons();
+    }
+
+    // Like switchScreen, but keeps fromUnitKey/unitCategory - used to
+    // navigate within the currency autocomplete flow (letter -> results ->
+    // back to the unit picker) without losing an in-progress FROM/TO pick.
+    function goToScreen(newScreen as Number) as Void {
+        screen = newScreen;
+        selectedIndex = 0;
         layoutButtons();
     }
 
@@ -359,6 +447,15 @@ class calc_for_garminView extends WatchUi.View {
         } else if (action.equals("ee")) {
             engine.appendRaw("*10^");
             return;
+        } else if (action.equals("curOther")) {
+            goToScreen(SCREEN_CUR_LETTER);
+            return;
+        } else if (action.equals("curLetterBack")) {
+            goToScreen(SCREEN_UNIT_PICK);
+            return;
+        } else if (action.equals("curResultsBack")) {
+            goToScreen(SCREEN_CUR_LETTER);
+            return;
         }
 
         var idxOrNull = action.find(":");
@@ -384,6 +481,19 @@ class calc_for_garminView extends WatchUi.View {
             }
         } else if (prefix.equals("unit")) {
             handleUnitTap(value);
+            if (screen != SCREEN_UNIT_PICK) {
+                goToScreen(SCREEN_UNIT_PICK);
+            }
+        } else if (prefix.equals("curletter")) {
+            curMatches = currencyCodesStartingWith(value);
+            if (curMatches.size() == 1) {
+                handleUnitTap(curMatches[0]);
+                goToScreen(SCREEN_UNIT_PICK);
+            } else if (curMatches.size() == 0) {
+                goToScreen(SCREEN_UNIT_PICK);
+            } else {
+                goToScreen(SCREEN_CUR_RESULTS);
+            }
         }
     }
 
@@ -474,7 +584,7 @@ class calc_for_garminView extends WatchUi.View {
         // While picking the unit converter's target unit, show what's been
         // picked so far instead of the raw expression, so the two-tap flow
         // ("source unit, then target unit") is self-explanatory.
-        if (screen == SCREEN_UNIT_PICK && fromUnitKey != null) {
+        if ((screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS) && fromUnitKey != null) {
             text = "FROM " + unitLabel(fromUnitKey as String) + "...";
         }
         // Regular text fonts, not FONT_NUMBER_*: the expression can contain
@@ -484,7 +594,8 @@ class calc_for_garminView extends WatchUi.View {
         var headerH = (safeH * 0.24).toNumber();
         dc.drawText(safeX + safeW / 2, safeY + headerH / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
+        var isUnitScreen = screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS;
+        var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (isUnitScreen ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];
             var isSelected = i == selectedIndex;

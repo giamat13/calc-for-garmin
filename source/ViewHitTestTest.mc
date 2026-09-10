@@ -83,6 +83,40 @@ function testCurrencyConversionUsesInjectedRates(logger as Test.Logger) as Boole
     return true;
 }
 
+// The "OTHER" autocomplete flow (letter -> matching codes -> pick) must
+// preserve an in-progress FROM pick across screen changes, since goToScreen
+// (unlike switchScreen) is used precisely to avoid losing it.
+(:test)
+function testCurrencyAutocompletePreservesFromPick(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.setCurrencyRatesForTest({
+        "USD" => 1.0d,
+        "EUR" => 0.5d,
+        "GBP" => 0.4d,
+    } as Dictionary<String, Double>);
+    v.activate(new CalcButton("CUR", "cat:cur"));
+    v.engine.appendDigit("2");
+    v.engine.appendDigit("0");
+    v.activate(new CalcButton("USD", "unit:USD"));       // FROM = USD
+    v.activate(new CalcButton("OTHER", "curOther"));      // -> letter screen
+    if (v.screen != v.SCREEN_CUR_LETTER) {
+        logger.debug("expected SCREEN_CUR_LETTER after OTHER, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("G", "curletter:G"));       // single match -> GBP auto-selected
+    var got = v.engine.displayText();
+    if (!got.equals("8")) {
+        logger.debug("20 USD at 0.4 GBP/USD should convert to 8, got " + got);
+        return false;
+    }
+    if (v.screen != v.SCREEN_UNIT_PICK) {
+        logger.debug("expected to land back on SCREEN_UNIT_PICK, got " + v.screen);
+        return false;
+    }
+    return true;
+}
+
 function checkAllButtonsTappable(logger as Test.Logger, round as Boolean, screen as Number) as Boolean {
     var v = new calc_for_garminView();
     if (screen != 0) {
