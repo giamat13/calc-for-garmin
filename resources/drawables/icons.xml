@@ -22,4 +22,7 @@
     <bitmap id="ic_plus" filename="icons/plus.svg" scaleX="8%" scaleY="8%" dithering="none"/>
     <bitmap id="ic_next" filename="icons/next.svg" scaleX="8%" scaleY="8%" dithering="none"/>
     <bitmap id="ic_go" filename="icons/go.svg" scaleX="8%" scaleY="8%" dithering="none"/>
+    <bitmap id="ic_larr" filename="icons/larr.svg" scaleX="8%" scaleY="8%" dithering="none"/>
+    <bitmap id="ic_rarr" filename="icons/rarr.svg" scaleX="8%" scaleY="8%" dithering="none"/>
+    <bitmap id="ic_pi" filename="icons/pi.svg" scaleX="8%" scaleY="8%" dithering="none"/>
 </resources>

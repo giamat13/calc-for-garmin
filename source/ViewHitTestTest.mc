@@ -23,7 +23,8 @@ function testAdvancedScreenButtonsAreTappable(logger as Test.Logger) as Boolean 
 (:test)
 function testUnitCategoryAndTipScreensAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 3) && checkAllButtonsTappable(logger, true, 3) &&
-        checkAllButtonsTappable(logger, false, 8) && checkAllButtonsTappable(logger, true, 8);
+        checkAllButtonsTappable(logger, false, 8) && checkAllButtonsTappable(logger, true, 8) &&
+        checkAllButtonsTappable(logger, false, 9) && checkAllButtonsTappable(logger, true, 9);
 }
 
 // Presses a sequence of actions, then checks what the display shows.
@@ -39,22 +40,31 @@ function pressAndExpect(logger as Test.Logger, v as calc_for_garminView, actions
     return true;
 }
 
+// STO stores the typed value under a name (and shows it back, like "=");
+// RCL splices it in at the cursor, so A/B become normal formula building
+// blocks - e.g. "A+B".
 (:test)
-function testMemoryAddSubtractRecall(logger as Test.Logger) as Boolean {
+function testVariableStoreRecallAndUseInExpression(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
-    return pressAndExpect(logger, v, ["digit:5", "memAdd", "clear", "digit:3", "memAdd", "clear", "digit:2", "memSub", "clear", "memRecall"], "6") &&
-        pressAndExpect(logger, v, ["op:*", "digit:2", "equals"], "12") &&
-        pressAndExpect(logger, v, ["memClear", "clear", "memRecall"], "0");
+    return pressAndExpect(logger, v, ["clear", "digit:5", "sto:A"], "5") &&
+        pressAndExpect(logger, v, ["clear", "digit:3", "sto:B"], "3") &&
+        pressAndExpect(logger, v, ["clear", "rcl:A", "op:+", "rcl:B", "equals"], "8") &&
+        pressAndExpect(logger, v, ["clear", "varClear", "rcl:A"], "0");
 }
 
-// 100 + 10% tip split 2 ways = 55 each; per-person stays in the engine.
+// RND/TIP/converter are "embedded flows": whatever's already typed (here
+// "1+") is stashed while the flow runs on a blank slate, then its result is
+// spliced back in exactly where the flow was entered - so a tip split can
+// be part of a bigger formula instead of a dead end. 100 + 10% tip split 2
+// ways = 55 each -> "1+55".
 (:test)
-function testTipSplit(logger as Test.Logger) as Boolean {
+function testTipSplitEmbedsResultAtCursor(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
-    return pressAndExpect(logger, v, ["digit:1", "digit:0", "digit:0", "tip", "tipNext", "digit:1", "digit:0", "tipNext", "digit:2", "tipGo"], "55") &&
-        pressAndExpect(logger, v, ["tipBack"], "55");
+    return pressAndExpect(logger, v,
+        ["clear", "digit:1", "op:+", "tip", "digit:1", "digit:0", "digit:0", "tipNext", "digit:1", "digit:0", "tipNext", "digit:2", "tipGo"],
+        "1+55");
 }
 
 // 12 kph is a 5:00/km pace, and the "m:ss" result converts back.
@@ -70,9 +80,9 @@ function testPaceConvertsBothWays(logger as Test.Logger) as Boolean {
 function testNewUnitCategories(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
-    return pressAndExpect(logger, v, ["cat:area", "digit:1", "unit:ha", "unit:m2"], "10000") &&
-        pressAndExpect(logger, v, ["units", "cat:time", "clear", "digit:2", "unit:hr", "unit:min"], "120") &&
-        pressAndExpect(logger, v, ["units", "cat:temp", "clear", "digit:0", "unit:c", "unit:K"], "273.15");
+    return pressAndExpect(logger, v, ["clear", "cat:area", "digit:1", "unit:ha", "unit:m2"], "10000") &&
+        pressAndExpect(logger, v, ["clear", "units", "cat:time", "digit:2", "unit:hr", "unit:min"], "120") &&
+        pressAndExpect(logger, v, ["clear", "units", "cat:temp", "digit:0", "unit:c", "unit:K"], "273.15");
 }
 
 (:test)
@@ -165,8 +175,11 @@ function testCurrencyAutocompletePreservesFromPick(logger as Test.Logger) as Boo
         logger.debug("20 USD at 0.4 GBP/USD should convert to 8, got " + got);
         return false;
     }
-    if (v.screen != v.SCREEN_UNIT_PICK) {
-        logger.debug("expected to land back on SCREEN_UNIT_PICK, got " + v.screen);
+    // A completed conversion now exits the flow and splices the result back
+    // into the (empty, here) expression that was active before OTHER was
+    // pressed, landing on the basic screen rather than staying on the picker.
+    if (v.screen != v.SCREEN_BASIC) {
+        logger.debug("expected to land back on SCREEN_BASIC, got " + v.screen);
         return false;
     }
     return true;

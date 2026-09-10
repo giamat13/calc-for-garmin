@@ -64,6 +64,10 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
                 view.switchScreen(view.SCREEN_SCIENTIFIC);
                 WatchUi.requestUpdate();
                 return true;
+            } else if (view.screen == view.SCREEN_VAR) {
+                view.switchScreen(view.SCREEN_ADVANCED);
+                WatchUi.requestUpdate();
+                return true;
             } else if (view.screen != view.SCREEN_BASIC) {
                 view.switchScreen(view.screen - 1);
                 WatchUi.requestUpdate();

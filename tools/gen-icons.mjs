@@ -3,9 +3,10 @@
 // table below. Run after changing it:  node tools/gen-icons.mjs
 //
 // Only buttons WITHOUT a conventional written form get an icon (DEL, BACK,
-// unit categories, dice, tip, ...). Digits, operators (+ - × ÷ % =), math
-// notation (sin, log, x², √, π, M+, ...) and unit/currency codes stay text -
-// that IS their standard notation, an icon would be less readable, not more.
+// unit categories, dice, tip, cursor arrows, ...) - plus π, requested as an
+// icon since its glyph renders inconsistently as plain text on-device.
+// Digits, operators (+ - × ÷ % =), math notation (sin, log, x², √, M+, ...)
+// and unit/currency codes stay text - that IS their standard notation.
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +40,9 @@ const ICONS = [
   ['plus', ['randNewRange', 'tipNew'], { d: 'M12 4 L12 20 M4 12 L20 12' }],
   ['next', ['randNext', 'tipNext'], { d: 'M4 12 L19 12 M13 6 L19 12 L13 18' }],
   ['go', 'tipGo', { d: 'M4 12.5 L9.5 18 L20 6' }],
+  ['larr', 'curLeft', { d: 'M15 4 L7 12 L15 20' }],
+  ['rarr', 'curRight', { d: 'M9 4 L17 12 L9 20' }],
+  ['pi', 'const:π', { d: 'M4 8 L20 8 M8 8 L7 20 M15 8 L15 17 Q15 20 18 19.6' }],
 ];
 
 const r = (n) => +n.toFixed(2);

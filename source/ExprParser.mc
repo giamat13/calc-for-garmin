@@ -10,14 +10,18 @@ class ExprParser {
     private var len as Number;
     private var pos as Number = 0;
     private var xValue as Double;
+    // Named variables (A, B, C, D - see CalculatorEngine.variables), usable
+    // directly in a formula like a constant, e.g. "A+B*2".
+    private var variables as Dictionary<String, Double>;
     var error as Boolean = false;
 
     private const E = 2.718281828459045d;
 
-    function initialize(str as String, xVal as Double) {
+    function initialize(str as String, xVal as Double, vars as Dictionary<String, Double>) {
         s = str;
         len = s.length();
         xValue = xVal;
+        variables = vars;
     }
 
     function parse() as Double {
@@ -177,6 +181,9 @@ class ExprParser {
             }
             if (lower.equals("x")) {
                 return xValue;
+            }
+            if (variables.hasKey(ident)) {
+                return variables[ident] as Double;
             }
             if (!peek().equals("(")) {
                 error = true;

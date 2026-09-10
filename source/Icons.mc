@@ -33,6 +33,9 @@ function iconFor(action as String, label as String) as ResourceId? {
         "randNext" => Rez.Drawables.ic_next,
         "tipNext" => Rez.Drawables.ic_next,
         "tipGo" => Rez.Drawables.ic_go,
+        "curLeft" => Rez.Drawables.ic_larr,
+        "curRight" => Rez.Drawables.ic_rarr,
+        "const:π" => Rez.Drawables.ic_pi,
     };
     return ids[action];
 }

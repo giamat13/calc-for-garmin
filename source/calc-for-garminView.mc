@@ -37,6 +37,15 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_CUR_RESULTS = 6; // currency autocomplete: matching codes for that letter
     const SCREEN_RANDOM = 7;      // random number generator: pick a range, then roll
     const SCREEN_TIP = 8;         // tip & bill split: bill, tip %, people -> each
+    const SCREEN_VAR = 9;         // named variables: store/recall A/B/C/D
+
+    // Random/tip/unit-conversion are "embedded flows": the expression being
+    // built (e.g. "1+") is stashed here while a temporary value is entered
+    // on a different screen, then the flow's result is spliced back in at
+    // the same cursor position - e.g. "1+" -> RND -> "1+7". Null when no
+    // such flow is in progress. See enterEmbeddedFlow()/exitEmbeddedFlow().
+    private var pendingExpr as String? = null;
+    private var pendingCursor as Number = 0;
 
     var engine as CalculatorEngine = new CalculatorEngine();
     var screen as Number = SCREEN_BASIC;
@@ -68,21 +77,19 @@ class calc_for_garminView extends WatchUi.View {
     private var curMatches as Array<String> = [] as Array<String>;
 
     // Random number generator state. randStage: 0 = entering MIN, 1 =
-    // entering MAX, 2 = showing a rolled result (with AGAIN/NEW/BACK).
-    // Bounds are stored as whatever was typed (via the engine's own
-    // expression parser, so "3+4" or "-5" work), then rounded to whole
-    // numbers when rolling.
+    // entering MAX. Bounds are stored as whatever was typed (via the
+    // engine's own expression parser, so "3+4" or "-5" work), then rounded
+    // to whole numbers when rolling. GEN immediately splices the roll back
+    // into the pending expression (see enterEmbeddedFlow()).
     private var randStage as Number = 0;
     private var randMin as Double = 0.0d;
     private var randMax as Double = 0.0d;
 
-    // Tip/split state. tipStage: 0 = BILL, 1 = TIP %, 2 = PEOPLE, 3 = result.
-    // The per-person amount lands in the engine, so BACK -> UC -> CUR can
-    // convert it straight away.
+    // Tip/split state. tipStage: 0 = BILL, 1 = TIP %, 2 = PEOPLE. GO
+    // immediately splices the per-person amount into the pending expression.
     private var tipStage as Number = 0;
     private var tipBill as Double = 0.0d;
     private var tipPct as Double = 0.0d;
-    private var tipTotal as Double = 0.0d;
 
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
@@ -179,13 +186,16 @@ class calc_for_garminView extends WatchUi.View {
         }
     }
 
-    // Basic screen: everything needed for everyday arithmetic, 5 cols x 4 rows.
+    // Basic screen: everything needed for everyday arithmetic, plus cursor
+    // arrows (needed to insert a random/tip/converted value mid-expression)
+    // and parens, 5 cols x 5 rows.
     private function basicButtons() as Array<CalcButton> {
         return [
             new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("%", "op:%"), new CalcButton("/", "op:/"), new CalcButton("fx", "sci"),
             new CalcButton("7", "digit:7"), new CalcButton("8", "digit:8"), new CalcButton("9", "digit:9"), new CalcButton("*", "op:*"), new CalcButton(".", "digit:."),
             new CalcButton("4", "digit:4"), new CalcButton("5", "digit:5"), new CalcButton("6", "digit:6"), new CalcButton("-", "op:-"), new CalcButton("0", "digit:0"),
             new CalcButton("1", "digit:1"), new CalcButton("2", "digit:2"), new CalcButton("3", "digit:3"), new CalcButton("+", "op:+"), new CalcButton("=", "equals"),
+            new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("<", "curLeft"), new CalcButton(">", "curRight"),
         ] as Array<CalcButton>;
     }
 
@@ -201,16 +211,29 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     // Advanced screen: inverse trig, roots, integer/rounding ops and the
-    // ×10^x shortcut for entering numbers in scientific notation, plus the
-    // memory keys, 4 cols x 5 rows.
+    // ×10^x shortcut for entering numbers in scientific notation, 4 cols x 5 rows.
     private function advancedButtons() as Array<CalcButton> {
         return [
             new CalcButton("asin", "func:asin"), new CalcButton("acos", "func:acos"), new CalcButton("atan", "func:atan"), new CalcButton("x!", "fact"),
             new CalcButton("1/x", "inv"), new CalcButton("cbrt", "func:cbrt"), new CalcButton("|x|", "func:abs"), new CalcButton("mod", "op:mod"),
             new CalcButton("EE", "ee"), new CalcButton("x3", "cube"), new CalcButton("floor", "func:floor"), new CalcButton("ceil", "func:ceil"),
-            new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("10x", "pow10"), new CalcButton("BACK", "sci"),
-            new CalcButton("M+", "memAdd"), new CalcButton("M-", "memSub"), new CalcButton("MR", "memRecall"), new CalcButton("MC", "memClear"),
+            new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("10x", "pow10"), new CalcButton("VAR", "var"),
+            new CalcButton("BACK", "sci"),
         ] as Array<CalcButton>;
+    }
+
+    // Named-variable screen: store the currently typed value under A/B/C/D,
+    // or recall one back into the expression at the cursor. 2 cols x 5 rows.
+    private function varButtons() as Array<CalcButton> {
+        var defs = [] as Array<CalcButton>;
+        var names = ["A", "B", "C", "D"];
+        for (var i = 0; i < names.size(); i++) {
+            defs.add(new CalcButton("STO " + names[i], "sto:" + names[i]));
+            defs.add(new CalcButton("RCL " + names[i], "rcl:" + names[i]));
+        }
+        defs.add(new CalcButton("CLR", "varClear"));
+        defs.add(new CalcButton("BACK", "varBack"));
+        return defs;
     }
 
     // Step 1 of the unit converter: pick WHAT to measure. 3 cols x 4 rows.
@@ -298,7 +321,7 @@ class calc_for_garminView extends WatchUi.View {
             defs.add(new CalcButton("OTHER", "curOther"));
         }
         defs.add(new CalcButton("C", "clear"));
-        defs.add(new CalcButton("BACK", "units"));
+        defs.add(new CalcButton("BACK", "unitCatBack"));
         return defs;
     }
 
@@ -386,30 +409,17 @@ class calc_for_garminView extends WatchUi.View {
         return defs;
     }
 
-    // Random screen: stage 0/1 is a compact numeric keypad for typing MIN
-    // then MAX (reuses the same "digit:"/"op:-"/"back"/"clear" actions the
-    // main keypad already handles); stage 2 shows the rolled result with
-    // options to roll again, pick a new range, or leave.
+    // Random screen: a compact numeric keypad for typing MIN then MAX
+    // (reuses the same "digit:"/"op:-"/"back"/"clear" actions the main
+    // keypad already handles). GEN splices the roll straight into whatever
+    // expression was being built and returns to it - see enterEmbeddedFlow().
     private function randomButtons() as Array<CalcButton> {
-        if (randStage == 2) {
-            return [
-                new CalcButton("AGAIN", "randAgain"),
-                new CalcButton("NEW", "randNewRange"),
-                new CalcButton("BACK", "randBack"),
-            ] as Array<CalcButton>;
-        }
         return keypadButtons("randBack", randStage == 0 ? "NEXT" : "GEN", randStage == 0 ? "randNext" : "randGen");
     }
 
-    // Tip screen: same keypad for BILL / TIP % / PEOPLE, then the result
-    // (total + per person in the header) with NEW / BACK.
+    // Tip screen: same keypad for BILL / TIP % / PEOPLE. GO splices the
+    // per-person amount back into the pending expression.
     private function tipButtons() as Array<CalcButton> {
-        if (tipStage == 3) {
-            return [
-                new CalcButton("NEW", "tipNew"),
-                new CalcButton("BACK", "tipBack"),
-            ] as Array<CalcButton>;
-        }
         return keypadButtons("tipBack", tipStage == 2 ? "GO" : "NEXT", tipStage == 2 ? "tipGo" : "tipNext");
     }
 
@@ -438,7 +448,7 @@ class calc_for_garminView extends WatchUi.View {
     private function layoutButtons() as Void {
         var defs = basicButtons();
         var cols = 5;
-        var rows = 4;
+        var rows = 5;
         if (screen == SCREEN_SCIENTIFIC) {
             defs = scientificButtons();
             cols = 4;
@@ -466,11 +476,15 @@ class calc_for_garminView extends WatchUi.View {
             rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_RANDOM) {
             defs = randomButtons();
-            cols = randStage == 2 ? 1 : 4;
+            cols = 4;
             rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_TIP) {
             defs = tipButtons();
-            cols = tipStage == 3 ? 1 : 4;
+            cols = 4;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_VAR) {
+            defs = varButtons();
+            cols = 2;
             rows = (defs.size() + cols - 1) / cols;
         }
 
@@ -514,10 +528,42 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     function switchScreen(newScreen as Number) as Void {
+        // Leaving to a "real" calculator screen exits any embedded flow
+        // (random/tip/unit conversion) still in progress; a successful
+        // completion already called exitEmbeddedFlow() itself before
+        // getting here, so this is then a no-op (pendingExpr is null).
+        if (pendingExpr != null && (newScreen == SCREEN_BASIC || newScreen == SCREEN_SCIENTIFIC || newScreen == SCREEN_ADVANCED)) {
+            exitEmbeddedFlow(null);
+        }
         screen = newScreen;
         selectedIndex = 0;
         fromUnitKey = null;
         layoutButtons();
+    }
+
+    // Stashes the expression being built so a temporary value can be typed
+    // on another screen (random range, tip inputs, a value to convert)
+    // without losing it; see exitEmbeddedFlow().
+    private function enterEmbeddedFlow() as Void {
+        pendingExpr = engine.expr;
+        pendingCursor = engine.cursorPos;
+        engine.clear();
+    }
+
+    // Restores the expression stashed by enterEmbeddedFlow(), optionally
+    // splicing text in at the point where the flow was entered. A no-op if
+    // no flow is in progress (so it's safe to call unconditionally on any
+    // "exit" action).
+    private function exitEmbeddedFlow(insertText as String?) as Void {
+        if (pendingExpr == null) {
+            return;
+        }
+        engine.expr = pendingExpr as String;
+        engine.cursorPos = pendingCursor;
+        if (insertText != null) {
+            engine.insertRaw(insertText as String);
+        }
+        pendingExpr = null;
     }
 
     // Like switchScreen, but keeps fromUnitKey/unitCategory - used to
@@ -558,7 +604,26 @@ class calc_for_garminView extends WatchUi.View {
             switchScreen(SCREEN_ADVANCED);
             return;
         } else if (action.equals("units")) {
+            enterEmbeddedFlow();
             switchScreen(SCREEN_UNITS);
+            return;
+        } else if (action.equals("unitCatBack")) {
+            switchScreen(SCREEN_UNITS);
+            return;
+        } else if (action.equals("curLeft")) {
+            engine.moveCursorLeft();
+            return;
+        } else if (action.equals("curRight")) {
+            engine.moveCursorRight();
+            return;
+        } else if (action.equals("var")) {
+            switchScreen(SCREEN_VAR);
+            return;
+        } else if (action.equals("varBack")) {
+            switchScreen(SCREEN_ADVANCED);
+            return;
+        } else if (action.equals("varClear")) {
+            engine.variables = {} as Dictionary<String, Double>;
             return;
         } else if (action.equals("open")) {
             engine.openParen();
@@ -594,10 +659,10 @@ class calc_for_garminView extends WatchUi.View {
             goToScreen(SCREEN_CUR_LETTER);
             return;
         } else if (action.equals("random")) {
+            enterEmbeddedFlow();
             randStage = 0;
             randMin = 0.0d;
             randMax = 0.0d;
-            engine.clear();
             switchScreen(SCREEN_RANDOM);
             return;
         } else if (action.equals("randNext")) {
@@ -616,35 +681,14 @@ class calc_for_garminView extends WatchUi.View {
             }
             randMax = maxOrNull as Double;
             rollRandom();
-            goToRandomStage(2);
-            return;
-        } else if (action.equals("randAgain")) {
-            rollRandom();
-            return;
-        } else if (action.equals("randNewRange")) {
-            randMin = 0.0d;
-            randMax = 0.0d;
-            engine.clear();
-            goToRandomStage(0);
+            exitEmbeddedFlow(engine.expr);
+            switchScreen(SCREEN_BASIC);
             return;
         } else if (action.equals("randBack")) {
             switchScreen(SCREEN_SCIENTIFIC);
             return;
-        } else if (action.equals("memAdd")) {
-            engine.memoryAdd(1.0d);
-            return;
-        } else if (action.equals("memSub")) {
-            engine.memoryAdd(-1.0d);
-            return;
-        } else if (action.equals("memRecall")) {
-            engine.memoryRecall();
-            return;
-        } else if (action.equals("memClear")) {
-            engine.memory = 0.0d;
-            return;
         } else if (action.equals("tip")) {
-            // Deliberately keeps the engine's value: compute the bill on the
-            // keypad first, then TIP uses it as BILL.
+            enterEmbeddedFlow();
             tipStage = 0;
             switchScreen(SCREEN_TIP);
             return;
@@ -670,13 +714,10 @@ class calc_for_garminView extends WatchUi.View {
             if (ppl < 1) {
                 ppl = 1;
             }
-            tipTotal = tipBill * (1.0d + tipPct / 100.0d);
-            engine.setResult(tipTotal / ppl);
-            goToTipStage(3);
-            return;
-        } else if (action.equals("tipNew")) {
-            engine.clear();
-            goToTipStage(0);
+            var total = tipBill * (1.0d + tipPct / 100.0d);
+            engine.setResult(total / ppl);
+            exitEmbeddedFlow(engine.expr);
+            switchScreen(SCREEN_BASIC);
             return;
         } else if (action.equals("tipBack")) {
             switchScreen(SCREEN_SCIENTIFIC);
@@ -705,40 +746,52 @@ class calc_for_garminView extends WatchUi.View {
                 refreshCurrencyRates();
             }
         } else if (prefix.equals("unit")) {
-            handleUnitTap(value);
-            if (screen != SCREEN_UNIT_PICK) {
+            if (handleUnitTap(value)) {
+                exitEmbeddedFlow(engine.expr);
+                switchScreen(SCREEN_BASIC);
+            } else if (screen != SCREEN_UNIT_PICK) {
                 goToScreen(SCREEN_UNIT_PICK);
             }
         } else if (prefix.equals("curletter")) {
             curMatches = currencyCodesStartingWith(value);
             if (curMatches.size() == 1) {
-                handleUnitTap(curMatches[0]);
-                goToScreen(SCREEN_UNIT_PICK);
+                if (handleUnitTap(curMatches[0])) {
+                    exitEmbeddedFlow(engine.expr);
+                    switchScreen(SCREEN_BASIC);
+                } else {
+                    goToScreen(SCREEN_UNIT_PICK);
+                }
             } else if (curMatches.size() == 0) {
                 goToScreen(SCREEN_UNIT_PICK);
             } else {
                 goToScreen(SCREEN_CUR_RESULTS);
             }
+        } else if (prefix.equals("sto")) {
+            engine.storeVar(value);
+        } else if (prefix.equals("rcl")) {
+            engine.recallVar(value);
         }
     }
 
     // First tap on the unit-pick screen records the source unit (and is
     // highlighted in onUpdate); the second tap on a *different* unit
     // evaluates the engine's current expression and converts it. Tapping
-    // the same unit again cancels the selection.
-    private function handleUnitTap(key as String) as Void {
+    // the same unit again cancels the selection. Returns true once a
+    // conversion has actually been computed (the caller then exits the
+    // embedded flow and splices the result back into the real expression).
+    private function handleUnitTap(key as String) as Boolean {
         if (fromUnitKey == null) {
             fromUnitKey = key;
-            return;
+            return false;
         }
         var from = fromUnitKey as String;
         fromUnitKey = null;
         if (from.equals(key)) {
-            return;
+            return false;
         }
         var valOrNull = engine.evaluateToDouble();
         if (valOrNull == null) {
-            return;
+            return false;
         }
         var result = convertValue(unitCategory, from, key, valOrNull as Double);
         if (key.equals("/km") || key.equals("/mi")) {
@@ -748,6 +801,7 @@ class calc_for_garminView extends WatchUi.View {
         } else {
             engine.setResult(result);
         }
+        return true;
     }
 
     private function formatPace(minutes as Double) as String {
@@ -931,20 +985,16 @@ class calc_for_garminView extends WatchUi.View {
         } else if (screen == SCREEN_RANDOM) {
             if (randStage == 0) {
                 text = "MIN? " + text;
-            } else if (randStage == 1) {
-                text = "MIN " + formatWhole(randMin) + " MAX? " + text;
             } else {
-                text = formatWhole(randMin) + "-" + formatWhole(randMax) + " -> " + text;
+                text = "MIN " + formatWhole(randMin) + " MAX? " + text;
             }
         } else if (screen == SCREEN_TIP) {
             if (tipStage == 0) {
                 text = "BILL? " + text;
             } else if (tipStage == 1) {
                 text = "TIP%? " + text;
-            } else if (tipStage == 2) {
-                text = "PPL? " + text;
             } else {
-                text = "TOT " + engine.formatNumber(tipTotal) + "\nEACH " + text;
+                text = "PPL? " + text;
             }
         }
         // Regular text fonts, not FONT_NUMBER_*: the expression can contain
@@ -953,11 +1003,18 @@ class calc_for_garminView extends WatchUi.View {
         var font = text.length() > 10 ? Graphics.FONT_TINY : (text.length() > 6 ? Graphics.FONT_SMALL : Graphics.FONT_LARGE);
         var headerH = (safeH * 0.24).toNumber();
         dc.drawText(safeX + safeW / 2, safeY + headerH / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        if (engine.memory != 0.0d) {
-            dc.drawText(safeX, safeY, Graphics.FONT_XTINY, "M", Graphics.TEXT_JUSTIFY_LEFT);
+        var setVars = "";
+        var varNames = ["A", "B", "C", "D"];
+        for (var vi = 0; vi < varNames.size(); vi++) {
+            if (engine.variables.hasKey(varNames[vi])) {
+                setVars += varNames[vi];
+            }
+        }
+        if (setVars.length() > 0) {
+            dc.drawText(safeX, safeY, Graphics.FONT_XTINY, setVars, Graphics.TEXT_JUSTIFY_LEFT);
         }
 
-        var isUnitScreen = screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS;
+        var isUnitScreen = screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS || screen == SCREEN_VAR;
         var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (isUnitScreen ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];
