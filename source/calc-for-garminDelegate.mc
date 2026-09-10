@@ -61,15 +61,23 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
                 WatchUi.requestUpdate();
                 return true;
             } else if (view.screen == view.SCREEN_RANDOM || view.screen == view.SCREEN_TIP) {
-                view.switchScreen(view.SCREEN_SCIENTIFIC);
+                view.switchScreen(view.SCREEN_MENU);
                 WatchUi.requestUpdate();
                 return true;
             } else if (view.screen == view.SCREEN_UNITS) {
-                view.switchScreen(view.SCREEN_SCIENTIFIC);
+                view.switchScreen(view.SCREEN_MENU);
                 WatchUi.requestUpdate();
                 return true;
             } else if (view.screen == view.SCREEN_VAR) {
-                view.switchScreen(view.SCREEN_ADVANCED);
+                view.switchScreen(view.SCREEN_MENU);
+                WatchUi.requestUpdate();
+                return true;
+            } else if (view.screen == view.SCREEN_SCIENTIFIC) {
+                view.switchScreen(view.SCREEN_MENU);
+                WatchUi.requestUpdate();
+                return true;
+            } else if (view.screen == view.SCREEN_MENU) {
+                view.switchScreen(view.SCREEN_BASIC);
                 WatchUi.requestUpdate();
                 return true;
             } else if (view.screen != view.SCREEN_BASIC) {

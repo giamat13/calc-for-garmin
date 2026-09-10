@@ -27,6 +27,47 @@ function testUnitCategoryAndTipScreensAreTappable(logger as Test.Logger) as Bool
         checkAllButtonsTappable(logger, false, 9) && checkAllButtonsTappable(logger, true, 9);
 }
 
+(:test)
+function testMenuScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
+    return checkAllButtonsTappable(logger, false, 10) && checkAllButtonsTappable(logger, true, 10);
+}
+
+// The home screen is a plain 4-function calculator with a single "MENU"
+// door into every advanced tool; each tool's BACK returns to that menu
+// (not to each other), and the menu's own BACK returns home.
+(:test)
+function testMenuHubNavigation(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("MENU", "menu"));
+    if (v.screen != v.SCREEN_MENU) {
+        logger.debug("expected SCREEN_MENU after menu, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("VAR", "var"));
+    if (v.screen != v.SCREEN_VAR) {
+        logger.debug("expected SCREEN_VAR after var, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "varBack"));
+    if (v.screen != v.SCREEN_MENU) {
+        logger.debug("expected varBack to return to SCREEN_MENU, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("fx", "sci"));
+    if (v.screen != v.SCREEN_SCIENTIFIC) {
+        logger.debug("expected SCREEN_SCIENTIFIC after sci, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "menu"));
+    if (v.screen != v.SCREEN_MENU) {
+        logger.debug("expected scientific BACK to return to SCREEN_MENU, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "basic"));
+    return v.screen == v.SCREEN_BASIC;
+}
+
 // Presses a sequence of actions, then checks what the display shows.
 function pressAndExpect(logger as Test.Logger, v as calc_for_garminView, actions as Array<String>, expected as String) as Boolean {
     for (var i = 0; i < actions.size(); i++) {

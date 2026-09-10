@@ -38,6 +38,7 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_RANDOM = 7;      // random number generator: pick a range, then roll
     const SCREEN_TIP = 8;         // tip & bill split: bill, tip %, people -> each
     const SCREEN_VAR = 9;         // named variables: store/recall A/B/C/D
+    const SCREEN_MENU = 10;       // tool hub: jump straight to any advanced tool
 
     // Random/tip/unit-conversion are "embedded flows": the expression being
     // built (e.g. "1+") is stashed here while a temporary value is entered
@@ -186,20 +187,33 @@ class calc_for_garminView extends WatchUi.View {
         }
     }
 
-    // Basic screen: everything needed for everyday arithmetic, plus cursor
-    // arrows (needed to insert a random/tip/converted value mid-expression)
-    // and parens, 5 cols x 5 rows.
+    // Home screen: a plain, familiar 4-function calculator - digits, the
+    // four operators, %, C/DEL and "=". No cursor arrows, parens, Ans or
+    // variables here; those live one tap away on the Scientific screen via
+    // MENU, so someone who only ever wants basic arithmetic never sees them.
+    // 4 cols x 5 rows.
     private function basicButtons() as Array<CalcButton> {
         return [
-            new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("%", "op:%"), new CalcButton("/", "op:/"), new CalcButton("fx", "sci"),
-            new CalcButton("7", "digit:7"), new CalcButton("8", "digit:8"), new CalcButton("9", "digit:9"), new CalcButton("*", "op:*"), new CalcButton(".", "digit:."),
-            new CalcButton("4", "digit:4"), new CalcButton("5", "digit:5"), new CalcButton("6", "digit:6"), new CalcButton("-", "op:-"), new CalcButton("0", "digit:0"),
-            new CalcButton("1", "digit:1"), new CalcButton("2", "digit:2"), new CalcButton("3", "digit:3"), new CalcButton("+", "op:+"), new CalcButton("=", "equals"),
-            new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("<", "curLeft"), new CalcButton(">", "curRight"), new CalcButton("Ans", "ans"),
+            new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("%", "op:%"), new CalcButton("/", "op:/"),
+            new CalcButton("1", "digit:1"), new CalcButton("2", "digit:2"), new CalcButton("3", "digit:3"), new CalcButton("*", "op:*"),
+            new CalcButton("4", "digit:4"), new CalcButton("5", "digit:5"), new CalcButton("6", "digit:6"), new CalcButton("-", "op:-"),
+            new CalcButton("7", "digit:7"), new CalcButton("8", "digit:8"), new CalcButton("9", "digit:9"), new CalcButton("+", "op:+"),
+            new CalcButton("MENU", "menu"), new CalcButton("0", "digit:0"), new CalcButton(".", "digit:."), new CalcButton("=", "equals"),
         ] as Array<CalcButton>;
     }
 
-    // Scientific screen: functions, parentheses and general powers, plus EQ
+    // Tool hub: every advanced tool is one tap away from here instead of
+    // paged through in sequence. 2 cols x 3 rows.
+    private function menuButtons() as Array<CalcButton> {
+        return [
+            new CalcButton("fx", "sci"), new CalcButton("Units", "units"),
+            new CalcButton("Tip", "tip"), new CalcButton("RND", "random"),
+            new CalcButton("VAR", "var"), new CalcButton("BACK", "basic"),
+        ] as Array<CalcButton>;
+    }
+
+    // Scientific screen: functions, parentheses, general powers, cursor
+    // movement and Ans (relocated here from the old basic screen), plus EQ
     // for building equations, 4 cols x 6 rows.
     private function scientificButtons() as Array<CalcButton> {
         return [
@@ -207,8 +221,8 @@ class calc_for_garminView extends WatchUi.View {
             new CalcButton("log", "func:log"), new CalcButton("ln", "func:ln"), new CalcButton("x2", "sqr"), new CalcButton("x", "const:X"),
             new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("^", "op:^"), new CalcButton("pi", "const:π"),
             new CalcButton("e", "const:e"), new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("ADV", "adv"),
-            new CalcButton("BACK", "basic"), new CalcButton("UC", "units"), new CalcButton("RND", "random"), new CalcButton("TIP", "tip"),
-            new CalcButton("EQ", "eq"),
+            new CalcButton("BACK", "menu"), new CalcButton("UC", "units"), new CalcButton("RND", "random"), new CalcButton("TIP", "tip"),
+            new CalcButton("EQ", "eq"), new CalcButton("Ans", "ans"), new CalcButton("<", "curLeft"), new CalcButton(">", "curRight"),
         ] as Array<CalcButton>;
     }
 
@@ -252,7 +266,7 @@ class calc_for_garminView extends WatchUi.View {
             new CalcButton("PRES",  "cat:pres"),
             new CalcButton("ENRG",  "cat:energy"),
             new CalcButton("CUR",   "cat:cur"),
-            new CalcButton("BACK",  "sci"),
+            new CalcButton("BACK",  "menu"),
         ] as Array<CalcButton>;
     }
 
@@ -449,7 +463,7 @@ class calc_for_garminView extends WatchUi.View {
 
     private function layoutButtons() as Void {
         var defs = basicButtons();
-        var cols = 5;
+        var cols = 4;
         var rows = 5;
         if (screen == SCREEN_SCIENTIFIC) {
             defs = scientificButtons();
@@ -488,6 +502,10 @@ class calc_for_garminView extends WatchUi.View {
             defs = varButtons();
             cols = 2;
             rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_MENU) {
+            defs = menuButtons();
+            cols = 2;
+            rows = 3;
         }
 
         var headerH = (safeH * 0.24).toNumber();
@@ -602,6 +620,9 @@ class calc_for_garminView extends WatchUi.View {
         } else if (action.equals("basic")) {
             switchScreen(SCREEN_BASIC);
             return;
+        } else if (action.equals("menu")) {
+            switchScreen(SCREEN_MENU);
+            return;
         } else if (action.equals("adv")) {
             switchScreen(SCREEN_ADVANCED);
             return;
@@ -628,7 +649,7 @@ class calc_for_garminView extends WatchUi.View {
             switchScreen(SCREEN_VAR);
             return;
         } else if (action.equals("varBack")) {
-            switchScreen(SCREEN_ADVANCED);
+            switchScreen(SCREEN_MENU);
             return;
         } else if (action.equals("varClear")) {
             engine.clearVariables();
@@ -693,7 +714,7 @@ class calc_for_garminView extends WatchUi.View {
             switchScreen(SCREEN_BASIC);
             return;
         } else if (action.equals("randBack")) {
-            switchScreen(SCREEN_SCIENTIFIC);
+            switchScreen(SCREEN_MENU);
             return;
         } else if (action.equals("tip")) {
             enterEmbeddedFlow();
@@ -728,7 +749,7 @@ class calc_for_garminView extends WatchUi.View {
             switchScreen(SCREEN_BASIC);
             return;
         } else if (action.equals("tipBack")) {
-            switchScreen(SCREEN_SCIENTIFIC);
+            switchScreen(SCREEN_MENU);
             return;
         }
 
@@ -1044,8 +1065,12 @@ class calc_for_garminView extends WatchUi.View {
             if (icon != null) {
                 dc.drawBitmap(b.x + (b.w - icon.getWidth()) / 2, b.y + (b.h - icon.getHeight()) / 2, icon);
             } else {
+                // Every other basic-screen button is a single character;
+                // "MENU" is the one long label there and needs its own
+                // smaller font so it doesn't overflow its cell.
+                var labelFont = (screen == SCREEN_BASIC && b.label.equals("MENU")) ? Graphics.FONT_TINY : buttonFont;
                 dc.setColor(Graphics.COLOR_WHITE, fill);
-                dc.drawText(b.x + b.w / 2, b.y + b.h / 2, buttonFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                dc.drawText(b.x + b.w / 2, b.y + b.h / 2, labelFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             }
         }
     }
