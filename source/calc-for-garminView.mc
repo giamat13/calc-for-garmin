@@ -13,6 +13,8 @@ class CalcButton {
     var y as Number = 0;
     var w as Number = 0;
     var h as Number = 0;
+    // SVG icon (see Icons.mc), loaded per layout; null draws the label.
+    var icon as WatchUi.BitmapResource? = null;
 
     function initialize(label as String, action as String) {
         me.label = label;
@@ -486,6 +488,10 @@ class calc_for_garminView extends WatchUi.View {
             b.y = gridTop + row * cellH;
             b.w = cellW;
             b.h = cellH;
+            var iconId = iconFor(b.action, b.label);
+            if (iconId != null) {
+                b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
+            }
         }
         buttons = defs;
         if (selectedIndex >= buttons.size()) {
@@ -957,16 +963,21 @@ class calc_for_garminView extends WatchUi.View {
             var b = buttons[i];
             var isSelected = i == selectedIndex;
             var isFromUnit = screen == SCREEN_UNIT_PICK && fromUnitKey != null && b.action.equals("unit:" + (fromUnitKey as String));
-            var fill = isSelected ? Graphics.COLOR_WHITE : (isFromUnit ? Graphics.COLOR_DK_BLUE : Graphics.COLOR_DK_GRAY);
+            // Orange, not white, for the selection: the icons are white.
+            var fill = isSelected ? Graphics.COLOR_ORANGE : (isFromUnit ? Graphics.COLOR_DK_BLUE : Graphics.COLOR_DK_GRAY);
             dc.setColor(fill, fill);
             dc.fillRectangle(b.x + 2, b.y + 2, b.w - 4, b.h - 4);
 
             dc.setColor(Graphics.COLOR_LT_GRAY, fill);
             dc.drawRectangle(b.x + 2, b.y + 2, b.w - 4, b.h - 4);
 
-            var textColor = isSelected ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE;
-            dc.setColor(textColor, fill);
-            dc.drawText(b.x + b.w / 2, b.y + b.h / 2, buttonFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            var icon = b.icon;
+            if (icon != null) {
+                dc.drawBitmap(b.x + (b.w - icon.getWidth()) / 2, b.y + (b.h - icon.getHeight()) / 2, icon);
+            } else {
+                dc.setColor(Graphics.COLOR_WHITE, fill);
+                dc.drawText(b.x + b.w / 2, b.y + b.h / 2, buttonFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
         }
     }
 
