@@ -25,7 +25,11 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     }
 
     // Some devices report a quick press as a hold rather than a tap; handle
-    // both the same way so a tap always registers.
+    // both the same way so a tap always registers. (A long-press gesture
+    // isn't used for anything here: physical buttons have no equivalent -
+    // InputDelegate.onKey fires once per press with no hold/duration info -
+    // so inserting "=" is a plain button (EQ, on the scientific screen)
+    // instead, which works identically for touch and physical navigation.)
     function onHold(clickEvent as WatchUi.ClickEvent) as Boolean {
         var coords = clickEvent.getCoordinates();
         return handleTapAt(coords[0], coords[1]);

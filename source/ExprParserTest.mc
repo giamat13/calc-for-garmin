@@ -63,14 +63,20 @@ function testVariableX(logger as Test.Logger) as Boolean {
     return !p.error && near(v, 11.0d, logger);
 }
 
+// The EQ button inserts the "=" sign itself (insertEquals()); a short
+// press on "=" (evaluate()) then solves,
+// since the expression now contains "=".
 (:test)
 function testEquationEngine(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
+    // Variables persist across app runs now, so start from a clean slate
+    // regardless of whatever an earlier test run left in Storage.
+    e.clearVariables();
     e.appendDigit("2");
     e.appendConstant("X");
     e.appendOperator("+");
     e.appendDigit("3");
-    e.evaluate();
+    e.insertEquals();
     if (!e.expr.equals("2X+3=")) {
         logger.debug("expected '2X+3=' got '" + e.expr + "'");
         return false;
@@ -91,6 +97,7 @@ function testEquationEngine(logger as Test.Logger) as Boolean {
 (:test)
 function testEquationWithParens(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
+    e.clearVariables();
     // 3*(X-2)=9  ->  X=5
     e.appendDigit("3");
     e.appendOperator("*");
@@ -99,26 +106,92 @@ function testEquationWithParens(logger as Test.Logger) as Boolean {
     e.appendOperator("-");
     e.appendDigit("2");
     e.closeParen();
-    e.evaluate();
+    e.insertEquals();
     e.appendDigit("9");
     e.evaluate();
     return !e.errorState && e.expr.equals("X=5");
 }
 
-// Solving isn't hardcoded to X any more - any bare single letter that isn't
-// a stored variable works: "2Y+3=7" -> "Y=2".
+// A known variable stays a plain value ("X+1" -> 11, no "=" needed) but can
+// always be redefined: just build a fresh equation with EQ + "="
+// again, no separate "forget X" step required.
+(:test)
+function testEquationCanRedefineAKnownVariable(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendConstant("X");
+    e.appendOperator("+");
+    e.appendDigit("3");
+    e.insertEquals();
+    e.appendDigit("7");
+    e.evaluate();
+    if (!e.expr.equals("X=4")) {
+        logger.debug("expected 'X=4' got '" + e.expr + "'");
+        return false;
+    }
+    e.clear();
+    e.appendConstant("X");
+    e.appendOperator("+");
+    e.appendDigit("1");
+    e.evaluate();
+    if (!e.expr.equals("5")) {
+        logger.debug("expected 'X+1' with X=4 to evaluate to '5', got '" + e.expr + "'");
+        return false;
+    }
+    e.clear();
+    e.appendDigit("2");
+    e.appendConstant("X");
+    e.appendOperator("+");
+    e.appendDigit("4");
+    e.insertEquals();
+    e.appendDigit("1");
+    e.appendDigit("0");
+    e.evaluate();
+    if (!e.expr.equals("X=3")) {
+        logger.debug("expected 'X=3' got '" + e.expr + "'");
+        return false;
+    }
+    return true;
+}
+
+// Solving isn't hardcoded to X any more - any bare single letter works:
+// "2Y+3=7" -> "Y=2".
 (:test)
 function testEquationSolvesForY(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
+    e.clearVariables();
     e.appendDigit("2");
     e.appendConstant("Y");
     e.appendOperator("+");
     e.appendDigit("3");
-    e.evaluate();
+    e.insertEquals();
     e.appendDigit("7");
     e.evaluate();
     if (!e.expr.equals("Y=2")) {
         logger.debug("expected 'Y=2' got '" + e.expr + "'");
+        return false;
+    }
+    return true;
+}
+
+// Ans holds the last plain "=" result and can be dropped into a new formula.
+(:test)
+function testAnsInsertsLastAnswer(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.appendDigit("2");
+    e.appendOperator("+");
+    e.appendDigit("3");
+    e.evaluate();
+    if (!e.expr.equals("5")) {
+        logger.debug("expected '5' got '" + e.expr + "'");
+        return false;
+    }
+    e.insertAns();
+    e.appendOperator("*");
+    e.appendDigit("2");
+    e.evaluate();
+    if (!e.expr.equals("10")) {
+        logger.debug("expected Ans(5)*2 = '10' got '" + e.expr + "'");
         return false;
     }
     return true;
@@ -130,6 +203,7 @@ function testEquationSolvesForY(logger as Test.Logger) as Boolean {
 (:test)
 function testStoredVariableIsNotTreatedAsUnknown(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
+    e.clearVariables();
     e.appendDigit("2");
     e.storeVar("A");
     e.clear();
@@ -147,10 +221,11 @@ function testStoredVariableIsNotTreatedAsUnknown(logger as Test.Logger) as Boole
 (:test)
 function testNonlinearEquationErrors(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
+    e.clearVariables();
     e.appendConstant("X");
     e.appendOperator("^");
     e.appendDigit("2");
-    e.evaluate();
+    e.insertEquals();
     e.appendDigit("4");
     e.evaluate();
     if (!e.errorState) {

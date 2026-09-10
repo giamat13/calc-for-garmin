@@ -195,11 +195,12 @@ class calc_for_garminView extends WatchUi.View {
             new CalcButton("7", "digit:7"), new CalcButton("8", "digit:8"), new CalcButton("9", "digit:9"), new CalcButton("*", "op:*"), new CalcButton(".", "digit:."),
             new CalcButton("4", "digit:4"), new CalcButton("5", "digit:5"), new CalcButton("6", "digit:6"), new CalcButton("-", "op:-"), new CalcButton("0", "digit:0"),
             new CalcButton("1", "digit:1"), new CalcButton("2", "digit:2"), new CalcButton("3", "digit:3"), new CalcButton("+", "op:+"), new CalcButton("=", "equals"),
-            new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("<", "curLeft"), new CalcButton(">", "curRight"),
+            new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("<", "curLeft"), new CalcButton(">", "curRight"), new CalcButton("Ans", "ans"),
         ] as Array<CalcButton>;
     }
 
-    // Scientific screen: functions, parentheses and general powers, 4 cols x 5 rows.
+    // Scientific screen: functions, parentheses and general powers, plus EQ
+    // for building equations, 4 cols x 6 rows.
     private function scientificButtons() as Array<CalcButton> {
         return [
             new CalcButton("sin", "func:sin"), new CalcButton("cos", "func:cos"), new CalcButton("tan", "func:tan"), new CalcButton("sqrt", "func:sqrt"),
@@ -207,6 +208,7 @@ class calc_for_garminView extends WatchUi.View {
             new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("^", "op:^"), new CalcButton("pi", "const:π"),
             new CalcButton("e", "const:e"), new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("ADV", "adv"),
             new CalcButton("BACK", "basic"), new CalcButton("UC", "units"), new CalcButton("RND", "random"), new CalcButton("TIP", "tip"),
+            new CalcButton("EQ", "eq"),
         ] as Array<CalcButton>;
     }
 
@@ -452,7 +454,7 @@ class calc_for_garminView extends WatchUi.View {
         if (screen == SCREEN_SCIENTIFIC) {
             defs = scientificButtons();
             cols = 4;
-            rows = 5;
+            rows = 6;
         } else if (screen == SCREEN_ADVANCED) {
             defs = advancedButtons();
             cols = 4;
@@ -616,6 +618,12 @@ class calc_for_garminView extends WatchUi.View {
         } else if (action.equals("curRight")) {
             engine.moveCursorRight();
             return;
+        } else if (action.equals("ans")) {
+            engine.insertAns();
+            return;
+        } else if (action.equals("eq")) {
+            engine.insertEquals();
+            return;
         } else if (action.equals("var")) {
             switchScreen(SCREEN_VAR);
             return;
@@ -623,7 +631,7 @@ class calc_for_garminView extends WatchUi.View {
             switchScreen(SCREEN_ADVANCED);
             return;
         } else if (action.equals("varClear")) {
-            engine.variables = {} as Dictionary<String, Double>;
+            engine.clearVariables();
             return;
         } else if (action.equals("open")) {
             engine.openParen();

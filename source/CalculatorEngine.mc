@@ -1,5 +1,6 @@
 import Toybox.Lang;
 import Toybox.Math;
+import Toybox.Application.Storage;
 
 // Text-expression calculator: button presses build up a formula string
 // (so parentheses and arbitrary powers work naturally), evaluated by
@@ -16,12 +17,30 @@ class CalculatorEngine {
     // "1+" then embed a random/tip/converted value right there.
     var cursorPos as Number = 0;
 
-    // Named variables (A/B/C/D - see calc_for_garminView's VAR screen),
-    // usable directly in a formula like a constant, e.g. "A+B*2".
+    // Named variables (A/B/C/D via the VAR screen, plus X/Y/Z/... once
+    // solved via an equation - see solveEquation()), usable directly in a
+    // formula like a constant, e.g. "A+B*2". Persisted so they survive
+    // leaving and returning to the calculator, not just switching screens.
     var variables as Dictionary<String, Double> = {} as Dictionary<String, Double>;
 
     function initialize() {
+        var stored = Storage.getValue("calcVariables");
+        if (stored != null) {
+            variables = stored as Dictionary<String, Double>;
+        }
     }
+
+    private function persistVariables() as Void {
+        Storage.setValue("calcVariables", variables);
+    }
+
+    function clearVariables() as Void {
+        variables = {} as Dictionary<String, Double>;
+        persistVariables();
+    }
+
+    // Last plain "=" result, for the ANS button.
+    var lastAnswer as Double = 0.0d;
 
     function displayText() as String {
         if (errorState) {
@@ -181,6 +200,7 @@ class CalculatorEngine {
             return null;
         }
         variables[name] = vOrNull as Double;
+        persistVariables();
         setResult(vOrNull as Double);
         return vOrNull;
     }
@@ -190,6 +210,24 @@ class CalculatorEngine {
         var v = variables.hasKey(name) ? variables[name] as Double : 0.0d;
         var s = formatNumber(v);
         insertAtCursor(v < 0.0d ? "(" + s + ")" : s);
+    }
+
+    // Inserts the last plain "=" result at the cursor, like any other value.
+    function insertAns() as Void {
+        resetIfNeeded(true);
+        var s = formatNumber(lastAnswer);
+        insertAtCursor(lastAnswer < 0.0d ? "(" + s + ")" : s);
+    }
+
+    // The EQ button inserts a literal "=" (building "LHS=RHS" to solve);
+    // the "=" button (evaluate()) then solves it. Whether "=" solves an
+    // equation or does a plain calculation depends only on whether the
+    // expression actually contains "=" - not on a variable's prior state -
+    // so a known variable can always be redefined by just typing a new
+    // equation for it.
+    function insertEquals() as Void {
+        resetIfNeeded(true);
+        insertAtCursor("=");
     }
 
     // Raw text insertion for things like the "×10^" scientific-notation
@@ -218,25 +256,16 @@ class CalculatorEngine {
         cursorPos = 0;
     }
 
-    // "=" does double duty when the formula has an unknown letter: the first
-    // press inserts "=" (so you can type the right-hand side), the second
-    // solves the equation, e.g. "2X+3" -> "=" -> "2X+3=7" -> "=" -> "X=2".
-    // Any single letter works (X, Y, Z, A, ...) as long as it isn't already
-    // a stored variable (see `variables`) - once stored, it's a given value
-    // like any other, not something to solve for.
+    // Solves the equation if the expression contains a literal "=" (put
+    // there by the EQ button - see insertEquals()), otherwise it's a plain
+    // calculation using whatever variables are currently known - e.g. "X+1"
+    // evaluates straight to 11 once X is known, no "=" involved.
     function evaluate() as Void {
         if (errorState || expr.length() == 0) {
             return;
         }
-        var unknown = findUnknownLetter(expr);
-        if (unknown != null) {
-            if (expr.find("=") == null) {
-                expr = expr + "=";
-                justEvaluated = false;
-                cursorPos = expr.length();
-            } else {
-                solveFor(unknown as String);
-            }
+        if (expr.find("=") != null) {
+            solveEquation();
             return;
         }
         var parser = new ExprParser(closeUnmatchedParens(expr), 0.0d, variables);
@@ -245,14 +274,16 @@ class CalculatorEngine {
             errorState = true;
             return;
         }
+        lastAnswer = result;
         expr = formatNumber(result);
         justEvaluated = true;
         cursorPos = expr.length();
     }
 
-    // First bare single-letter identifier in s that isn't "e" (the constant)
-    // and isn't already a stored variable - that's the equation's unknown.
-    private function findUnknownLetter(s as String) as String? {
+    // First bare single-letter identifier in s that isn't "e" (the
+    // constant) - the equation's unknown. Ignores any prior stored value:
+    // building a fresh "LHS=RHS" always (re)solves for it.
+    private function findVariableLetter(s as String) as String? {
         var i = 0;
         while (i < s.length()) {
             var c = s.substring(i, i + 1) as String;
@@ -265,7 +296,7 @@ class CalculatorEngine {
                 i += 1;
             }
             var ident = s.substring(start, i) as String;
-            if (ident.length() == 1 && !(ident.toLower() as String).equals("e") && !variables.hasKey(ident)) {
+            if (ident.length() == 1 && !(ident.toLower() as String).equals("e")) {
                 return ident;
             }
         }
@@ -282,7 +313,7 @@ class CalculatorEngine {
     // two sample points fully determine it (f(v) = a*v + b), so v = -b/a. A
     // third sample point catches non-linear formulas instead of silently
     // returning a wrong answer.
-    private function solveFor(letter as String) as Void {
+    private function solveEquation() as Void {
         var eqIdxOrNull = expr.find("=");
         if (eqIdxOrNull == null) {
             errorState = true;
@@ -295,6 +326,15 @@ class CalculatorEngine {
             errorState = true;
             return;
         }
+        var letterOrNull = findVariableLetter(lhs);
+        if (letterOrNull == null) {
+            letterOrNull = findVariableLetter(rhs);
+        }
+        if (letterOrNull == null) {
+            errorState = true;
+            return;
+        }
+        var letter = letterOrNull as String;
 
         var f0 = evalDiff(letter, lhs, rhs, 0.0d);
         var f1 = evalDiff(letter, lhs, rhs, 1.0d);
@@ -317,7 +357,13 @@ class CalculatorEngine {
             errorState = true;
             return;
         }
-        expr = letter + "=" + formatNumber(-b / a);
+        var solved = -b / a;
+        expr = letter + "=" + formatNumber(solved);
+        lastAnswer = solved;
+        // Solving always overwrites: a fresh equation for the same letter
+        // (long-press "=" again to build a new one) redefines it freely.
+        variables[letter] = solved;
+        persistVariables();
         justEvaluated = true;
         cursorPos = expr.length();
     }

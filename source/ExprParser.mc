@@ -179,11 +179,14 @@ class ExprParser {
             if (lower.equals("e")) {
                 return E;
             }
-            if (lower.equals("x")) {
-                return xValue;
-            }
+            // A stored/solved "X" in `variables` wins over the legacy xVal
+            // slot, so a value fixed by a past equation (or STO) sticks in
+            // plain calculations too, not only while re-solving for it.
             if (variables.hasKey(ident)) {
                 return variables[ident] as Double;
+            }
+            if (lower.equals("x")) {
+                return xValue;
             }
             if (!peek().equals("(")) {
                 error = true;
