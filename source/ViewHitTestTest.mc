@@ -21,6 +21,61 @@ function testAdvancedScreenButtonsAreTappable(logger as Test.Logger) as Boolean 
 }
 
 (:test)
+function testUnitCategoryAndTipScreensAreTappable(logger as Test.Logger) as Boolean {
+    return checkAllButtonsTappable(logger, false, 3) && checkAllButtonsTappable(logger, true, 3) &&
+        checkAllButtonsTappable(logger, false, 8) && checkAllButtonsTappable(logger, true, 8);
+}
+
+// Presses a sequence of actions, then checks what the display shows.
+function pressAndExpect(logger as Test.Logger, v as calc_for_garminView, actions as Array<String>, expected as String) as Boolean {
+    for (var i = 0; i < actions.size(); i++) {
+        v.activate(new CalcButton("", actions[i]));
+    }
+    var got = v.engine.displayText();
+    if (!got.equals(expected)) {
+        logger.debug("after " + actions.toString() + " expected " + expected + ", got " + got);
+        return false;
+    }
+    return true;
+}
+
+(:test)
+function testMemoryAddSubtractRecall(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v, ["digit:5", "memAdd", "clear", "digit:3", "memAdd", "clear", "digit:2", "memSub", "clear", "memRecall"], "6") &&
+        pressAndExpect(logger, v, ["op:*", "digit:2", "equals"], "12") &&
+        pressAndExpect(logger, v, ["memClear", "clear", "memRecall"], "0");
+}
+
+// 100 + 10% tip split 2 ways = 55 each; per-person stays in the engine.
+(:test)
+function testTipSplit(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v, ["digit:1", "digit:0", "digit:0", "tip", "tipNext", "digit:1", "digit:0", "tipNext", "digit:2", "tipGo"], "55") &&
+        pressAndExpect(logger, v, ["tipBack"], "55");
+}
+
+// 12 kph is a 5:00/km pace, and the "m:ss" result converts back.
+(:test)
+function testPaceConvertsBothWays(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v, ["cat:pace", "digit:1", "digit:2", "unit:kph", "unit:/km"], "5:00") &&
+        pressAndExpect(logger, v, ["unit:/km", "unit:kph"], "12");
+}
+
+(:test)
+function testNewUnitCategories(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v, ["cat:area", "digit:1", "unit:ha", "unit:m2"], "10000") &&
+        pressAndExpect(logger, v, ["units", "cat:time", "clear", "digit:2", "unit:hr", "unit:min"], "120") &&
+        pressAndExpect(logger, v, ["units", "cat:temp", "clear", "digit:0", "unit:c", "unit:K"], "273.15");
+}
+
+(:test)
 function testTapOutsideAnyButtonMisses(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);

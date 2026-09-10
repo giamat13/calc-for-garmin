@@ -206,7 +206,21 @@ class ExprParser {
         while (!peek().equals("") && (isDigitLiteral(peek()) || peek().equals("."))) {
             pos += 1;
         }
-        return (s.substring(start, pos) as String).toDouble() as Double;
+        var v = (s.substring(start, pos) as String).toDouble() as Double;
+        // "m:ss" (a converted pace) reads back as minutes + seconds/60.
+        if (peek().equals(":")) {
+            pos += 1;
+            var secStart = pos;
+            while (isDigitLiteral(peek())) {
+                pos += 1;
+            }
+            if (pos == secStart) {
+                error = true;
+                return 0.0d;
+            }
+            v = v + ((s.substring(secStart, pos) as String).toDouble() as Double) / 60.0d;
+        }
+        return v;
     }
 
     private function readIdent() as String {

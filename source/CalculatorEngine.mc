@@ -117,6 +117,33 @@ class CalculatorEngine {
         justEvaluated = true;
     }
 
+    // Like setResult, for results that aren't a plain number (pace "5:30").
+    function setResultText(s as String) as Void {
+        expr = s;
+        errorState = false;
+        justEvaluated = true;
+    }
+
+    // Calculator memory (M+ / M- / MR / MC). Lives only while the app runs.
+    var memory as Double = 0.0d;
+
+    // Evaluates the current formula, adds sign * result to memory, and shows
+    // the result - like pressing "=" first.
+    function memoryAdd(sign as Double) as Void {
+        var vOrNull = evaluateToDouble();
+        if (vOrNull == null) {
+            return;
+        }
+        memory = memory + sign * (vOrNull as Double);
+        setResult(vOrNull as Double);
+    }
+
+    function memoryRecall() as Void {
+        resetIfNeeded(true);
+        var s = formatNumber(memory);
+        expr = expr + (memory < 0.0d ? "(" + s + ")" : s);
+    }
+
     // Raw text insertion for things like the "×10^" scientific-notation
     // shortcut, which don't fit the digit/operator/function/constant shapes.
     function appendRaw(text as String) as Void {
@@ -253,7 +280,7 @@ class CalculatorEngine {
         return out;
     }
 
-    private function formatNumber(v as Double) as String {
+    function formatNumber(v as Double) as String {
         var av = v < 0.0d ? -v : v;
         if (av != 0.0d && (av >= 1000000000.0d || av < 0.0001d)) {
             return v.format("%.4e") as String;
