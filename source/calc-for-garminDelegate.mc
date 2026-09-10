@@ -56,6 +56,10 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
                 view.switchScreen(view.SCREEN_UNITS);
                 WatchUi.requestUpdate();
                 return true;
+            } else if (view.screen == view.SCREEN_RANDOM) {
+                view.switchScreen(view.SCREEN_SCIENTIFIC);
+                WatchUi.requestUpdate();
+                return true;
             } else if (view.screen == view.SCREEN_UNITS) {
                 view.switchScreen(view.SCREEN_SCIENTIFIC);
                 WatchUi.requestUpdate();

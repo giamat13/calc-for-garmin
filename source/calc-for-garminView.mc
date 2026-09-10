@@ -4,6 +4,7 @@ import Toybox.Lang;
 import Toybox.System;
 import Toybox.Communications;
 import Toybox.Application.Storage;
+import Toybox.Math;
 
 class CalcButton {
     var label as String;
@@ -32,6 +33,7 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_UNIT_PICK = 4;   // unit picker for the chosen category
     const SCREEN_CUR_LETTER = 5;  // currency autocomplete: pick a first letter
     const SCREEN_CUR_RESULTS = 6; // currency autocomplete: matching codes for that letter
+    const SCREEN_RANDOM = 7;      // random number generator: pick a range, then roll
 
     var engine as CalculatorEngine = new CalculatorEngine();
     var screen as Number = SCREEN_BASIC;
@@ -61,6 +63,15 @@ class calc_for_garminView extends WatchUi.View {
     // Currency autocomplete: after picking a first letter, the matching
     // codes for it are shown as buttons on SCREEN_CUR_RESULTS.
     private var curMatches as Array<String> = [] as Array<String>;
+
+    // Random number generator state. randStage: 0 = entering MIN, 1 =
+    // entering MAX, 2 = showing a rolled result (with AGAIN/NEW/BACK).
+    // Bounds are stored as whatever was typed (via the engine's own
+    // expression parser, so "3+4" or "-5" work), then rounded to whole
+    // numbers when rolling.
+    private var randStage as Number = 0;
+    private var randMin as Double = 0.0d;
+    private var randMax as Double = 0.0d;
 
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
@@ -171,7 +182,7 @@ class calc_for_garminView extends WatchUi.View {
             new CalcButton("log", "func:log"), new CalcButton("ln", "func:ln"), new CalcButton("x2", "sqr"), new CalcButton("x", "const:X"),
             new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("^", "op:^"), new CalcButton("pi", "const:π"),
             new CalcButton("e", "const:e"), new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("ADV", "adv"),
-            new CalcButton("BACK", "basic"), new CalcButton("UC", "units"),
+            new CalcButton("BACK", "basic"), new CalcButton("UC", "units"), new CalcButton("RND", "random"),
         ] as Array<CalcButton>;
     }
 
@@ -215,6 +226,11 @@ class calc_for_garminView extends WatchUi.View {
             return CURRENCY_KEYS;
         }
         return [] as Array<String>;
+    }
+
+    // Compact integer display for the random screen's MIN/MAX hints.
+    private function formatWhole(v as Double) as String {
+        return ((Math.round(v) as Numeric).toNumber()).toString();
     }
 
     private function unitLabel(key as String) as String {
@@ -311,6 +327,37 @@ class calc_for_garminView extends WatchUi.View {
         return defs;
     }
 
+    // Random screen: stage 0/1 is a compact numeric keypad for typing MIN
+    // then MAX (reuses the same "digit:"/"op:-"/"back"/"clear" actions the
+    // main keypad already handles); stage 2 shows the rolled result with
+    // options to roll again, pick a new range, or leave.
+    private function randomButtons() as Array<CalcButton> {
+        var defs = [] as Array<CalcButton>;
+        if (randStage == 2) {
+            defs.add(new CalcButton("AGAIN", "randAgain"));
+            defs.add(new CalcButton("NEW", "randNewRange"));
+            defs.add(new CalcButton("BACK", "randBack"));
+            return defs;
+        }
+        defs.add(new CalcButton("7", "digit:7"));
+        defs.add(new CalcButton("8", "digit:8"));
+        defs.add(new CalcButton("9", "digit:9"));
+        defs.add(new CalcButton("DEL", "back"));
+        defs.add(new CalcButton("4", "digit:4"));
+        defs.add(new CalcButton("5", "digit:5"));
+        defs.add(new CalcButton("6", "digit:6"));
+        defs.add(new CalcButton("C", "clear"));
+        defs.add(new CalcButton("1", "digit:1"));
+        defs.add(new CalcButton("2", "digit:2"));
+        defs.add(new CalcButton("3", "digit:3"));
+        defs.add(new CalcButton("-", "op:-"));
+        defs.add(new CalcButton("0", "digit:0"));
+        defs.add(new CalcButton(".", "digit:."));
+        defs.add(new CalcButton("BACK", "randBack"));
+        defs.add(new CalcButton(randStage == 0 ? "NEXT" : "GEN", randStage == 0 ? "randNext" : "randGen"));
+        return defs;
+    }
+
     private function layoutButtons() as Void {
         var defs = basicButtons();
         var cols = 5;
@@ -338,6 +385,10 @@ class calc_for_garminView extends WatchUi.View {
         } else if (screen == SCREEN_CUR_RESULTS) {
             defs = curResultButtons();
             cols = 2;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_RANDOM) {
+            defs = randomButtons();
+            cols = randStage == 2 ? 1 : 4;
             rows = (defs.size() + cols - 1) / cols;
         }
 
@@ -456,6 +507,43 @@ class calc_for_garminView extends WatchUi.View {
         } else if (action.equals("curResultsBack")) {
             goToScreen(SCREEN_CUR_LETTER);
             return;
+        } else if (action.equals("random")) {
+            randStage = 0;
+            randMin = 0.0d;
+            randMax = 0.0d;
+            engine.clear();
+            switchScreen(SCREEN_RANDOM);
+            return;
+        } else if (action.equals("randNext")) {
+            var minOrNull = readRandomEntry();
+            if (minOrNull == null) {
+                return;
+            }
+            randMin = minOrNull as Double;
+            engine.clear();
+            goToRandomStage(1);
+            return;
+        } else if (action.equals("randGen")) {
+            var maxOrNull = readRandomEntry();
+            if (maxOrNull == null) {
+                return;
+            }
+            randMax = maxOrNull as Double;
+            rollRandom();
+            goToRandomStage(2);
+            return;
+        } else if (action.equals("randAgain")) {
+            rollRandom();
+            return;
+        } else if (action.equals("randNewRange")) {
+            randMin = 0.0d;
+            randMax = 0.0d;
+            engine.clear();
+            goToRandomStage(0);
+            return;
+        } else if (action.equals("randBack")) {
+            switchScreen(SCREEN_SCIENTIFIC);
+            return;
         }
 
         var idxOrNull = action.find(":");
@@ -517,6 +605,41 @@ class calc_for_garminView extends WatchUi.View {
         }
         var result = convertValue(unitCategory, from, key, valOrNull as Double);
         engine.setResult(result);
+    }
+
+    // Reads whatever's been typed on the random screen as a number. An
+    // untouched keypad (nothing typed yet) counts as 0 rather than an
+    // error, so pressing NEXT/GEN without typing anything just rolls with
+    // that bound as 0 instead of silently doing nothing.
+    private function readRandomEntry() as Double? {
+        if (engine.expr.length() == 0 && !engine.errorState) {
+            return 0.0d;
+        }
+        return engine.evaluateToDouble();
+    }
+
+    private function goToRandomStage(stage as Number) as Void {
+        randStage = stage;
+        selectedIndex = 0;
+        layoutButtons();
+    }
+
+    // Rolls a random whole number in [min, max] (bounds are rounded and
+    // swapped if entered backwards) and shows it via the engine's display.
+    private function rollRandom() as Void {
+        var lo = (Math.round(randMin) as Numeric).toNumber();
+        var hi = (Math.round(randMax) as Numeric).toNumber();
+        if (hi < lo) {
+            var tmp = lo;
+            lo = hi;
+            hi = tmp;
+        }
+        var range = hi - lo + 1;
+        var r = Math.rand() % range;
+        if (r < 0) {
+            r = r + range;
+        }
+        engine.setResult((lo + r).toDouble());
     }
 
     private function convertValue(category as String, from as String, to as String, v as Double) as Double {
@@ -586,6 +709,14 @@ class calc_for_garminView extends WatchUi.View {
         // ("source unit, then target unit") is self-explanatory.
         if ((screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS) && fromUnitKey != null) {
             text = "FROM " + unitLabel(fromUnitKey as String) + "...";
+        } else if (screen == SCREEN_RANDOM) {
+            if (randStage == 0) {
+                text = "MIN? " + text;
+            } else if (randStage == 1) {
+                text = "MIN " + formatWhole(randMin) + " MAX? " + text;
+            } else {
+                text = formatWhole(randMin) + "-" + formatWhole(randMax) + " -> " + text;
+            }
         }
         // Regular text fonts, not FONT_NUMBER_*: the expression can contain
         // letters and symbols (X, =, sin, etc.), and the digit-only number
