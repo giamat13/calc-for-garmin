@@ -1026,11 +1026,50 @@ class calc_for_garminView extends WatchUi.View {
         return null;
     }
 
+    // Modern flat-color-by-category palette (custom hex, not the stock
+    // 16-color Graphics.COLOR_* set) so a glance at a button's color tells
+    // you what kind of thing it does: digits are neutral, math operators
+    // amber, destructive actions coral, "=" green, navigation/menu purple,
+    // scientific functions teal, everything else utility blue.
+    private const ACCENT_DIGIT = 0x23233A;
+    private const ACCENT_OP = 0xFFB020;
+    private const ACCENT_EQUALS = 0x00D68F;
+    private const ACCENT_DESTRUCTIVE = 0xFF5470;
+    private const ACCENT_NAV = 0x7C4DFF;
+    private const ACCENT_FUNC = 0x00BBD3;
+    private const ACCENT_UTILITY = 0x4C6FFF;
+    private const ACCENT_SELECT_RING = 0x00E5FF;
+    private const ACCENT_FROM_UNIT = 0xFFD166;
+    private const BG_TOP = 0x14141F;
+
+    private function buttonColor(action as String) as Number {
+        if (action.equals("equals") || action.equals("eq")) {
+            return ACCENT_EQUALS;
+        } else if (action.equals("clear") || action.equals("back") || action.equals("varClear")) {
+            return ACCENT_DESTRUCTIVE;
+        } else if (action.equals("menu") || action.find("Back") != null || action.equals("basic")) {
+            return ACCENT_NAV;
+        } else if (action.find("digit:") == 0) {
+            return ACCENT_DIGIT;
+        } else if (action.find("op:") == 0) {
+            return ACCENT_OP;
+        } else if (action.find("func:") == 0 || action.find("const:") == 0 || action.equals("sqr") ||
+            action.equals("open") || action.equals("close")) {
+            return ACCENT_FUNC;
+        } else {
+            return ACCENT_UTILITY;
+        }
+    }
+
     function onUpdate(dc as Dc) as Void {
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
+        var headerHBg = (safeH * 0.24).toNumber();
+        dc.setColor(BG_TOP, BG_TOP);
+        dc.fillRectangle(safeX, safeY, safeW, headerHBg);
+
+        dc.setColor(Graphics.COLOR_WHITE, BG_TOP);
         var text = engine.displayText();
         // While picking the unit converter's target unit, show what's been
         // picked so far instead of the raw expression, so the two-tap flow
@@ -1077,25 +1116,45 @@ class calc_for_garminView extends WatchUi.View {
         var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (isSmallCellScreen ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];
+            var minDim = b.w < b.h ? b.w : b.h;
+            var radius = (minDim / 6).toNumber();
+            if (radius < 4) {
+                radius = 4;
+            }
+            // A radius past half the shorter side makes the corner arcs
+            // overlap and pinch a notch into the middle of the edge - cap it.
+            var maxRadius = ((minDim - 6) / 2).toNumber();
+            if (radius > maxRadius) {
+                radius = maxRadius;
+            }
+            if (radius < 0) {
+                radius = 0;
+            }
             var isSelected = i == selectedIndex;
             var isFromUnit = screen == SCREEN_UNIT_PICK && fromUnitKey != null && b.action.equals("unit:" + (fromUnitKey as String));
-            // Orange, not white, for the selection: the icons are white.
-            var fill = isSelected ? Graphics.COLOR_ORANGE : (isFromUnit ? Graphics.COLOR_DK_BLUE : Graphics.COLOR_DK_GRAY);
-            dc.setColor(fill, fill);
-            dc.fillRectangle(b.x + 2, b.y + 2, b.w - 4, b.h - 4);
+            var fill = isFromUnit ? ACCENT_FROM_UNIT : buttonColor(b.action);
 
-            dc.setColor(Graphics.COLOR_LT_GRAY, fill);
-            dc.drawRectangle(b.x + 2, b.y + 2, b.w - 4, b.h - 4);
+            // Selection is a ring drawn AS A SECOND, SLIGHTLY LARGER FILL
+            // underneath the button's own fill (not a stroked outline on
+            // top) - drawRoundedRectangle's stroke overlapped the fill's own
+            // corner arcs and left a black notch cut into the edge.
+            if (isSelected) {
+                dc.setColor(ACCENT_SELECT_RING, ACCENT_SELECT_RING);
+                dc.fillRoundedRectangle(b.x + 1, b.y + 1, b.w - 2, b.h - 2, radius);
+            }
+            dc.setColor(fill, fill);
+            dc.fillRoundedRectangle(b.x + 3, b.y + 3, b.w - 6, b.h - 6, radius);
 
             var icon = b.icon;
+            var labelColor = (fill == ACCENT_FROM_UNIT || fill == ACCENT_OP) ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE;
             if (icon != null) {
                 dc.drawBitmap(b.x + (b.w - icon.getWidth()) / 2, b.y + (b.h - icon.getHeight()) / 2, icon);
             } else {
                 // Every other basic-screen button is a single character;
                 // "MENU" is the one long label there and needs its own
                 // smaller font so it doesn't overflow its cell.
-                var labelFont = (screen == SCREEN_BASIC && b.label.equals("MENU")) ? Graphics.FONT_TINY : buttonFont;
-                dc.setColor(Graphics.COLOR_WHITE, fill);
+                var labelFont = (screen == SCREEN_BASIC && b.label.equals("MENU")) ? Graphics.FONT_XTINY : buttonFont;
+                dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
                 dc.drawText(b.x + b.w / 2, b.y + b.h / 2, labelFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             }
         }
