@@ -2,6 +2,8 @@ import Toybox.Graphics;
 import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.System;
+import Toybox.Communications;
+import Toybox.Application.Storage;
 
 class CalcButton {
     var label as String;
@@ -39,6 +41,21 @@ class calc_for_garminView extends WatchUi.View {
     private var unitCategory as String = "";
     private var fromUnitKey as String? = null;
 
+    // Currency conversion: rates are USD-based (1 USD = rate[code] units of
+    // that currency). Falls back to the last successfully fetched rates
+    // (persisted in Storage), or to this hardcoded table on first-ever use
+    // with no internet and no stored rates.
+    const CURRENCY_KEYS = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"] as Array<String>;
+    const DEFAULT_CURRENCY_RATES = {
+        "USD" => 1.0d,
+        "EUR" => 0.92d,
+        "GBP" => 0.79d,
+        "JPY" => 149.5d,
+        "CAD" => 1.36d,
+        "AUD" => 1.52d,
+    } as Dictionary<String, Double>;
+    private var currencyRates as Dictionary<String, Double> = DEFAULT_CURRENCY_RATES;
+
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
     // largest square that is guaranteed to stay inside the circle.
@@ -49,6 +66,53 @@ class calc_for_garminView extends WatchUi.View {
 
     function initialize() {
         View.initialize();
+        var stored = Storage.getValue("currencyRates");
+        if (stored != null) {
+            currencyRates = stored as Dictionary<String, Double>;
+        }
+    }
+
+    // Best-effort background refresh; whatever's already in currencyRates
+    // (fetched-and-stored, or the hardcoded default) keeps being used for
+    // conversions until/unless this succeeds.
+    private function refreshCurrencyRates() as Void {
+        var options = {
+            :method => Communications.HTTP_REQUEST_METHOD_GET,
+            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON,
+        };
+        Communications.makeWebRequest("https://open.er-api.com/v6/latest/USD", null, options, method(:onCurrencyRatesResponse));
+    }
+
+    function onCurrencyRatesResponse(responseCode as Number, data as Dictionary?) as Void {
+        if (responseCode != 200 || data == null) {
+            return;
+        }
+        var body = data as Dictionary;
+        var rates = body["rates"];
+        if (rates == null) {
+            return;
+        }
+        rates = rates as Dictionary;
+        var fresh = {} as Dictionary<String, Double>;
+        for (var i = 0; i < CURRENCY_KEYS.size(); i++) {
+            var key = CURRENCY_KEYS[i];
+            var r = rates[key];
+            if (r != null) {
+                fresh[key] = (r as Numeric).toDouble();
+            }
+        }
+        if (fresh.size() == 0) {
+            return;
+        }
+        currencyRates = fresh;
+        Storage.setValue("currencyRates", fresh);
+        WatchUi.requestUpdate();
+    }
+
+    // Test-only hook to make currency conversion deterministic without
+    // depending on Storage or network state.
+    function setCurrencyRatesForTest(rates as Dictionary<String, Double>) as Void {
+        currencyRates = rates;
     }
 
     function onLayout(dc as Dc) as Void {
@@ -121,6 +185,7 @@ class calc_for_garminView extends WatchUi.View {
             new CalcButton("TEMP",  "cat:temp"),
             new CalcButton("SPD",   "cat:speed"),
             new CalcButton("VOL",   "cat:vol"),
+            new CalcButton("CUR",   "cat:cur"),
             new CalcButton("BACK",  "sci"),
         ] as Array<CalcButton>;
     }
@@ -137,6 +202,8 @@ class calc_for_garminView extends WatchUi.View {
             return ["kph", "mph"] as Array<String>;
         } else if (category.equals("vol")) {
             return ["l", "gal"] as Array<String>;
+        } else if (category.equals("cur")) {
+            return CURRENCY_KEYS;
         }
         return [] as Array<String>;
     }
@@ -188,7 +255,7 @@ class calc_for_garminView extends WatchUi.View {
         } else if (screen == SCREEN_UNITS) {
             defs = unitCategoryButtons();
             cols = 2;
-            rows = 3;
+            rows = 4;
         } else if (screen == SCREEN_UNIT_PICK) {
             defs = unitPickButtons();
             cols = 2;
@@ -312,6 +379,9 @@ class calc_for_garminView extends WatchUi.View {
         } else if (prefix.equals("cat")) {
             unitCategory = value;
             switchScreen(SCREEN_UNIT_PICK);
+            if (value.equals("cur")) {
+                refreshCurrencyRates();
+            }
         } else if (prefix.equals("unit")) {
             handleUnitTap(value);
         }
@@ -342,6 +412,14 @@ class calc_for_garminView extends WatchUi.View {
     private function convertValue(category as String, from as String, to as String, v as Double) as Double {
         if (category.equals("temp")) {
             return convertTemp(from, to, v);
+        }
+        if (category.equals("cur")) {
+            var rf = currencyRates[from];
+            var rt = currencyRates[to];
+            if (rf == null || rt == null) {
+                return v;
+            }
+            return v / (rf as Double) * (rt as Double);
         }
         var ffrom = unitFactor(category, from);
         var fto = unitFactor(category, to);

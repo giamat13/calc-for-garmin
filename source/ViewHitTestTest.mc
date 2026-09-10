@@ -59,6 +59,30 @@ function testDigitButtonDispatchesToEngine(logger as Test.Logger) as Boolean {
     return v.engine.displayText().equals("7");
 }
 
+// Currency conversion uses fetched/stored rates rather than the static
+// unitFactor table; this pins the USD-based math (v / rate[from] *
+// rate[to]) against a known rate set, independent of Storage/network state.
+(:test)
+function testCurrencyConversionUsesInjectedRates(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.setCurrencyRatesForTest({
+        "USD" => 1.0d,
+        "EUR" => 0.5d,
+    } as Dictionary<String, Double>);
+    v.activate(new CalcButton("CUR", "cat:cur"));
+    v.engine.appendDigit("1");
+    v.engine.appendDigit("0");
+    v.activate(new CalcButton("USD", "unit:USD"));
+    v.activate(new CalcButton("EUR", "unit:EUR"));
+    var got = v.engine.displayText();
+    if (!got.equals("5")) {
+        logger.debug("10 USD at 0.5 EUR/USD should convert to 5, got " + got);
+        return false;
+    }
+    return true;
+}
+
 function checkAllButtonsTappable(logger as Test.Logger, round as Boolean, screen as Number) as Boolean {
     var v = new calc_for_garminView();
     if (screen != 0) {
