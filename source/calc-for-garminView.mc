@@ -26,11 +26,18 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_BASIC = 0;
     const SCREEN_SCIENTIFIC = 1;
     const SCREEN_ADVANCED = 2;
+    const SCREEN_UNITS = 3;       // category picker: weight / distance / temp / ...
+    const SCREEN_UNIT_PICK = 4;   // unit picker for the chosen category
 
     var engine as CalculatorEngine = new CalculatorEngine();
     var screen as Number = SCREEN_BASIC;
     var selectedIndex as Number = 0;
     private var buttons as Array<CalcButton> = [] as Array<CalcButton>;
+
+    // Two-step unit conversion state: first tap picks the source unit
+    // (highlighted), second tap on a different unit performs the conversion.
+    private var unitCategory as String = "";
+    private var fromUnitKey as String? = null;
 
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
@@ -91,7 +98,7 @@ class calc_for_garminView extends WatchUi.View {
             new CalcButton("log", "func:log"), new CalcButton("ln", "func:ln"), new CalcButton("x2", "sqr"), new CalcButton("x", "const:X"),
             new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("^", "op:^"), new CalcButton("pi", "const:π"),
             new CalcButton("e", "const:e"), new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("ADV", "adv"),
-            new CalcButton("BACK", "basic"),
+            new CalcButton("BACK", "basic"), new CalcButton("UC", "units"),
         ] as Array<CalcButton>;
     }
 
@@ -106,6 +113,66 @@ class calc_for_garminView extends WatchUi.View {
         ] as Array<CalcButton>;
     }
 
+    // Step 1 of the unit converter: pick WHAT to measure. 2 cols x 3 rows.
+    private function unitCategoryButtons() as Array<CalcButton> {
+        return [
+            new CalcButton("DIST",  "cat:dist"),
+            new CalcButton("WT",    "cat:weight"),
+            new CalcButton("TEMP",  "cat:temp"),
+            new CalcButton("SPD",   "cat:speed"),
+            new CalcButton("VOL",   "cat:vol"),
+            new CalcButton("BACK",  "sci"),
+        ] as Array<CalcButton>;
+    }
+
+    // The unit keys that belong to each measurement category, in display order.
+    private function unitKeysFor(category as String) as Array<String> {
+        if (category.equals("dist")) {
+            return ["km", "mi", "m", "ft", "cm", "in"] as Array<String>;
+        } else if (category.equals("weight")) {
+            return ["kg", "lb"] as Array<String>;
+        } else if (category.equals("temp")) {
+            return ["c", "f"] as Array<String>;
+        } else if (category.equals("speed")) {
+            return ["kph", "mph"] as Array<String>;
+        } else if (category.equals("vol")) {
+            return ["l", "gal"] as Array<String>;
+        }
+        return [] as Array<String>;
+    }
+
+    private function unitLabel(key as String) as String {
+        if (key.equals("km")) { return "km"; }
+        else if (key.equals("mi")) { return "mi"; }
+        else if (key.equals("m")) { return "m"; }
+        else if (key.equals("ft")) { return "ft"; }
+        else if (key.equals("cm")) { return "cm"; }
+        else if (key.equals("in")) { return "in"; }
+        else if (key.equals("kg")) { return "kg"; }
+        else if (key.equals("lb")) { return "lb"; }
+        else if (key.equals("c")) { return "°C"; }
+        else if (key.equals("f")) { return "°F"; }
+        else if (key.equals("kph")) { return "kph"; }
+        else if (key.equals("mph")) { return "mph"; }
+        else if (key.equals("l")) { return "L"; }
+        else if (key.equals("gal")) { return "gal"; }
+        return key;
+    }
+
+    // Step 2 of the unit converter: pick the source unit, then the target
+    // unit (handled two-tap in activate()/handleUnitTap()). 2 cols, rows
+    // sized to whatever the category needs.
+    private function unitPickButtons() as Array<CalcButton> {
+        var keys = unitKeysFor(unitCategory);
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < keys.size(); i++) {
+            defs.add(new CalcButton(unitLabel(keys[i]), "unit:" + keys[i]));
+        }
+        defs.add(new CalcButton("C", "clear"));
+        defs.add(new CalcButton("BACK", "units"));
+        return defs;
+    }
+
     private function layoutButtons() as Void {
         var defs = basicButtons();
         var cols = 5;
@@ -118,6 +185,14 @@ class calc_for_garminView extends WatchUi.View {
             defs = advancedButtons();
             cols = 4;
             rows = 4;
+        } else if (screen == SCREEN_UNITS) {
+            defs = unitCategoryButtons();
+            cols = 2;
+            rows = 3;
+        } else if (screen == SCREEN_UNIT_PICK) {
+            defs = unitPickButtons();
+            cols = 2;
+            rows = (defs.size() + cols - 1) / cols;
         }
 
         var headerH = (safeH * 0.24).toNumber();
@@ -158,6 +233,7 @@ class calc_for_garminView extends WatchUi.View {
     function switchScreen(newScreen as Number) as Void {
         screen = newScreen;
         selectedIndex = 0;
+        fromUnitKey = null;
         layoutButtons();
     }
 
@@ -172,6 +248,7 @@ class calc_for_garminView extends WatchUi.View {
         var action = b.action;
         if (action.equals("clear")) {
             engine.clear();
+            fromUnitKey = null;
             return;
         } else if (action.equals("back")) {
             engine.backspace();
@@ -187,6 +264,9 @@ class calc_for_garminView extends WatchUi.View {
             return;
         } else if (action.equals("adv")) {
             switchScreen(SCREEN_ADVANCED);
+            return;
+        } else if (action.equals("units")) {
+            switchScreen(SCREEN_UNITS);
             return;
         } else if (action.equals("open")) {
             engine.openParen();
@@ -229,7 +309,82 @@ class calc_for_garminView extends WatchUi.View {
             engine.appendFunction(value);
         } else if (prefix.equals("const")) {
             engine.appendConstant(value);
+        } else if (prefix.equals("cat")) {
+            unitCategory = value;
+            switchScreen(SCREEN_UNIT_PICK);
+        } else if (prefix.equals("unit")) {
+            handleUnitTap(value);
         }
+    }
+
+    // First tap on the unit-pick screen records the source unit (and is
+    // highlighted in onUpdate); the second tap on a *different* unit
+    // evaluates the engine's current expression and converts it. Tapping
+    // the same unit again cancels the selection.
+    private function handleUnitTap(key as String) as Void {
+        if (fromUnitKey == null) {
+            fromUnitKey = key;
+            return;
+        }
+        var from = fromUnitKey as String;
+        fromUnitKey = null;
+        if (from.equals(key)) {
+            return;
+        }
+        var valOrNull = engine.evaluateToDouble();
+        if (valOrNull == null) {
+            return;
+        }
+        var result = convertValue(unitCategory, from, key, valOrNull as Double);
+        engine.setResult(result);
+    }
+
+    private function convertValue(category as String, from as String, to as String, v as Double) as Double {
+        if (category.equals("temp")) {
+            return convertTemp(from, to, v);
+        }
+        var ffrom = unitFactor(category, from);
+        var fto = unitFactor(category, to);
+        if (ffrom == null || fto == null) {
+            return v;
+        }
+        // Every non-temperature unit's factor converts it to a common base
+        // unit (meters / kg / kph / liters), so from->to is a single ratio.
+        return v * (ffrom as Double) / (fto as Double);
+    }
+
+    private function convertTemp(from as String, to as String, v as Double) as Double {
+        if (from.equals(to)) {
+            return v;
+        }
+        if (from.equals("c") && to.equals("f")) {
+            return v * 9.0d / 5.0d + 32.0d;
+        }
+        if (from.equals("f") && to.equals("c")) {
+            return (v - 32.0d) * 5.0d / 9.0d;
+        }
+        return v;
+    }
+
+    private function unitFactor(category as String, key as String) as Double? {
+        if (category.equals("dist")) {
+            if (key.equals("km")) { return 1000.0d; }
+            else if (key.equals("mi")) { return 1609.34d; }
+            else if (key.equals("m")) { return 1.0d; }
+            else if (key.equals("ft")) { return 0.3048d; }
+            else if (key.equals("cm")) { return 0.01d; }
+            else if (key.equals("in")) { return 0.0254d; }
+        } else if (category.equals("weight")) {
+            if (key.equals("kg")) { return 1.0d; }
+            else if (key.equals("lb")) { return 0.453592d; }
+        } else if (category.equals("speed")) {
+            if (key.equals("kph")) { return 1.0d; }
+            else if (key.equals("mph")) { return 1.60934d; }
+        } else if (category.equals("vol")) {
+            if (key.equals("l")) { return 1.0d; }
+            else if (key.equals("gal")) { return 3.78541d; }
+        }
+        return null;
     }
 
     function onUpdate(dc as Dc) as Void {
@@ -238,6 +393,12 @@ class calc_for_garminView extends WatchUi.View {
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         var text = engine.displayText();
+        // While picking the unit converter's target unit, show what's been
+        // picked so far instead of the raw expression, so the two-tap flow
+        // ("source unit, then target unit") is self-explanatory.
+        if (screen == SCREEN_UNIT_PICK && fromUnitKey != null) {
+            text = "FROM " + unitLabel(fromUnitKey as String) + "...";
+        }
         // Regular text fonts, not FONT_NUMBER_*: the expression can contain
         // letters and symbols (X, =, sin, etc.), and the digit-only number
         // fonts have no glyphs for those.
@@ -245,11 +406,12 @@ class calc_for_garminView extends WatchUi.View {
         var headerH = (safeH * 0.24).toNumber();
         dc.drawText(safeX + safeW / 2, safeY + headerH / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : Graphics.FONT_SMALL;
+        var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];
             var isSelected = i == selectedIndex;
-            var fill = isSelected ? Graphics.COLOR_WHITE : Graphics.COLOR_DK_GRAY;
+            var isFromUnit = screen == SCREEN_UNIT_PICK && fromUnitKey != null && b.action.equals("unit:" + (fromUnitKey as String));
+            var fill = isSelected ? Graphics.COLOR_WHITE : (isFromUnit ? Graphics.COLOR_DK_BLUE : Graphics.COLOR_DK_GRAY);
             dc.setColor(fill, fill);
             dc.fillRectangle(b.x + 2, b.y + 2, b.w - 4, b.h - 4);
 

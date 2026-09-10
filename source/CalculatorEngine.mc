@@ -93,6 +93,30 @@ class CalculatorEngine {
         justEvaluated = false;
     }
 
+    // Evaluate the current expression and return the numeric result without
+    // changing the display.  Returns null (and sets errorState) on failure.
+    // Used by the unit-converter screen.
+    function evaluateToDouble() as Double? {
+        if (errorState || expr.length() == 0) {
+            return null;
+        }
+        var parser = new ExprParser(closeUnmatchedParens(expr), 0.0d);
+        var result = parser.parse();
+        if (parser.error) {
+            errorState = true;
+            return null;
+        }
+        return result;
+    }
+
+    // Replace the current expression with a pre-computed numeric result.
+    // Used by the unit-converter screen after applying a conversion factor.
+    function setResult(v as Double) as Void {
+        expr = formatNumber(v);
+        errorState = false;
+        justEvaluated = true;
+    }
+
     // Raw text insertion for things like the "×10^" scientific-notation
     // shortcut, which don't fit the digit/operator/function/constant shapes.
     function appendRaw(text as String) as Void {
