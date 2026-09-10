@@ -39,6 +39,9 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_TIP = 8;         // tip & bill split: bill, tip %, people -> each
     const SCREEN_VAR = 9;         // named variables: store/recall A/B/C/D
     const SCREEN_MENU = 10;       // tool hub: jump straight to any advanced tool
+    const SCREEN_PERSONALIZE = 11; // QR code + link to the setup web page (theme/menu SEED)
+
+    const SETUP_URL = "https://giamat13.github.io/calc-for-garmin/";
 
     // Random/tip/unit-conversion are "embedded flows": the expression being
     // built (e.g. "1+") is stashed here while a temporary value is entered
@@ -106,6 +109,7 @@ class calc_for_garminView extends WatchUi.View {
         if (stored != null) {
             currencyRates = stored as Dictionary<String, Double>;
         }
+        refreshTheme();
     }
 
     // Best-effort background refresh; whatever's already in currencyRates
@@ -157,6 +161,7 @@ class calc_for_garminView extends WatchUi.View {
         currencyRates = rates;
     }
 
+
     function onLayout(dc as Dc) as Void {
         var isRound = System.getDeviceSettings().screenShape == System.SCREEN_SHAPE_ROUND;
         layoutForSize(dc.getWidth(), dc.getHeight(), isRound);
@@ -203,12 +208,37 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     // Tool hub: every advanced tool is one tap away from here instead of
-    // paged through in sequence. 2 cols x 3 rows.
+    // paged through in sequence. Which tools appear and in what order
+    // comes from SeedConfig (set via the setup web page's SEED code);
+    // "Setup" and "BACK" are always appended. 2 cols x 4 rows.
     private function menuButtons() as Array<CalcButton> {
+        var items = SeedConfig.get().menuItems;
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < items.size(); i++) {
+            var item = items[i];
+            if (item.equals("sci")) {
+                defs.add(new CalcButton("fx", "sci"));
+            } else if (item.equals("units")) {
+                defs.add(new CalcButton("Units", "units"));
+            } else if (item.equals("tip")) {
+                defs.add(new CalcButton("Tip", "tip"));
+            } else if (item.equals("rnd")) {
+                defs.add(new CalcButton("RND", "random"));
+            } else if (item.equals("var")) {
+                defs.add(new CalcButton("VAR", "var"));
+            }
+        }
+        defs.add(new CalcButton("Setup", "setup"));
+        defs.add(new CalcButton("BACK", "basic"));
+        return defs;
+    }
+
+    // QR code + "open on phone" link to the setup web page where colors
+    // and the MENU item order are customized into a SEED code, pasted
+    // back into this app's Connect IQ settings. 2 cols x 1 row.
+    private function personalizeButtons() as Array<CalcButton> {
         return [
-            new CalcButton("fx", "sci"), new CalcButton("Units", "units"),
-            new CalcButton("Tip", "tip"), new CalcButton("RND", "random"),
-            new CalcButton("VAR", "var"), new CalcButton("BACK", "basic"),
+            new CalcButton("OPEN", "setupOpen"), new CalcButton("BACK", "menu"),
         ] as Array<CalcButton>;
     }
 
@@ -505,7 +535,11 @@ class calc_for_garminView extends WatchUi.View {
         } else if (screen == SCREEN_MENU) {
             defs = menuButtons();
             cols = 2;
-            rows = 3;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_PERSONALIZE) {
+            defs = personalizeButtons();
+            cols = 2;
+            rows = 1;
         }
 
         // BACK always lands in the grid's bottom-right corner, regardless of
@@ -522,7 +556,7 @@ class calc_for_garminView extends WatchUi.View {
             }
         }
 
-        var headerH = (safeH * 0.24).toNumber();
+        var headerH = (safeH * headerFraction()).toNumber();
         var gridTop = safeY + headerH;
         var gridH = safeH - headerH;
         var cellW = safeW / cols;
@@ -559,6 +593,19 @@ class calc_for_garminView extends WatchUi.View {
         }
     }
 
+    // The personalize screen shows a QR code instead of the expression, so
+    // it gets most of the screen instead of the usual thin header band.
+    private function headerFraction() as Float {
+        return screen == SCREEN_PERSONALIZE ? 0.62 : 0.24;
+    }
+
+    // Public wrapper so App.onSettingsChanged() can rebuild the button grid
+    // (e.g. the MENU screen's item list) after a new SEED is pasted in,
+    // without needing the raw screen dimensions again.
+    function refreshLayout() as Void {
+        layoutButtons();
+    }
+
     function getButtons() as Array<CalcButton> {
         return buttons;
     }
@@ -589,11 +636,36 @@ class calc_for_garminView extends WatchUi.View {
 
     // Stashes the expression being built so a temporary value can be typed
     // on another screen (random range, tip inputs, a value to convert)
-    // without losing it; see exitEmbeddedFlow().
+    // without losing it; see exitEmbeddedFlow(). If what's already typed
+    // is itself a complete, usable value (e.g. "50" before tapping Units)
+    // rather than an unfinished prefix (e.g. "1+"), that value is kept as
+    // the flow's starting value instead of being wiped and forcing a
+    // retype - only an unfinished prefix needs the flow's result spliced
+    // back into it later.
     private function enterEmbeddedFlow() as Void {
-        pendingExpr = engine.expr;
-        pendingCursor = engine.cursorPos;
-        engine.clear();
+        var expr = engine.expr;
+        if (endsMidExpression(expr)) {
+            pendingExpr = expr;
+            pendingCursor = engine.cursorPos;
+            engine.clear();
+        } else {
+            pendingExpr = "";
+            pendingCursor = 0;
+        }
+    }
+
+    // True if expr doesn't yet hold a complete value - empty, or ending in
+    // an operator/open-paren that still needs an operand after it.
+    private function endsMidExpression(expr as String) as Boolean {
+        if (expr.length() == 0) {
+            return true;
+        }
+        if (expr.length() >= 3 && expr.substring(expr.length() - 3, expr.length()).equals("mod")) {
+            return true;
+        }
+        var last = expr.substring(expr.length() - 1, expr.length());
+        return last.equals("+") || last.equals("-") || last.equals("*") || last.equals("/") ||
+            last.equals("^") || last.equals("(");
     }
 
     // Restores the expression stashed by enterEmbeddedFlow(), optionally
@@ -648,6 +720,12 @@ class calc_for_garminView extends WatchUi.View {
             return;
         } else if (action.equals("menu")) {
             switchScreen(SCREEN_MENU);
+            return;
+        } else if (action.equals("setup")) {
+            switchScreen(SCREEN_PERSONALIZE);
+            return;
+        } else if (action.equals("setupOpen")) {
+            Communications.openWebPage(SETUP_URL, null, null);
             return;
         } else if (action.equals("adv")) {
             switchScreen(SCREEN_ADVANCED);
@@ -1031,16 +1109,30 @@ class calc_for_garminView extends WatchUi.View {
     // you what kind of thing it does: digits are neutral, math operators
     // amber, destructive actions coral, "=" green, navigation/menu purple,
     // scientific functions teal, everything else utility blue.
-    private const ACCENT_DIGIT = 0x23233A;
-    private const ACCENT_OP = 0xFFB020;
-    private const ACCENT_EQUALS = 0x00D68F;
-    private const ACCENT_DESTRUCTIVE = 0xFF5470;
-    private const ACCENT_NAV = 0x7C4DFF;
+    // The 5 theme-able accents (digit/op/equals/destructive/nav) come from
+    // SeedConfig - the stock look until the setup web page's SEED code is
+    // pasted into this app's Connect IQ settings. See refreshTheme().
+    private var ACCENT_DIGIT = 0x23233A;
+    private var ACCENT_OP = 0xFFB020;
+    private var ACCENT_EQUALS = 0x00D68F;
+    private var ACCENT_DESTRUCTIVE = 0xFF5470;
+    private var ACCENT_NAV = 0x7C4DFF;
     private const ACCENT_FUNC = 0x00BBD3;
     private const ACCENT_UTILITY = 0x4C6FFF;
     private const ACCENT_SELECT_RING = 0x00E5FF;
     private const ACCENT_FROM_UNIT = 0xFFD166;
     private const BG_TOP = 0x14141F;
+
+    // Re-reads the 5 accent colors from SeedConfig; call on launch and
+    // whenever the phone's Settings UI may have changed the pasted SEED.
+    function refreshTheme() as Void {
+        var colors = SeedConfig.get().colors;
+        ACCENT_DIGIT = colors[0];
+        ACCENT_OP = colors[1];
+        ACCENT_EQUALS = colors[2];
+        ACCENT_DESTRUCTIVE = colors[3];
+        ACCENT_NAV = colors[4];
+    }
 
     private function buttonColor(action as String) as Number {
         if (action.equals("equals") || action.equals("eq")) {
@@ -1065,47 +1157,57 @@ class calc_for_garminView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
 
-        var headerHBg = (safeH * 0.24).toNumber();
+        var headerHBg = (safeH * headerFraction()).toNumber();
         dc.setColor(BG_TOP, BG_TOP);
         dc.fillRectangle(safeX, safeY, safeW, headerHBg);
 
-        dc.setColor(Graphics.COLOR_WHITE, BG_TOP);
-        var text = engine.displayText();
-        // While picking the unit converter's target unit, show what's been
-        // picked so far instead of the raw expression, so the two-tap flow
-        // ("source unit, then target unit") is self-explanatory.
-        if ((screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS) && fromUnitKey != null) {
-            text = "FROM " + unitLabel(fromUnitKey as String) + "...";
-        } else if (screen == SCREEN_RANDOM) {
-            if (randStage == 0) {
-                text = "MIN? " + text;
-            } else {
-                text = "MIN " + formatWhole(randMin) + " MAX? " + text;
+        if (screen == SCREEN_PERSONALIZE) {
+            var qr = WatchUi.loadResource(Rez.Drawables.QrCode) as WatchUi.BitmapResource;
+            var qrX = safeX + (safeW - qr.getWidth()) / 2;
+            var qrY = safeY + 6;
+            dc.drawBitmap(qrX, qrY, qr);
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(safeX + safeW / 2, safeY + headerHBg - 16, Graphics.FONT_XTINY,
+                "Scan or tap OPEN", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else {
+            dc.setColor(Graphics.COLOR_WHITE, BG_TOP);
+            var text = engine.displayText();
+            // While picking the unit converter's target unit, show what's
+            // been picked so far instead of the raw expression, so the
+            // two-tap flow ("source unit, then target unit") is
+            // self-explanatory.
+            if ((screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS) && fromUnitKey != null) {
+                text = "FROM " + unitLabel(fromUnitKey as String) + "...";
+            } else if (screen == SCREEN_RANDOM) {
+                if (randStage == 0) {
+                    text = "MIN? " + text;
+                } else {
+                    text = "MIN " + formatWhole(randMin) + " MAX? " + text;
+                }
+            } else if (screen == SCREEN_TIP) {
+                if (tipStage == 0) {
+                    text = "BILL? " + text;
+                } else if (tipStage == 1) {
+                    text = "TIP%? " + text;
+                } else {
+                    text = "PPL? " + text;
+                }
             }
-        } else if (screen == SCREEN_TIP) {
-            if (tipStage == 0) {
-                text = "BILL? " + text;
-            } else if (tipStage == 1) {
-                text = "TIP%? " + text;
-            } else {
-                text = "PPL? " + text;
+            // Regular text fonts, not FONT_NUMBER_*: the expression can
+            // contain letters and symbols (X, =, sin, etc.), and the
+            // digit-only number fonts have no glyphs for those.
+            var font = text.length() > 10 ? Graphics.FONT_TINY : (text.length() > 6 ? Graphics.FONT_SMALL : Graphics.FONT_LARGE);
+            dc.drawText(safeX + safeW / 2, safeY + headerHBg / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            var setVars = "";
+            var varNames = ["A", "B", "C", "D"];
+            for (var vi = 0; vi < varNames.size(); vi++) {
+                if (engine.variables.hasKey(varNames[vi])) {
+                    setVars += varNames[vi];
+                }
             }
-        }
-        // Regular text fonts, not FONT_NUMBER_*: the expression can contain
-        // letters and symbols (X, =, sin, etc.), and the digit-only number
-        // fonts have no glyphs for those.
-        var font = text.length() > 10 ? Graphics.FONT_TINY : (text.length() > 6 ? Graphics.FONT_SMALL : Graphics.FONT_LARGE);
-        var headerH = (safeH * 0.24).toNumber();
-        dc.drawText(safeX + safeW / 2, safeY + headerH / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        var setVars = "";
-        var varNames = ["A", "B", "C", "D"];
-        for (var vi = 0; vi < varNames.size(); vi++) {
-            if (engine.variables.hasKey(varNames[vi])) {
-                setVars += varNames[vi];
+            if (setVars.length() > 0) {
+                dc.drawText(safeX, safeY, Graphics.FONT_XTINY, setVars, Graphics.TEXT_JUSTIFY_LEFT);
             }
-        }
-        if (setVars.length() > 0) {
-            dc.drawText(safeX, safeY, Graphics.FONT_XTINY, setVars, Graphics.TEXT_JUSTIFY_LEFT);
         }
 
         // Small-cell screens (long labels like "asin"/"floor" packed 4x6, or

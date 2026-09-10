@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>עיצוב אישי - calc-for-garmin</title>
+<style>
+  :root {
+    --bg: #0f0f17;
+    --card: #181826;
+    --card-border: #2a2a3c;
+    --text: #f2f2f7;
+    --muted: #9797ab;
+    --accent: #7c4dff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    padding: 16px;
+    padding-bottom: 60px;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 4px;
+  }
+  .sub {
+    color: var(--muted);
+    margin: 0 0 20px;
+    font-size: 0.95rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 1.05rem;
+    margin: 0 0 12px;
+  }
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .preset-btn {
+    background: #22223a;
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 12px 8px;
+    font-size: 0.9rem;
+    text-align: center;
+    cursor: pointer;
+  }
+  .preset-btn:active { transform: scale(0.97); }
+  .colors {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #12121e;
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+  .color-row label {
+    flex: 1;
+    font-size: 0.9rem;
+  }
+  .color-row input[type=color] {
+    width: 44px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    padding: 0;
+  }
+  .preview {
+    background: #000;
+    border-radius: 14px;
+    padding: 10px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    max-width: 260px;
+    margin: 0 auto;
+  }
+  .preview .disp {
+    grid-column: 1 / -1;
+    background: #14141f;
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: left;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+  .preview .k {
+    border-radius: 10px;
+    padding: 12px 0;
+    text-align: center;
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.9rem;
+  }
+  .menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #12121e;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .menu-item.disabled { opacity: 0.4; }
+  .menu-item .name {
+    flex: 1;
+    font-size: 0.95rem;
+  }
+  .menu-item button {
+    background: #22223a;
+    color: var(--text);
+    border: none;
+    border-radius: 8px;
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .menu-item input[type=checkbox] {
+    width: 20px;
+    height: 20px;
+  }
+  textarea, .seed-box {
+    width: 100%;
+    background: #0b0b12;
+    color: #b9ffcf;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+    direction: ltr;
+    text-align: left;
+    word-break: break-all;
+  }
+  .row {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  button.primary {
+    flex: 1;
+    background: linear-gradient(135deg, #7c4dff, #00bbd3);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary {
+    flex: 1;
+    background: #22223a;
+    color: var(--text);
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .steps {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    margin: 0;
+    padding-inline-start: 20px;
+  }
+  .copied {
+    color: #00d68f;
+    font-size: 0.85rem;
+    margin-top: 6px;
+    height: 1.2em;
+  }
+</style>
+</head>
+<body>
+
+<h1>🎨 עיצוב אישי למחשבון</h1>
+<p class="sub">בחרו תבנית, שנו צבעים וסדר תפריט, ובסוף תקבלו קוד SEED להדבקה בהגדרות האפליקציה בשעון.</p>
+
+<div class="card">
+  <h2>1. תבנית מוכנה</h2>
+  <div class="presets">
+    <div class="preset-btn" data-preset="regular">רגיל</div>
+    <div class="preset-btn" data-preset="beginner">מתחיל</div>
+    <div class="preset-btn" data-preset="daily">יומיומי</div>
+    <div class="preset-btn" data-preset="advanced">מתמטיקאי מתקדם</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>2. תצוגה מקדימה</h2>
+  <div class="preview" id="preview"></div>
+</div>
+
+<div class="card">
+  <h2>3. צבעים</h2>
+  <div class="colors" id="colors"></div>
+</div>
+
+<div class="card">
+  <h2>4. תפריט הכלים (MENU)</h2>
+  <p class="sub" style="margin-bottom:10px">סמנו אילו כלים יופיעו בתפריט, והשתמשו בחיצים לשינוי הסדר.</p>
+  <div class="menu-list" id="menuList"></div>
+</div>
+
+<div class="card">
+  <h2>5. ייבוא קוד קיים (אופציונלי)</h2>
+  <textarea id="importBox" rows="2" placeholder="הדביקו כאן SEED קיים לעריכה"></textarea>
+  <div class="row">
+    <button class="secondary" id="loadBtn">טען SEED</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>6. קבלת קוד SEED</h2>
+  <div class="row">
+    <button class="primary" id="genBtn">צור SEED</button>
+  </div>
+  <textarea class="seed-box" id="seedOut" rows="3" readonly style="margin-top:12px"></textarea>
+  <div class="row">
+    <button class="secondary" id="copyBtn">העתק</button>
+  </div>
+  <div class="copied" id="copiedMsg"></div>
+  <ol class="steps">
+    <li>העתיקו את קוד ה-SEED שלמעלה.</li>
+    <li>באפליקציית Garmin Connect בטלפון: המכשיר שלי → אפליקציות של השעון → calc-for-garmin → הגדרות.</li>
+    <li>הדביקו את הקוד בשדה "Theme &amp; menu code" ושמרו.</li>
+    <li>השינויים מסתנכרנים לשעון אוטומטית תוך כמה שניות.</li>
+  </ol>
+</div>
+
+<script>
+(function () {
+  var COLOR_KEYS = ["digit", "op", "equals", "destructive", "nav"];
+  var COLOR_LABELS = {
+    digit: "ספרות",
+    op: "אופרטורים (+ − × ÷)",
+    equals: "כפתור =",
+    destructive: "מחיקה / C",
+    nav: "ניווט (MENU / BACK)"
+  };
+  var MENU_KEYS = ["sci", "units", "tip", "rnd", "var"];
+  var MENU_LABELS = {
+    sci: "מדעי (fx)",
+    units: "המרת יחידות",
+    tip: "טיפ / פיצול חשבון",
+    rnd: "מספר אקראי",
+    var: "משתנים (A/B/C/D)"
+  };
+
+  var PRESETS = {
+    regular: {
+      colors: { digit: "23233a", op: "ffb020", equals: "00d68f", destructive: "ff5470", nav: "7c4dff" },
+      menu: ["sci", "units", "tip", "rnd", "var"]
+    },
+    beginner: {
+      colors: { digit: "2e3a46", op: "4fc3f7", equals: "66bb6a", destructive: "ef5350", nav: "29b6f6" },
+      menu: ["tip", "units"]
+    },
+    daily: {
+      colors: { digit: "3a2e28", op: "ffa726", equals: "26a69a", destructive: "ef6c75", nav: "8d6e63" },
+      menu: ["tip", "units", "rnd", "var"]
+    },
+    advanced: {
+      colors: { digit: "1a1a2e", op: "00e5ff", equals: "7c4dff", destructive: "ff1744", nav: "536dfe" },
+      menu: ["sci", "var", "units"]
+    }
+  };
+
+  var state = {
+    colors: Object.assign({}, PRESETS.regular.colors),
+    // every key present, "enabled" list keeps only the checked ones in order
+    order: MENU_KEYS.slice(),
+    enabled: {}
+  };
+  MENU_KEYS.forEach(function (k) { state.enabled[k] = PRESETS.regular.menu.indexOf(k) !== -1; });
+  // put enabled items first, in the preset's order
+  reorderFromEnabledFirst(PRESETS.regular.menu);
+
+  function reorderFromEnabledFirst(enabledOrder) {
+    var rest = MENU_KEYS.filter(function (k) { return enabledOrder.indexOf(k) === -1; });
+    state.order = enabledOrder.concat(rest);
+  }
+
+  function applyPreset(name) {
+    var p = PRESETS[name];
+    if (!p) { return; }
+    state.colors = Object.assign({}, p.colors);
+    MENU_KEYS.forEach(function (k) { state.enabled[k] = p.menu.indexOf(k) !== -1; });
+    reorderFromEnabledFirst(p.menu);
+    renderColors();
+    renderMenu();
+    renderPreview();
+  }
+
+  function renderColors() {
+    var el = document.getElementById("colors");
+    el.innerHTML = "";
+    COLOR_KEYS.forEach(function (key) {
+      var row = document.createElement("div");
+      row.className = "color-row";
+      var label = document.createElement("label");
+      label.textContent = COLOR_LABELS[key];
+      var input = document.createElement("input");
+      input.type = "color";
+      input.value = "#" + state.colors[key];
+      input.addEventListener("input", function () {
+        state.colors[key] = input.value.replace("#", "");
+        renderPreview();
+      });
+      row.appendChild(label);
+      row.appendChild(input);
+      el.appendChild(row);
+    });
+  }
+
+  function move(key, delta) {
+    var idx = state.order.indexOf(key);
+    var swapWith = idx + delta;
+    if (swapWith < 0 || swapWith >= state.order.length) { return; }
+    var tmp = state.order[idx];
+    state.order[idx] = state.order[swapWith];
+    state.order[swapWith] = tmp;
+    renderMenu();
+  }
+
+  function renderMenu() {
+    var el = document.getElementById("menuList");
+    el.innerHTML = "";
+    state.order.forEach(function (key, i) {
+      var row = document.createElement("div");
+      row.className = "menu-item" + (state.enabled[key] ? "" : " disabled");
+
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = state.enabled[key];
+      cb.addEventListener("change", function () {
+        state.enabled[key] = cb.checked;
+        row.className = "menu-item" + (state.enabled[key] ? "" : " disabled");
+      });
+
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = MENU_LABELS[key];
+
+      var up = document.createElement("button");
+      up.textContent = "↑";
+      up.addEventListener("click", function () { move(key, -1); });
+
+      var down = document.createElement("button");
+      down.textContent = "↓";
+      down.addEventListener("click", function () { move(key, 1); });
+
+      row.appendChild(cb);
+      row.appendChild(name);
+      row.appendChild(up);
+      row.appendChild(down);
+      el.appendChild(row);
+    });
+  }
+
+  function renderPreview() {
+    var el = document.getElementById("preview");
+    el.innerHTML = "";
+    var disp = document.createElement("div");
+    disp.className = "disp";
+    disp.style.color = "#fff";
+    disp.textContent = "12+8";
+    el.appendChild(disp);
+
+    var keys = [
+      ["C", "destructive"], ["DEL", "destructive"], ["%", "op"], ["÷", "op"],
+      ["1", "digit"], ["2", "digit"], ["3", "digit"], ["×", "op"],
+      ["4", "digit"], ["5", "digit"], ["6", "digit"], ["−", "op"],
+      ["MENU", "nav"], ["0", "digit"], [".", "digit"], ["=", "equals"]
+    ];
+    keys.forEach(function (pair) {
+      var b = document.createElement("div");
+      b.className = "k";
+      b.style.background = "#" + state.colors[pair[1]];
+      if (pair[1] === "op") { b.style.color = "#000"; }
+      b.textContent = pair[0];
+      el.appendChild(b);
+    });
+  }
+
+  function generateSeed() {
+    var cStr = "C=" + COLOR_KEYS.map(function (k) { return state.colors[k]; }).join(",");
+    var enabledOrdered = state.order.filter(function (k) { return state.enabled[k]; });
+    var mStr = "M=" + enabledOrdered.join(",");
+    return "1|" + cStr + "|" + mStr;
+  }
+
+  function parseSeed(seed) {
+    seed = (seed || "").trim();
+    if (seed.substring(0, 2) !== "1|") { return null; }
+    var fields = seed.substring(2).split("|");
+    var colors = null, menu = null;
+    fields.forEach(function (f) {
+      if (f.indexOf("C=") === 0) {
+        var parts = f.substring(2).split(",");
+        if (parts.length === 5) {
+          colors = {};
+          COLOR_KEYS.forEach(function (k, i) { colors[k] = parts[i].toLowerCase(); });
+        }
+      } else if (f.indexOf("M=") === 0) {
+        menu = f.substring(2).split(",").filter(function (x) { return MENU_KEYS.indexOf(x) !== -1; });
+      }
+    });
+    if (!colors && !menu) { return null; }
+    return { colors: colors, menu: menu };
+  }
+
+  document.querySelectorAll(".preset-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () { applyPreset(btn.getAttribute("data-preset")); });
+  });
+
+  document.getElementById("genBtn").addEventListener("click", function () {
+    document.getElementById("seedOut").value = generateSeed();
+    document.getElementById("copiedMsg").textContent = "";
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", function () {
+    var box = document.getElementById("seedOut");
+    if (!box.value) { box.value = generateSeed(); }
+    box.select();
+    var msg = document.getElementById("copiedMsg");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(box.value).then(function () {
+        msg.textContent = "הועתק!";
+      }).catch(function () {
+        document.execCommand("copy");
+        msg.textContent = "הועתק!";
+      });
+    } else {
+      document.execCommand("copy");
+      msg.textContent = "הועתק!";
+    }
+  });
+
+  document.getElementById("loadBtn").addEventListener("click", function () {
+    var parsed = parseSeed(document.getElementById("importBox").value);
+    if (!parsed) {
+      alert("קוד לא תקין");
+      return;
+    }
+    if (parsed.colors) { state.colors = parsed.colors; }
+    if (parsed.menu) {
+      MENU_KEYS.forEach(function (k) { state.enabled[k] = parsed.menu.indexOf(k) !== -1; });
+      reorderFromEnabledFirst(parsed.menu);
+    }
+    renderColors();
+    renderMenu();
+    renderPreview();
+  });
+
+  renderColors();
+  renderMenu();
+  renderPreview();
+})();
+</script>
+
+</body>
+</html>
