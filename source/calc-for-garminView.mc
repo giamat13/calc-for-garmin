@@ -1022,8 +1022,12 @@ class calc_for_garminView extends WatchUi.View {
             dc.drawText(safeX, safeY, Graphics.FONT_XTINY, setVars, Graphics.TEXT_JUSTIFY_LEFT);
         }
 
-        var isUnitScreen = screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS || screen == SCREEN_VAR;
-        var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (isUnitScreen ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
+        // Small-cell screens (long labels like "asin"/"floor" packed 4x6, or
+        // narrow 2-col pickers) need FONT_TINY - FONT_SMALL overflows the
+        // cell and bleeds into neighboring buttons.
+        var isSmallCellScreen = screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER ||
+            screen == SCREEN_CUR_RESULTS || screen == SCREEN_VAR || screen == SCREEN_ADVANCED || screen == SCREEN_SCIENTIFIC;
+        var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (isSmallCellScreen ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];
             var isSelected = i == selectedIndex;
