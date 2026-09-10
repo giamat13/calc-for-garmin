@@ -126,6 +126,9 @@ class calc_for_garminView extends WatchUi.View {
         }
         currencyRates = fresh;
         Storage.setValue("currencyRates", fresh);
+        // Rebuild buttons too: a letter screen opened before the fetch landed
+        // would otherwise keep showing only the default codes' letters.
+        layoutButtons();
         WatchUi.requestUpdate();
     }
 
