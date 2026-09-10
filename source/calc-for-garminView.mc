@@ -508,16 +508,30 @@ class calc_for_garminView extends WatchUi.View {
             rows = 3;
         }
 
+        // BACK always lands in the grid's bottom-right corner, regardless of
+        // how many other buttons come before it or whether the last row is
+        // fully packed - otherwise its position shifts from screen to
+        // screen, which is what made it confusing to find.
+        var backBtn = null as CalcButton?;
+        var others = [] as Array<CalcButton>;
+        for (var oi = 0; oi < defs.size(); oi++) {
+            if (backBtn == null && defs[oi].label.equals("BACK")) {
+                backBtn = defs[oi];
+            } else {
+                others.add(defs[oi]);
+            }
+        }
+
         var headerH = (safeH * 0.24).toNumber();
         var gridTop = safeY + headerH;
         var gridH = safeH - headerH;
         var cellW = safeW / cols;
         var cellH = gridH / rows;
 
-        for (var i = 0; i < defs.size(); i++) {
+        for (var i = 0; i < others.size(); i++) {
             var row = i / cols;
             var col = i % cols;
-            var b = defs[i];
+            var b = others[i];
             b.x = safeX + col * cellW;
             b.y = gridTop + row * cellH;
             b.w = cellW;
@@ -527,7 +541,19 @@ class calc_for_garminView extends WatchUi.View {
                 b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
             }
         }
-        buttons = defs;
+        if (backBtn != null) {
+            var b = backBtn as CalcButton;
+            b.x = safeX + (cols - 1) * cellW;
+            b.y = gridTop + (rows - 1) * cellH;
+            b.w = cellW;
+            b.h = cellH;
+            var iconId = iconFor(b.action, b.label);
+            if (iconId != null) {
+                b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
+            }
+            others.add(b);
+        }
+        buttons = others;
         if (selectedIndex >= buttons.size()) {
             selectedIndex = 0;
         }
