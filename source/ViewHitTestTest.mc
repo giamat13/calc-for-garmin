@@ -7,7 +7,7 @@ import Toybox.Lang;
 // so a failure here means taps really would miss buttons on-device.
 (:test)
 function testBasicScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
-    return checkAllButtonsTappable(logger, false, false) && checkAllButtonsTappable(logger, true, false);
+    return checkAllButtonsTappable(logger, false, 0) && checkAllButtonsTappable(logger, true, 0);
 }
 
 (:test)
@@ -145,6 +145,35 @@ function checkAllButtonsTappable(logger as Test.Logger, round as Boolean, screen
             logger.debug("button '" + b.label + "' center resolved to a different button index " + idx + " instead of " + i);
             return false;
         }
+    }
+    return true;
+}
+
+// The letter screen used to call Array.sort(), which only exists from CIQ
+// 3.4.0 and crashed on 3.3 devices (vivoactive 4s). This pins both that the
+// screen builds at all and that the letters come out sorted.
+(:test)
+function testCurrencyLetterScreenIsSortedWithoutArraySort(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.setCurrencyRatesForTest({
+        "ZAR" => 18.0d,
+        "AUD" => 1.5d,
+        "MXN" => 17.0d,
+        "AED" => 3.6d,
+    } as Dictionary<String, Double>);
+    v.activate(new CalcButton("CUR", "cat:cur"));
+    v.activate(new CalcButton("OTHER", "curOther"));
+    var buttons = v.getButtons();
+    var letters = "";
+    for (var i = 0; i < buttons.size(); i++) {
+        if (buttons[i].action.find("curletter:") == 0) {
+            letters += buttons[i].label;
+        }
+    }
+    if (!letters.equals("AMZ")) {
+        logger.debug("expected sorted letters AMZ, got " + letters);
+        return false;
     }
     return true;
 }

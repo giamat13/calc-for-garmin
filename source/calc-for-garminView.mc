@@ -271,6 +271,36 @@ class calc_for_garminView extends WatchUi.View {
         return defs;
     }
 
+    // Array.sort() is CIQ 3.4.0+; vivoactive 4s and friends cap at 3.3, so
+    // sorting there throws Symbol Not Found. Insertion sort over char codes
+    // instead - the lists here are letters and currency codes, tens of items.
+    private function sortStrings(arr as Array<String>) as Array<String> {
+        for (var i = 1; i < arr.size(); i++) {
+            var v = arr[i];
+            var j = i - 1;
+            while (j >= 0 && stringLess(v, arr[j])) {
+                arr[j + 1] = arr[j];
+                j--;
+            }
+            arr[j + 1] = v;
+        }
+        return arr;
+    }
+
+    private function stringLess(a as String, b as String) as Boolean {
+        var ca = a.toCharArray();
+        var cb = b.toCharArray();
+        var n = ca.size() < cb.size() ? ca.size() : cb.size();
+        for (var i = 0; i < n; i++) {
+            var da = ca[i].toNumber();
+            var db = cb[i].toNumber();
+            if (da != db) {
+                return da < db;
+            }
+        }
+        return ca.size() < cb.size();
+    }
+
     // First letters of every known currency code, sorted, for the
     // autocomplete letter screen.
     private function currencyLetters() as Array<String> {
@@ -288,8 +318,7 @@ class calc_for_garminView extends WatchUi.View {
                 letters.add(letter);
             }
         }
-        letters.sort(null);
-        return letters;
+        return sortStrings(letters);
     }
 
     private function curLetterButtons() as Array<CalcButton> {
@@ -314,8 +343,7 @@ class calc_for_garminView extends WatchUi.View {
                 out.add(k);
             }
         }
-        out.sort(null);
-        return out;
+        return sortStrings(out);
     }
 
     private function curResultButtons() as Array<CalcButton> {
