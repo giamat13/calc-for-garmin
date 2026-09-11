@@ -35,6 +35,23 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
         return handleTapAt(coords[0], coords[1]);
     }
 
+    // Touch-only: a swipe moves the cursor exactly like the "<"/">"
+    // buttons (curLeft/curRight). No isTouchScreen check needed - a
+    // button-only device has no touchscreen to swipe on, so onSwipe
+    // simply never fires there.
+    function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
+        var dir = swipeEvent.getDirection();
+        if (dir == WatchUi.SWIPE_LEFT) {
+            view.engine.moveCursorLeft();
+        } else if (dir == WatchUi.SWIPE_RIGHT) {
+            view.engine.moveCursorRight();
+        } else {
+            return false;
+        }
+        WatchUi.requestUpdate();
+        return true;
+    }
+
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
         var key = keyEvent.getKey();
         if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
