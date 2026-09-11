@@ -45,6 +45,7 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_PCT = 12;         // advanced %: discount / markup / margin
     const SCREEN_DATE = 13;        // date tool: days until a date, or exact age
     const SCREEN_MORE = 14;        // overflow hub off the Scientific screen: VAR/PCT+/DATE
+    const SCREEN_NAV = 15;         // editing helpers off MENU: cursor arrows, Ans, brackets
 
     const SETUP_URL = "https://giamat13.github.io/calc-for-garmin/";
 
@@ -255,7 +256,7 @@ class calc_for_garminView extends WatchUi.View {
         else if (token.equals("uc")) { return new CalcButton("UC", "units"); }
         else if (token.equals("rnd")) { return new CalcButton("RND", "random"); }
         else if (token.equals("tip")) { return new CalcButton("TIP", "tip"); }
-        else if (token.equals("eqIns")) { return new CalcButton("EQ", "eq"); }
+        else if (token.equals("eqIns")) { return new CalcButton("=", "eq"); }
         else if (token.equals("ans")) { return new CalcButton("Ans", "ans"); }
         else if (token.equals("curl")) { return new CalcButton("<", "curLeft"); }
         else if (token.equals("curr")) { return new CalcButton(">", "curRight"); }
@@ -273,16 +274,9 @@ class calc_for_garminView extends WatchUi.View {
         else if (token.equals("floor")) { return new CalcButton("floor", "func:floor"); }
         else if (token.equals("ceil")) { return new CalcButton("ceil", "func:ceil"); }
         else if (token.equals("pow10")) { return new CalcButton("10x", "pow10"); }
+        else if (token.equals("frac")) { return new CalcButton("a/b", "frac"); }
         else if (token.equals("var")) { return new CalcButton("VAR", "var"); }
         else if (token.equals("backSci")) { return new CalcButton("BACK", "sci"); }
-        else if (token.equals("stoA")) { return new CalcButton("STO A", "sto:A"); }
-        else if (token.equals("stoB")) { return new CalcButton("STO B", "sto:B"); }
-        else if (token.equals("stoC")) { return new CalcButton("STO C", "sto:C"); }
-        else if (token.equals("stoD")) { return new CalcButton("STO D", "sto:D"); }
-        else if (token.equals("rclA")) { return new CalcButton("RCL A", "rcl:A"); }
-        else if (token.equals("rclB")) { return new CalcButton("RCL B", "rcl:B"); }
-        else if (token.equals("rclC")) { return new CalcButton("RCL C", "rcl:C"); }
-        else if (token.equals("rclD")) { return new CalcButton("RCL D", "rcl:D"); }
         else if (token.equals("clr")) { return new CalcButton("CLR", "varClear"); }
         else if (token.equals("dist")) { return new CalcButton("DIST", "cat:dist"); }
         else if (token.equals("wt")) { return new CalcButton("WT", "cat:weight"); }
@@ -341,6 +335,8 @@ class calc_for_garminView extends WatchUi.View {
                 defs.add(new CalcButton("PCT+", "apct"));
             } else if (item.equals("date")) {
                 defs.add(new CalcButton("DATE", "date"));
+            } else if (item.equals("nav")) {
+                defs.add(new CalcButton("NAV", "nav"));
             }
         }
         defs.add(new CalcButton("BACK", "basic"));
@@ -370,10 +366,29 @@ class calc_for_garminView extends WatchUi.View {
         return buttonsFromTokens(SeedConfig.get().advLayout);
     }
 
-    // Named-variable screen: store the currently typed value under A/B/C/D,
-    // or recall one back into the expression at the cursor. 2 cols x 5 rows.
+    // Every letter usable as an algebraic unknown, e.g. tapping X then
+    // building "2X+3=10" and hitting "=" on the basic screen solves for X
+    // (CalculatorEngine.solveEquation). Fixed, not seed-customizable - a
+    // shuffled alphabet has no benefit, unlike the other 4 screens.
+    // S,C,T,L,A,F,M are omitted: each is the first letter of a real
+    // function name (sin/cos/tan/log|ln/asin|acos|atan|abs/floor|fact/mod),
+    // so two of those letters typed back-to-back with no operator between
+    // would parse as that function's name instead of two variables
+    // multiplied. E is omitted too - it's always Euler's constant to the
+    // parser (ExprParser.mc), never an unknown to solve for.
+    private const VAR_LETTERS = [
+        "B", "D", "G", "H", "I", "J", "K", "N", "O", "P", "Q", "R", "U", "V", "W", "X", "Y", "Z"
+    ] as Array<String>;
+
     private function varButtons() as Array<CalcButton> {
-        return buttonsFromTokens(SeedConfig.get().varLayout);
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < VAR_LETTERS.size(); i++) {
+            defs.add(new CalcButton(VAR_LETTERS[i], "const:" + VAR_LETTERS[i]));
+        }
+        defs.add(new CalcButton("=", "eq"));
+        defs.add(new CalcButton("CLR", "varClear"));
+        defs.add(new CalcButton("BACK", "menu"));
+        return defs;
     }
 
     // Step 1 of the unit converter: pick WHAT to measure. 3 cols x 4 rows.
@@ -590,6 +605,17 @@ class calc_for_garminView extends WatchUi.View {
         ] as Array<CalcButton>;
     }
 
+    // Editing-helper screen off MENU: cursor arrows, Ans and the smart
+    // brackets, split out on their own page instead of only living on the
+    // Scientific screen. Fixed, not seed-customizable, same as VAR.
+    private function navButtons() as Array<CalcButton> {
+        return [
+            new CalcButton("<", "curLeft"), new CalcButton(">", "curRight"), new CalcButton("Ans", "ans"),
+            new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("a/b", "frac"),
+            new CalcButton("BACK", "menu"),
+        ] as Array<CalcButton>;
+    }
+
     // Compact 4x4 numeric keypad shared by the random and tip screens.
     private function keypadButtons(backAction as String, nextLabel as String, nextAction as String) as Array<CalcButton> {
         var defs = [] as Array<CalcButton>;
@@ -661,9 +687,13 @@ class calc_for_garminView extends WatchUi.View {
             defs = moreButtons();
             cols = 2;
             rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_NAV) {
+            defs = navButtons();
+            cols = 3;
+            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_VAR) {
             defs = varButtons();
-            cols = 2;
+            cols = 5;
             rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_MENU) {
             defs = menuButtons();
@@ -676,14 +706,15 @@ class calc_for_garminView extends WatchUi.View {
         }
 
         // BACK lands in the grid's bottom-right corner on every screen
-        // EXCEPT the fully customizable ones (basic/sci/adv/var/units),
-        // where BACK is just another token in SeedConfig's pool and can be
-        // moved anywhere like any other button - otherwise a user-chosen
-        // BACK position would be silently overridden right back to the
-        // corner. Elsewhere it's still pinned so it doesn't shift from
-        // screen to screen, which is what made it confusing to find.
+        // EXCEPT the fully customizable ones (basic/sci/adv/units), where
+        // BACK is just another token in SeedConfig's pool and can be moved
+        // anywhere like any other button - otherwise a user-chosen BACK
+        // position would be silently overridden right back to the corner.
+        // Elsewhere it's still pinned so it doesn't shift from screen to
+        // screen, which is what made it confusing to find. VAR's letters
+        // are fixed (not in the pool), so it's pinned too.
         var customizableScreen = screen == SCREEN_BASIC || screen == SCREEN_SCIENTIFIC ||
-            screen == SCREEN_ADVANCED || screen == SCREEN_VAR || screen == SCREEN_UNITS;
+            screen == SCREEN_ADVANCED || screen == SCREEN_UNITS;
         var backBtn = null as CalcButton?;
         var others = [] as Array<CalcButton>;
         if (customizableScreen) {
@@ -918,6 +949,9 @@ class calc_for_garminView extends WatchUi.View {
         } else if (action.equals("var")) {
             switchScreen(SCREEN_VAR);
             return;
+        } else if (action.equals("nav")) {
+            switchScreen(SCREEN_NAV);
+            return;
         } else if (action.equals("varClear")) {
             engine.clearVariables();
             return;
@@ -938,6 +972,9 @@ class calc_for_garminView extends WatchUi.View {
             return;
         } else if (action.equals("pow10")) {
             engine.wrapPow10();
+            return;
+        } else if (action.equals("frac")) {
+            engine.toggleFraction();
             return;
         } else if (action.equals("fact")) {
             engine.wrapFactorial();
@@ -1479,7 +1516,7 @@ class calc_for_garminView extends WatchUi.View {
         } else if (action.find("op:") == 0) {
             return ACCENT_OP;
         } else if (action.find("func:") == 0 || action.find("const:") == 0 || action.equals("sqr") ||
-            action.equals("open") || action.equals("close")) {
+            action.equals("open") || action.equals("close") || action.equals("frac")) {
             return ACCENT_FUNC;
         } else {
             return ACCENT_UTILITY;
@@ -1564,11 +1601,9 @@ class calc_for_garminView extends WatchUi.View {
             var font = text.length() > 10 ? Graphics.FONT_TINY : (text.length() > 6 ? Graphics.FONT_SMALL : Graphics.FONT_LARGE);
             dc.drawText(safeX + safeW / 2, safeY + headerHBg / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             var setVars = "";
-            var varNames = ["A", "B", "C", "D"];
-            for (var vi = 0; vi < varNames.size(); vi++) {
-                if (engine.variables.hasKey(varNames[vi])) {
-                    setVars += varNames[vi];
-                }
+            var varKeys = sortStrings(engine.variables.keys() as Array<String>);
+            for (var vi = 0; vi < varKeys.size(); vi++) {
+                setVars += varKeys[vi];
             }
             if (setVars.length() > 0) {
                 dc.drawText(safeX, safeY, Graphics.FONT_XTINY, setVars, Graphics.TEXT_JUSTIFY_LEFT);

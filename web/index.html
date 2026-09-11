@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>עיצוב אישי - calc-for-garmin</title>
+<title>Custom Design - calc-for-garmin</title>
 <style>
   :root {
     --bg: #0f0f17;
@@ -184,78 +184,74 @@
 </head>
 <body>
 
-<h1>🎨 עיצוב אישי למחשבון</h1>
-<p class="sub">מסדרים את הכפתורים בדיוק כמו שנוח לכם, ובסוף מקבלים קוד SEED להדבקה בהגדרות האפליקציה בשעון.</p>
+<h1>🎨 Custom Calculator Design</h1>
+<p class="sub">Arrange the buttons exactly the way you like, then get a SEED code to paste into the watch app's settings.</p>
 
 <div class="card">
-  <h2><span class="step-badge">1</span>ייבוא קוד קיים (אופציונלי)</h2>
-  <p class="hint">כבר יש לכם SEED? הדביקו אותו כאן כדי להמשיך לערוך אותו.</p>
-  <textarea id="importBox" rows="2" placeholder="הדביקו כאן SEED קיים"></textarea>
+  <h2><span class="step-badge">1</span>Import Existing Code (Optional)</h2>
+  <p class="hint">Already have a SEED? Paste it here to keep editing it.</p>
+  <textarea id="importBox" rows="2" placeholder="Paste an existing SEED here"></textarea>
   <div class="row">
-    <button class="secondary" id="loadBtn">טען SEED</button>
+    <button class="secondary" id="loadBtn">Load SEED</button>
   </div>
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">2</span>תבנית סידור</h2>
-  <p class="hint">התבניות קובעות איך הכפתורים מסודרים על המקלדת - לא את הצבעים. אפשר לבחור תבנית ואז להמשיך לערוך ידנית.</p>
+  <h2><span class="step-badge">2</span>Layout Template</h2>
+  <p class="hint">Templates set how the buttons are arranged on the keypad - not the colors. Pick a template and keep editing manually from there.</p>
   <div class="presets" id="presets"></div>
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">3</span>מקלדת המסך הראשי</h2>
-  <p class="hint">הקישו על כפתור אחד, ואז על כפתור שני - גם במסך אחר למטה (מדעי / מתקדם / משתנים / קטגוריות) - כדי להחליף ביניהם. אפשר להזיז כל כפתור לכל מקום, כולל ה-BACK והספרות. ✕ בפינת כפתור מוחק אותו לגמרי (הוא נעלם מהשעון); גררו כפתור אחר לשם כדי להחזיר.</p>
+  <h2><span class="step-badge">3</span>Main Screen Keypad</h2>
+  <p class="hint">Tap one button, then tap a second one - even on a different screen below (Scientific / Advanced / Categories) - to swap them. Any button can move anywhere, including BACK and the digits. ✕ in a button's corner deletes it entirely (it disappears from the watch); drag another button there to bring it back.</p>
   <div class="grid" id="grid"></div>
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">4</span>צבעים</h2>
-  <p class="hint">שליטה מלאה על איך זה נראה - כולל צבע הרקע העליון.</p>
+  <h2><span class="step-badge">4</span>Colors</h2>
+  <p class="hint">Full control over how it looks - including the top display's background color.</p>
   <div class="colors" id="colors"></div>
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">5</span>תפריט הכלים (MENU)</h2>
-  <p class="hint">סמנו אילו כלים יופיעו בתפריט. הקישו על שורה אחת ואז על שורה שנייה כדי להחליף את הסדר ביניהן.</p>
+  <h2><span class="step-badge">5</span>Tools Menu (MENU)</h2>
+  <p class="hint">Check which tools appear in the menu. Tap one row, then a second, to swap their order.</p>
   <div class="list" id="menuList"></div>
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">6</span>מסך מדעי (fx)</h2>
-  <p class="hint">אותו עיקרון בדיוק - כולל להחליף כפתור עם מסך אחר לגמרי, ולמחוק עם ✕.</p>
+  <h2><span class="step-badge">6</span>Scientific Screen (fx)</h2>
+  <p class="hint">Same idea exactly - including swapping a button with one on a completely different screen, and deleting with ✕.</p>
   <div class="grid" id="sciGrid" style="grid-template-columns:repeat(4,1fr)"></div>
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">7</span>מסך מתקדם (ADV)</h2>
+  <h2><span class="step-badge">7</span>Advanced Screen (ADV)</h2>
   <div class="grid" id="advGrid" style="grid-template-columns:repeat(4,1fr)"></div>
 </div>
 
-<div class="card">
-  <h2><span class="step-badge">8</span>מסך משתנים (VAR)</h2>
-  <div class="grid" id="varGrid" style="grid-template-columns:repeat(2,1fr)"></div>
-</div>
 
 <div class="card">
-  <h2><span class="step-badge">9</span>מסך קטגוריות המרה</h2>
+  <h2><span class="step-badge">8</span>Conversion Categories Screen</h2>
   <div class="grid" id="unitsGrid" style="grid-template-columns:repeat(3,1fr)"></div>
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">10</span>קבלת קוד SEED</h2>
+  <h2><span class="step-badge">9</span>Get Your SEED Code</h2>
   <div class="row">
-    <button class="primary" id="genBtn">צור SEED</button>
+    <button class="primary" id="genBtn">Generate SEED</button>
   </div>
   <textarea class="seed-box" id="seedOut" rows="3" readonly style="margin-top:12px"></textarea>
   <div class="row">
-    <button class="secondary" id="copyBtn">העתק</button>
+    <button class="secondary" id="copyBtn">Copy</button>
   </div>
   <div class="copied" id="copiedMsg"></div>
   <ol class="steps">
-    <li>העתיקו את קוד ה-SEED שלמעלה.</li>
-    <li>באפליקציית Garmin Connect בטלפון: המכשיר שלי → אפליקציות של השעון → calc-for-garmin → הגדרות.</li>
-    <li>הדביקו את הקוד בשדה "Theme &amp; menu code" ושמרו.</li>
-    <li>השינויים מסתנכרנים לשעון אוטומטית תוך כמה שניות.</li>
+    <li>Copy the SEED code above.</li>
+    <li>In the Garmin Connect phone app: My Device → Watch Apps → calc-for-garmin → Settings.</li>
+    <li>Paste the code into the "Theme &amp; menu code" field and save.</li>
+    <li>The changes sync to the watch automatically within a few seconds.</li>
   </ol>
 </div>
 
@@ -263,42 +259,43 @@
 (function () {
   var COLOR_KEYS = ["digit", "op", "equals", "destructive", "nav", "bg"];
   var COLOR_LABELS = {
-    digit: "ספרות",
-    op: "אופרטורים (+ − × ÷)",
-    equals: "כפתור =",
-    destructive: "מחיקה / C",
-    nav: "ניווט (MENU / BACK)",
-    bg: "רקע התצוגה העליונה"
+    digit: "Digits",
+    op: "Operators (+ − × ÷)",
+    equals: "= button",
+    destructive: "Delete / C",
+    nav: "Navigation (MENU / BACK)",
+    bg: "Top display background"
   };
   var DEFAULT_COLORS = { digit: "23233a", op: "ffb020", equals: "00d68f", destructive: "ff5470", nav: "7c4dff", bg: "14141f" };
 
-  var MENU_KEYS = ["sci", "units", "tip", "rnd", "var", "apct", "date"];
+  var MENU_KEYS = ["sci", "units", "tip", "rnd", "var", "apct", "date", "nav"];
   var MENU_LABELS = {
-    sci: "מדעי (fx)",
-    units: "המרת יחידות",
-    tip: "טיפ / פיצול חשבון",
-    rnd: "מספר אקראי",
-    var: "משתנים (A/B/C/D)",
-    apct: "אחוזים מתקדם (הנחה/תוספת/מרווח)",
-    date: "תאריך (ימים עד / גיל / הפרש בין תאריכים)"
+    sci: "Scientific (fx)",
+    units: "Unit Conversion",
+    tip: "Tip / Bill Split",
+    rnd: "Random Number",
+    var: "Variables - Equation Solving (X, Y, ...)",
+    apct: "Advanced Percent (Discount/Markup/Margin)",
+    date: "Date (Days Until / Age / Date Difference)",
+    nav: "Cursor Arrows, Ans & Brackets"
   };
 
   // ONE shared pool of every button on every customizable screen. A
   // button can be moved not just within its own screen but to any of the
-  // other 4 - the watch treats the whole thing as a single 83-token
-  // permutation ("P=" in the seed), sliced back into these 5 screens in
+  // other 3 - the watch treats the whole thing as a single 74-token
+  // permutation ("P=" in the seed), sliced back into these 4 screens in
   // this fixed order. TOKEN_LABEL/TOKEN_COLOR cover every token from
-  // every screen, since any of them could end up anywhere.
+  // every screen, since any of them could end up anywhere. The VAR and
+  // NAV screens aren't part of this pool - both are fixed grids, not
+  // something worth letting a user reorder.
   var TOKEN_LABEL = {
-    blank: "ריק",
+    blank: "Empty",
     c: "C", del: "DEL", pct: "%", div: "÷", mul: "×", sub: "−", add: "+", dot: ".", eq: "=", menu: "MENU",
     sin: "sin", cos: "cos", tan: "tan", sqrt: "sqrt", log: "log", ln: "ln", sqr: "x²", x: "x",
     open: "(", close: ")", pow: "^", pi: "π", e: "e", adv: "ADV", uc: "UC", rnd: "RND", tip: "TIP",
-    eqIns: "EQ", ans: "Ans", curl: "<", curr: ">", backMenu: "BACK",
+    eqIns: "=", ans: "Ans", curl: "<", curr: ">", backMenu: "BACK",
     asin: "asin", acos: "acos", atan: "atan", fact: "x!", inv: "1/x", cbrt: "cbrt", absv: "|x|",
-    mod: "mod", ee: "EE", cube: "x³", floor: "floor", ceil: "ceil", pow10: "10ˣ", var: "VAR", backSci: "BACK",
-    stoA: "STO A", rclA: "RCL A", stoB: "STO B", rclB: "RCL B", stoC: "STO C", rclC: "RCL C",
-    stoD: "STO D", rclD: "RCL D", clr: "CLR",
+    mod: "mod", ee: "EE", cube: "x³", floor: "floor", ceil: "ceil", pow10: "10ˣ", frac: "a/b", var: "VAR", backSci: "BACK",
     dist: "DIST", wt: "WT", temp: "TEMP", spd: "SPD", pace: "PACE", vol: "VOL", area: "AREA",
     time: "TIME", pres: "PRES", enrg: "ENRG", cur: "CUR"
   };
@@ -319,16 +316,15 @@
     "uc", "rnd", "tip", "eqIns", "ans", "curl", "curr", "backMenu"];
 
   var ADV_DEFAULT = ["asin", "acos", "atan", "fact", "inv", "cbrt", "absv", "mod",
-    "ee", "cube", "floor", "ceil", "c", "del", "pow10", "var", "backSci"];
-
-  var VAR_DEFAULT = ["stoA", "rclA", "stoB", "rclB", "stoC", "rclC", "stoD", "rclD", "clr", "backMenu"];
+    "ee", "cube", "floor", "ceil", "c", "del", "pow10", "frac", "var", "backSci"];
 
   var UNITS_DEFAULT = ["dist", "wt", "temp", "spd", "pace", "vol", "area", "time", "pres", "enrg", "cur", "backMenu"];
 
-  // The full 83-token required pool, in the fixed screen order the watch
-  // app expects (basic, sci, adv, var, units) - used both to build the
-  // "P=" seed field and to validate one on import.
-  var REQUIRED_POOL = [].concat(DEFAULT_LAYOUT, SCI_DEFAULT, ADV_DEFAULT, VAR_DEFAULT, UNITS_DEFAULT);
+  // The full 73-token required pool, in the fixed screen order the watch
+  // app expects (basic, sci, adv, units) - used both to build the "P="
+  // seed field and to validate one on import. VAR isn't in this pool -
+  // its letters are a fixed alphabet, not user-reorderable.
+  var REQUIRED_POOL = [].concat(DEFAULT_LAYOUT, SCI_DEFAULT, ADV_DEFAULT, UNITS_DEFAULT);
 
   // Layout presets are about ARRANGEMENT, not color - color stays a
   // separate, independent control (section 4) that any preset can be
@@ -336,39 +332,39 @@
   // other 4 screens keep whatever the user has arranged independently.
   var PRESETS = {
     classic: {
-      name: "קלאסי",
+      name: "Classic",
       layout: DEFAULT_LAYOUT,
-      menu: ["sci", "units", "tip", "rnd", "var"]
+      menu: ["sci", "units", "tip", "rnd", "nav", "var"]
     },
     pocket: {
-      name: "מחשבון כיס",
+      name: "Pocket Calculator",
       layout: ["c", "del", "pct", "div", "7", "8", "9", "mul", "4", "5", "6", "sub",
         "1", "2", "3", "add", "menu", "0", "dot", "eq"],
-      menu: ["units", "tip", "sci", "rnd", "var"]
+      menu: ["units", "tip", "sci", "rnd", "nav", "var"]
     },
     beginner: {
-      name: "ידידותי למתחילים",
+      name: "Beginner Friendly",
       layout: ["7", "8", "9", "c", "4", "5", "6", "del", "1", "2", "3", "eq",
         "0", "dot", "add", "sub", "menu", "pct", "div", "mul"],
       menu: ["tip", "units"]
     },
     oneHand: {
-      name: "יומיומי - יד אחת",
+      name: "Everyday - One Hand",
       layout: ["menu", "pct", "div", "mul", "sub", "add", "dot", "del",
         "7", "8", "9", "c", "4", "5", "6", "eq", "1", "2", "3", "0"],
-      menu: ["tip", "units", "rnd", "var"]
+      menu: ["tip", "units", "rnd", "nav", "var"]
     },
     advanced: {
-      name: "מתמטיקאי מתקדם",
+      name: "Advanced Mathematician",
       layout: ["menu", "1", "2", "3", "add", "4", "5", "6", "sub", "7", "8", "9",
         "mul", "c", "del", "pct", "div", "0", "dot", "eq"],
-      menu: ["sci", "var", "units", "rnd"]
+      menu: ["sci", "var", "nav", "units", "rnd"]
     },
     mirror: {
-      name: "מראה",
+      name: "Mirror",
       layout: ["div", "pct", "del", "c", "mul", "3", "2", "1", "sub", "6", "5", "4",
         "add", "9", "8", "7", "eq", "dot", "0", "menu"],
-      menu: ["sci", "units", "tip", "rnd", "var"]
+      menu: ["sci", "units", "tip", "rnd", "nav", "var"]
     }
   };
 
@@ -377,7 +373,6 @@
     layout: DEFAULT_LAYOUT.slice(),
     sciLayout: SCI_DEFAULT.slice(),
     advLayout: ADV_DEFAULT.slice(),
-    varLayout: VAR_DEFAULT.slice(),
     unitsLayout: UNITS_DEFAULT.slice(),
     order: MENU_KEYS.slice(),
     enabled: {},
@@ -387,12 +382,11 @@
   // The 5 screens as one registry, keyed the same way everywhere (seed
   // order, selection tracking, re-rendering) so a swap can reach across
   // screens instead of just within one grid.
-  var SCREENS = ["basic", "sci", "adv", "var", "units"];
+  var SCREENS = ["basic", "sci", "adv", "units"];
   var screenArrays = {
-    basic: state.layout, sci: state.sciLayout, adv: state.advLayout,
-    var: state.varLayout, units: state.unitsLayout
+    basic: state.layout, sci: state.sciLayout, adv: state.advLayout, units: state.unitsLayout
   };
-  var screenBg = { sci: "#00838f", adv: "#5c4dff", var: "#3f51b5", units: "#4c6fff" };
+  var screenBg = { sci: "#00838f", adv: "#5c4dff", units: "#4c6fff" };
 
   // ONE selection shared by every grid: tapping a tile in any screen
   // either sets the selection or, if something else is already selected
@@ -434,7 +428,7 @@
     var del = document.createElement("div");
     del.className = "del";
     del.textContent = "✕";
-    del.title = "מחק כפתור זה";
+    del.title = "Delete this button";
     del.addEventListener("click", function (ev) {
       ev.stopPropagation();
       deleteTile(screenKey, index);
@@ -488,14 +482,12 @@
 
   var renderSciGrid = makeFlatGrid("sciGrid", "sci");
   var renderAdvGrid = makeFlatGrid("advGrid", "adv");
-  var renderVarGrid = makeFlatGrid("varGrid", "var");
   var renderUnitsGrid = makeFlatGrid("unitsGrid", "units");
 
   function renderAllGrids() {
     renderBasicGrid();
     renderSciGrid();
     renderAdvGrid();
-    renderVarGrid();
     renderUnitsGrid();
   }
 
@@ -573,7 +565,7 @@
 
       var tag = document.createElement("div");
       tag.className = "tag";
-      tag.textContent = "מקום " + (i + 1);
+      tag.textContent = "Slot " + (i + 1);
 
       row.appendChild(cb);
       row.appendChild(name);
@@ -606,7 +598,7 @@
     var cStr = "C=" + COLOR_KEYS.map(function (k) { return state.colors[k]; }).join(",");
     var enabledOrdered = state.order.filter(function (k) { return state.enabled[k]; });
     var mStr = "M=" + enabledOrdered.join(",");
-    var pool = [].concat(state.layout, state.sciLayout, state.advLayout, state.varLayout, state.unitsLayout);
+    var pool = [].concat(state.layout, state.sciLayout, state.advLayout, state.unitsLayout);
     var pStr = "P=" + pool.join(",");
     return "1|" + cStr + "|" + mStr + "|" + pStr;
   }
@@ -665,21 +657,21 @@
     var msg = document.getElementById("copiedMsg");
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(box.value).then(function () {
-        msg.textContent = "הועתק!";
+        msg.textContent = "Copied!";
       }).catch(function () {
         document.execCommand("copy");
-        msg.textContent = "הועתק!";
+        msg.textContent = "Copied!";
       });
     } else {
       document.execCommand("copy");
-      msg.textContent = "הועתק!";
+      msg.textContent = "Copied!";
     }
   });
 
   document.getElementById("loadBtn").addEventListener("click", function () {
     var parsed = parseSeed(document.getElementById("importBox").value);
     if (!parsed) {
-      alert("קוד לא תקין");
+      alert("Invalid code");
       return;
     }
     state.activePreset = null;

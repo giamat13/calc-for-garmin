@@ -278,6 +278,120 @@ function testScientificNotationEntry(logger as Test.Logger) as Boolean {
     return !p.error && near(v, 1500.0d, logger);
 }
 
+// (),[],{} all group identically - only the smart-bracket buttons (below)
+// care which glyph is which.
+(:test)
+function testSquareAndCurlyBrackets(logger as Test.Logger) as Boolean {
+    var p = new ExprParser("2*[3+{1+1}]", 0.0d, {} as Dictionary<String, Double>);
+    var v = p.parse();
+    return !p.error && near(v, 10.0d, logger);
+}
+
+(:test)
+function testMismatchedBracketTypeErrors(logger as Test.Logger) as Boolean {
+    var p = new ExprParser("(2+3]", 0.0d, {} as Dictionary<String, Double>);
+    p.parse();
+    if (!p.error) {
+        logger.debug("expected error on mismatched bracket types");
+        return false;
+    }
+    return true;
+}
+
+// openParen()/closeParen() pick the glyph by nesting depth: (), then [],
+// then {} for anything deeper - and closeParen() always matches whichever
+// type is currently innermost.
+(:test)
+function testSmartBracketButtonsPickGlyphByDepth(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.openParen();
+    e.appendDigit("1");
+    e.openParen();
+    e.appendDigit("2");
+    e.openParen();
+    e.appendDigit("3");
+    e.closeParen();
+    e.closeParen();
+    e.closeParen();
+    if (!e.expr.equals("(1[2{3}])")) {
+        logger.debug("expected '(1[2{3}])' got '" + e.expr + "'");
+        return false;
+    }
+    return true;
+}
+
+// "LHS=RHS" with no letter on either side isn't an equation to solve for
+// an unknown - it's just two values, so "=" shows their difference (0
+// means they're actually equal) instead of erroring.
+(:test)
+function testSolveWithNoVariableShowsDifference(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendDigit("1");
+    e.appendDigit("0");
+    e.insertEquals();
+    e.appendDigit("4");
+    e.appendOperator("+");
+    e.appendDigit("3");
+    e.evaluate();
+    if (e.errorState) {
+        logger.debug("expected no error when no variable is present");
+        return false;
+    }
+    if (!e.expr.equals("3")) {
+        logger.debug("expected '3' (10 - (4+3)) got '" + e.expr + "'");
+        return false;
+    }
+    return true;
+}
+
+(:test)
+function testSolveWithNoVariableEqualSidesGivesZero(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendDigit("5");
+    e.insertEquals();
+    e.appendDigit("5");
+    e.evaluate();
+    return !e.errorState && e.expr.equals("0");
+}
+
+// toggleFraction() flips the last "=" result between decimal and a/b, and
+// back again - it's a display toggle, not a recompute.
+(:test)
+function testToggleFractionShowsAndHidesFraction(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendDigit("1");
+    e.appendOperator("/");
+    e.appendDigit("3");
+    e.evaluate();
+    e.toggleFraction();
+    if (!e.expr.equals("1/3")) {
+        logger.debug("expected '1/3' got '" + e.expr + "'");
+        return false;
+    }
+    e.toggleFraction();
+    if (!e.expr.equals("0.333333")) {
+        logger.debug("expected '0.333333' back in decimal, got '" + e.expr + "'");
+        return false;
+    }
+    return true;
+}
+
+// An exact integer result has nothing to gain from fraction form, so
+// toggling it is a no-op.
+(:test)
+function testToggleFractionOnIntegerIsUnchanged(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendDigit("4");
+    e.evaluate();
+    e.toggleFraction();
+    return !e.errorState && e.expr.equals("4");
+}
+
 function near(a as Double, b as Double, logger as Test.Logger) as Boolean {
     var d = a - b;
     if (d < 0.0d) {

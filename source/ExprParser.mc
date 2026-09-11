@@ -121,7 +121,8 @@ class ExprParser {
         if (c.equals("")) {
             return false;
         }
-        return isDigitLiteral(c) || c.equals(".") || c.equals("(") || c.equals("π") || isAlphaCh(c);
+        return isDigitLiteral(c) || c.equals(".") || c.equals("(") || c.equals("[") || c.equals("{") ||
+            c.equals("π") || isAlphaCh(c);
     }
 
     private function parseUnary() as Double {
@@ -156,10 +157,15 @@ class ExprParser {
             error = true;
             return 0.0d;
         }
-        if (c.equals("(")) {
+        // (),[],{} all just group - the depth-based smart-bracket buttons
+        // (CalculatorEngine.openParen/closeParen) pick which glyph to insert
+        // by nesting level, so the parser only needs to require the CLOSING
+        // glyph match whichever one was opened.
+        if (c.equals("(") || c.equals("[") || c.equals("{")) {
+            var closeCh = c.equals("[") ? "]" : (c.equals("{") ? "}" : ")");
             pos += 1;
             var v = parseExpr();
-            if (!error && peek().equals(")")) {
+            if (!error && peek().equals(closeCh)) {
                 pos += 1;
             } else {
                 error = true;

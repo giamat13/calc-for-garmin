@@ -17,11 +17,16 @@ class CalculatorEngine {
     // "1+" then embed a random/tip/converted value right there.
     var cursorPos as Number = 0;
 
-    // Named variables (A/B/C/D via the VAR screen, plus X/Y/Z/... once
-    // solved via an equation - see solveEquation()), usable directly in a
-    // formula like a constant, e.g. "A+B*2". Persisted so they survive
-    // leaving and returning to the calculator, not just switching screens.
+    // Named variables - any letter typed via the VAR screen becomes one
+    // once it's solved for via an equation (see solveEquation()) - usable
+    // directly in a formula like a constant, e.g. "B+D*2". Persisted so
+    // they survive leaving and returning to the calculator, not just
+    // switching screens.
     var variables as Dictionary<String, Double> = {} as Dictionary<String, Double>;
+
+    // Whether the last "=" result is currently shown as a/b instead of a
+    // decimal - see toggleFraction().
+    private var fractionMode as Boolean = false;
 
     function initialize() {
         var stored = Storage.getValue("calcVariables");
@@ -101,16 +106,52 @@ class CalculatorEngine {
         insertAtCursor(sym);
     }
 
+    // Auto-nesting brackets: one button picks the glyph by how deep the
+    // cursor already sits - (), then [], then {} for anything nested
+    // deeper than that.
     function openParen() as Void {
         resetIfNeeded(true);
-        insertAtCursor("(");
+        var depth = openBracketStack(expr.substring(0, cursorPos) as String).size();
+        insertAtCursor(depth == 0 ? "(" : (depth == 1 ? "[" : "{"));
     }
 
+    // Closes whichever bracket type is currently innermost at the cursor,
+    // so the depth-based open button and this one always pair correctly.
     function closeParen() as Void {
         if (errorState) {
             return;
         }
-        insertAtCursor(")");
+        var stack = openBracketStack(expr.substring(0, cursorPos) as String);
+        insertAtCursor(stack.size() > 0 ? closeFor(stack[stack.size() - 1]) : ")");
+    }
+
+    // The still-open brackets before `s`, outermost first - i.e. what you'd
+    // need to close, in order, to fully close `s`.
+    private function openBracketStack(s as String) as Array<String> {
+        var stack = [] as Array<String>;
+        for (var i = 0; i < s.length(); i++) {
+            var c = s.substring(i, i + 1) as String;
+            if (c.equals("(") || c.equals("[") || c.equals("{")) {
+                stack.add(c);
+            } else if ((c.equals(")") || c.equals("]") || c.equals("}")) && stack.size() > 0) {
+                var popped = [] as Array<String>;
+                for (var j = 0; j < stack.size() - 1; j++) {
+                    popped.add(stack[j]);
+                }
+                stack = popped;
+            }
+        }
+        return stack;
+    }
+
+    private function closeFor(open as String) as String {
+        if (open.equals("[")) {
+            return "]";
+        }
+        if (open.equals("{")) {
+            return "}";
+        }
+        return ")";
     }
 
     // Wrap the whole formula so far, e.g. "3+4" -> "(3+4)^2".
@@ -253,6 +294,7 @@ class CalculatorEngine {
         expr = "";
         errorState = false;
         justEvaluated = false;
+        fractionMode = false;
         cursorPos = 0;
     }
 
@@ -277,7 +319,69 @@ class CalculatorEngine {
         lastAnswer = result;
         expr = formatNumber(result);
         justEvaluated = true;
+        fractionMode = false;
         cursorPos = expr.length();
+    }
+
+    // Flips the just-shown "=" result between decimal and a/b fraction
+    // form. A second press flips it back - it doesn't affect anything
+    // else, so typing after it (or a fresh "=") always starts decimal.
+    function toggleFraction() as Void {
+        if (errorState || !justEvaluated) {
+            return;
+        }
+        fractionMode = !fractionMode;
+        expr = fractionMode ? formatFraction(lastAnswer) : formatNumber(lastAnswer);
+        cursorPos = expr.length();
+    }
+
+    // Continued-fraction approximation of `v` as a/b, capped at a 4-digit
+    // denominator so it stays a short, useful fraction rather than a
+    // perfect-but-unreadable one for values that aren't a clean ratio.
+    private function formatFraction(v as Double) as String {
+        var neg = v < 0.0d;
+        var mag = neg ? -v : v;
+        var whole = Math.floor(mag).toNumber();
+        var frac = mag - whole;
+        if (frac < 0.000001d) {
+            return formatNumber(v);
+        }
+        var parts = fractionParts(frac, 9999);
+        var num = parts[0] as Number;
+        var den = parts[1] as Number;
+        var sign = neg ? "-" : "";
+        if (whole == 0) {
+            return sign + num.toString() + "/" + den.toString();
+        }
+        return sign + whole.toString() + " " + num.toString() + "/" + den.toString();
+    }
+
+    // Standard continued-fraction convergents of x (0 < x < 1): keeps
+    // refining num/den until the denominator would exceed maxDen, then
+    // stops and returns the last convergent that fit.
+    private function fractionParts(x as Double, maxDen as Number) as Array<Number> {
+        var hPrev2 = 0; var hPrev1 = 1;
+        var kPrev2 = 1; var kPrev1 = 0;
+        var num = 0; var den = 1;
+        var b = x;
+        for (var i = 0; i < 30; i++) {
+            var a = Math.floor(b).toNumber();
+            var h = a * hPrev1 + hPrev2;
+            var k = a * kPrev1 + kPrev2;
+            if (k > maxDen) {
+                break;
+            }
+            num = h;
+            den = k;
+            hPrev2 = hPrev1; hPrev1 = h;
+            kPrev2 = kPrev1; kPrev1 = k;
+            var rem = b - a;
+            if (rem < 0.000001d) {
+                break;
+            }
+            b = 1.0d / rem;
+        }
+        return [num, den] as Array<Number>;
     }
 
     // First bare single-letter identifier in s that isn't "e" (the
@@ -331,7 +435,18 @@ class CalculatorEngine {
             letterOrNull = findVariableLetter(rhs);
         }
         if (letterOrNull == null) {
-            errorState = true;
+            // No unknown on either side - "LHS=RHS" isn't an equation to
+            // solve, just two values to compare, so show their difference
+            // instead of erroring (0 means they're actually equal).
+            var diff = evalDiff("x", lhs, rhs, 0.0d);
+            if (diff == null) {
+                errorState = true;
+                return;
+            }
+            expr = formatNumber(diff as Double);
+            lastAnswer = diff as Double;
+            justEvaluated = true;
+            cursorPos = expr.length();
             return;
         }
         var letter = letterOrNull as String;
@@ -405,19 +520,12 @@ class CalculatorEngine {
     }
 
     private function closeUnmatchedParens(s as String) as String {
-        var open = 0;
-        for (var i = 0; i < s.length(); i++) {
-            var c = s.substring(i, i + 1) as String;
-            if (c.equals("(")) {
-                open++;
-            } else if (c.equals(")")) {
-                open--;
-            }
-        }
+        var stack = openBracketStack(s);
         var out = s;
-        while (open > 0) {
-            out = out + ")";
-            open--;
+        var i = stack.size() - 1;
+        while (i >= 0) {
+            out = out + closeFor(stack[i]);
+            i -= 1;
         }
         return out;
     }
