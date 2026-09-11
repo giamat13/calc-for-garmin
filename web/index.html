@@ -84,6 +84,7 @@
     color: #fff;
   }
   .tile {
+    position: relative;
     border-radius: 10px;
     padding: 14px 0;
     text-align: center;
@@ -95,6 +96,20 @@
     user-select: none;
   }
   .tile.selected { border-color: #fff; transform: scale(0.95); }
+  .tile.blank { opacity: 0.4; border-style: dashed; border-color: rgba(255,255,255,0.4); }
+  .tile .del {
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ff5470;
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 20px;
+    text-align: center;
+  }
 
   .list { display: flex; flex-direction: column; gap: 8px; }
   .list-item {
@@ -189,7 +204,7 @@
 
 <div class="card">
   <h2><span class="step-badge">3</span>מקלדת המסך הראשי</h2>
-  <p class="hint">הקישו על כפתור אחד ואז על כפתור שני כדי להחליף ביניהם. אפשר להזיז כל כפתור לכל מקום, כולל הספרות.</p>
+  <p class="hint">הקישו על כפתור אחד, ואז על כפתור שני - גם במסך אחר למטה (מדעי / מתקדם / משתנים / קטגוריות) - כדי להחליף ביניהם. אפשר להזיז כל כפתור לכל מקום, כולל ה-BACK והספרות. ✕ בפינת כפתור מוחק אותו לגמרי (הוא נעלם מהשעון); גררו כפתור אחר לשם כדי להחזיר.</p>
   <div class="grid" id="grid"></div>
 </div>
 
@@ -206,7 +221,28 @@
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">6</span>קבלת קוד SEED</h2>
+  <h2><span class="step-badge">6</span>מסך מדעי (fx)</h2>
+  <p class="hint">אותו עיקרון בדיוק - כולל להחליף כפתור עם מסך אחר לגמרי, ולמחוק עם ✕.</p>
+  <div class="grid" id="sciGrid" style="grid-template-columns:repeat(4,1fr)"></div>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge">7</span>מסך מתקדם (ADV)</h2>
+  <div class="grid" id="advGrid" style="grid-template-columns:repeat(4,1fr)"></div>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge">8</span>מסך משתנים (VAR)</h2>
+  <div class="grid" id="varGrid" style="grid-template-columns:repeat(2,1fr)"></div>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge">9</span>מסך קטגוריות המרה</h2>
+  <div class="grid" id="unitsGrid" style="grid-template-columns:repeat(3,1fr)"></div>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge">10</span>קבלת קוד SEED</h2>
   <div class="row">
     <button class="primary" id="genBtn">צור SEED</button>
   </div>
@@ -245,12 +281,29 @@
     var: "משתנים (A/B/C/D)"
   };
 
-  // Every basic-screen slot as a short token; must always stay a full
-  // permutation of these 20 - the watch app rejects anything else and
-  // falls back to its own default rather than risk a broken keypad.
-  var BASIC_TOKENS = ["c", "del", "pct", "div", "mul", "sub", "add", "dot", "eq", "menu",
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
-  var TOKEN_LABEL = { c: "C", del: "DEL", pct: "%", div: "÷", mul: "×", sub: "−", add: "+", dot: ".", eq: "=", menu: "MENU" };
+  // ONE shared pool of every button on every customizable screen. A
+  // button can be moved not just within its own screen but to any of the
+  // other 4 - the watch treats the whole thing as a single 83-token
+  // permutation ("P=" in the seed), sliced back into these 5 screens in
+  // this fixed order. TOKEN_LABEL/TOKEN_COLOR cover every token from
+  // every screen, since any of them could end up anywhere.
+  var TOKEN_LABEL = {
+    blank: "ריק",
+    c: "C", del: "DEL", pct: "%", div: "÷", mul: "×", sub: "−", add: "+", dot: ".", eq: "=", menu: "MENU",
+    sin: "sin", cos: "cos", tan: "tan", sqrt: "sqrt", log: "log", ln: "ln", sqr: "x²", x: "x",
+    open: "(", close: ")", pow: "^", pi: "π", e: "e", adv: "ADV", uc: "UC", rnd: "RND", tip: "TIP",
+    eqIns: "EQ", ans: "Ans", curl: "<", curr: ">", backMenu: "BACK",
+    asin: "asin", acos: "acos", atan: "atan", fact: "x!", inv: "1/x", cbrt: "cbrt", absv: "|x|",
+    mod: "mod", ee: "EE", cube: "x³", floor: "floor", ceil: "ceil", pow10: "10ˣ", var: "VAR", backSci: "BACK",
+    stoA: "STO A", rclA: "RCL A", stoB: "STO B", rclB: "RCL B", stoC: "STO C", rclC: "RCL C",
+    stoD: "STO D", rclD: "RCL D", clr: "CLR",
+    dist: "DIST", wt: "WT", temp: "TEMP", spd: "SPD", pace: "PACE", vol: "VOL", area: "AREA",
+    time: "TIME", pres: "PRES", enrg: "ENRG", cur: "CUR"
+  };
+  // Only the basic keypad colors by category (digit/op/equals/destructive/
+  // nav) - the other 4 grids use one flat accent color regardless of
+  // which token is in a slot, so a foreign token landing there just
+  // shows in that screen's color.
   var TOKEN_COLOR = { c: "destructive", del: "destructive", pct: "op", div: "op", mul: "op", sub: "op", add: "op",
     dot: "digit", eq: "equals", menu: "nav" };
   function labelFor(t) { return TOKEN_LABEL[t] || t; }
@@ -259,9 +312,26 @@
   var DEFAULT_LAYOUT = ["c", "del", "pct", "div", "1", "2", "3", "mul", "4", "5", "6", "sub",
     "7", "8", "9", "add", "menu", "0", "dot", "eq"];
 
+  var SCI_DEFAULT = ["sin", "cos", "tan", "sqrt", "log", "ln", "sqr", "x",
+    "open", "close", "pow", "pi", "e", "c", "del", "adv",
+    "uc", "rnd", "tip", "eqIns", "ans", "curl", "curr", "backMenu"];
+
+  var ADV_DEFAULT = ["asin", "acos", "atan", "fact", "inv", "cbrt", "absv", "mod",
+    "ee", "cube", "floor", "ceil", "c", "del", "pow10", "var", "backSci"];
+
+  var VAR_DEFAULT = ["stoA", "rclA", "stoB", "rclB", "stoC", "rclC", "stoD", "rclD", "clr", "backMenu"];
+
+  var UNITS_DEFAULT = ["dist", "wt", "temp", "spd", "pace", "vol", "area", "time", "pres", "enrg", "cur", "backMenu"];
+
+  // The full 83-token required pool, in the fixed screen order the watch
+  // app expects (basic, sci, adv, var, units) - used both to build the
+  // "P=" seed field and to validate one on import.
+  var REQUIRED_POOL = [].concat(DEFAULT_LAYOUT, SCI_DEFAULT, ADV_DEFAULT, VAR_DEFAULT, UNITS_DEFAULT);
+
   // Layout presets are about ARRANGEMENT, not color - color stays a
   // separate, independent control (section 4) that any preset can be
-  // combined with.
+  // combined with. Presets only touch the basic keypad + MENU set; the
+  // other 4 screens keep whatever the user has arranged independently.
   var PRESETS = {
     classic: {
       name: "קלאסי",
@@ -303,10 +373,130 @@
   var state = {
     colors: Object.assign({}, DEFAULT_COLORS),
     layout: DEFAULT_LAYOUT.slice(),
+    sciLayout: SCI_DEFAULT.slice(),
+    advLayout: ADV_DEFAULT.slice(),
+    varLayout: VAR_DEFAULT.slice(),
+    unitsLayout: UNITS_DEFAULT.slice(),
     order: MENU_KEYS.slice(),
     enabled: {},
     activePreset: "classic"
   };
+
+  // The 5 screens as one registry, keyed the same way everywhere (seed
+  // order, selection tracking, re-rendering) so a swap can reach across
+  // screens instead of just within one grid.
+  var SCREENS = ["basic", "sci", "adv", "var", "units"];
+  var screenArrays = {
+    basic: state.layout, sci: state.sciLayout, adv: state.advLayout,
+    var: state.varLayout, units: state.unitsLayout
+  };
+  var screenBg = { sci: "#00838f", adv: "#5c4dff", var: "#3f51b5", units: "#4c6fff" };
+
+  // ONE selection shared by every grid: tapping a tile in any screen
+  // either sets the selection or, if something else is already selected
+  // (in this screen or a different one), swaps the two tiles across
+  // whichever screens they're in and clears the selection. This is what
+  // lets a button move between screens, not just within one.
+  var selection = null; // { screen, index }
+
+  function tileClicked(screenKey, index) {
+    if (selection === null) {
+      selection = { screen: screenKey, index: index };
+    } else if (selection.screen === screenKey && selection.index === index) {
+      selection = null;
+    } else {
+      var a = screenArrays[selection.screen];
+      var b = screenArrays[screenKey];
+      var tmp = a[selection.index];
+      a[selection.index] = b[index];
+      b[index] = tmp;
+      selection = null;
+    }
+    renderAll();
+  }
+
+  // Deletes a button outright: it becomes "blank" (no-op, drawn blended
+  // into the background on the watch) instead of needing to be swapped
+  // somewhere out of the way. Dragging any other button onto a blank
+  // slot later swaps it back in, so nothing is unrecoverable mid-session.
+  function deleteTile(screenKey, index) {
+    screenArrays[screenKey][index] = "blank";
+    if (selection && selection.screen === screenKey && selection.index === index) {
+      selection = null;
+    }
+    renderAll();
+  }
+
+  function addDeleteBadge(tile, screenKey, index, token) {
+    if (token === "blank") { return; }
+    var del = document.createElement("div");
+    del.className = "del";
+    del.textContent = "✕";
+    del.title = "מחק כפתור זה";
+    del.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      deleteTile(screenKey, index);
+    });
+    tile.appendChild(del);
+  }
+
+  function renderBasicGrid() {
+    var el = document.getElementById("grid");
+    el.innerHTML = "";
+    var disp = document.createElement("div");
+    disp.className = "disp";
+    disp.style.background = "#" + state.colors.bg;
+    disp.textContent = "12+8";
+    el.appendChild(disp);
+
+    state.layout.forEach(function (token, i) {
+      var tile = document.createElement("div");
+      var isBlank = token === "blank";
+      tile.className = "tile" + (isBlank ? " blank" : "") +
+        (selection && selection.screen === "basic" && selection.index === i ? " selected" : "");
+      var colorKey = colorKeyFor(token);
+      tile.style.background = isBlank ? "#" + state.colors.bg : "#" + state.colors[colorKey];
+      if (!isBlank && colorKey === "op") { tile.style.color = "#000"; }
+      tile.textContent = labelFor(token);
+      tile.addEventListener("click", function () { tileClicked("basic", i); });
+      addDeleteBadge(tile, "basic", i, token);
+      el.appendChild(tile);
+    });
+  }
+
+  // Generic grid for the other 4 screens: one flat accent color per
+  // screen, same shared tap-to-swap/move-between-screens behavior.
+  function makeFlatGrid(containerId, screenKey) {
+    return function render() {
+      var el = document.getElementById(containerId);
+      el.innerHTML = "";
+      screenArrays[screenKey].forEach(function (token, i) {
+        var tile = document.createElement("div");
+        var isBlank = token === "blank";
+        tile.className = "tile" + (isBlank ? " blank" : "") +
+          (selection && selection.screen === screenKey && selection.index === i ? " selected" : "");
+        tile.style.background = screenBg[screenKey];
+        tile.textContent = labelFor(token);
+        tile.addEventListener("click", function () { tileClicked(screenKey, i); });
+        addDeleteBadge(tile, screenKey, i, token);
+        el.appendChild(tile);
+      });
+    };
+  }
+
+  var renderSciGrid = makeFlatGrid("sciGrid", "sci");
+  var renderAdvGrid = makeFlatGrid("advGrid", "adv");
+  var renderVarGrid = makeFlatGrid("varGrid", "var");
+  var renderUnitsGrid = makeFlatGrid("unitsGrid", "units");
+
+  function renderAllGrids() {
+    renderBasicGrid();
+    renderSciGrid();
+    renderAdvGrid();
+    renderVarGrid();
+    renderUnitsGrid();
+  }
+
   MENU_KEYS.forEach(function (k) { state.enabled[k] = PRESETS.classic.menu.indexOf(k) !== -1; });
   reorderFromEnabledFirst(PRESETS.classic.menu);
 
@@ -319,12 +509,10 @@
     var p = PRESETS[key];
     if (!p) { return; }
     state.activePreset = key;
-    state.layout = p.layout.slice();
+    state.layout.splice(0, state.layout.length, ...p.layout);
     MENU_KEYS.forEach(function (k) { state.enabled[k] = p.menu.indexOf(k) !== -1; });
     reorderFromEnabledFirst(p.menu);
-    renderPresets();
-    renderGrid();
-    renderMenu();
+    renderAll();
   }
 
   function renderPresets() {
@@ -352,48 +540,11 @@
       input.value = "#" + state.colors[key];
       input.addEventListener("input", function () {
         state.colors[key] = input.value.replace("#", "");
-        renderGrid();
+        renderBasicGrid();
       });
       row.appendChild(label);
       row.appendChild(input);
       el.appendChild(row);
-    });
-  }
-
-  // Tap-to-swap: tapping a tile selects it (highlighted); tapping a
-  // second tile swaps their positions in state.layout/state.order and
-  // clears the selection. Tapping the same tile again deselects it.
-  var gridSelection = null;
-  function renderGrid() {
-    var el = document.getElementById("grid");
-    el.innerHTML = "";
-    var disp = document.createElement("div");
-    disp.className = "disp";
-    disp.style.background = "#" + state.colors.bg;
-    disp.textContent = "12+8";
-    el.appendChild(disp);
-
-    state.layout.forEach(function (token, i) {
-      var tile = document.createElement("div");
-      tile.className = "tile" + (gridSelection === i ? " selected" : "");
-      var colorKey = colorKeyFor(token);
-      tile.style.background = "#" + state.colors[colorKey];
-      if (colorKey === "op") { tile.style.color = "#000"; }
-      tile.textContent = labelFor(token);
-      tile.addEventListener("click", function () {
-        if (gridSelection === null) {
-          gridSelection = i;
-        } else if (gridSelection === i) {
-          gridSelection = null;
-        } else {
-          var tmp = state.layout[gridSelection];
-          state.layout[gridSelection] = state.layout[i];
-          state.layout[i] = tmp;
-          gridSelection = null;
-        }
-        renderGrid();
-      });
-      el.appendChild(tile);
     });
   }
 
@@ -442,19 +593,46 @@
     });
   }
 
+  function renderAll() {
+    renderPresets();
+    renderColors();
+    renderAllGrids();
+    renderMenu();
+  }
+
   function generateSeed() {
     var cStr = "C=" + COLOR_KEYS.map(function (k) { return state.colors[k]; }).join(",");
     var enabledOrdered = state.order.filter(function (k) { return state.enabled[k]; });
     var mStr = "M=" + enabledOrdered.join(",");
-    var bStr = "B=" + state.layout.join(",");
-    return "1|" + cStr + "|" + mStr + "|" + bStr;
+    var pool = [].concat(state.layout, state.sciLayout, state.advLayout, state.varLayout, state.unitsLayout);
+    var pStr = "P=" + pool.join(",");
+    return "1|" + cStr + "|" + mStr + "|" + pStr;
+  }
+
+  // Validates a token list against a required multiset (a full
+  // permutation - duplicates like "c"/"del"/"backMenu" must appear the
+  // same number of times, in any order/screen) - mirrors SeedConfig.mc.
+  function validPermutation(tokens, required) {
+    if (tokens.length !== required.length) { return false; }
+    var remaining = required.slice();
+    for (var i = 0; i < tokens.length; i++) {
+      if (tokens[i] === "blank") {
+        if (remaining.length === 0) { return false; }
+        remaining.splice(0, 1);
+        continue;
+      }
+      var idx = remaining.indexOf(tokens[i]);
+      if (idx === -1) { return false; }
+      remaining.splice(idx, 1);
+    }
+    return true;
   }
 
   function parseSeed(seed) {
     seed = (seed || "").trim();
     if (seed.substring(0, 2) !== "1|") { return null; }
     var fields = seed.substring(2).split("|");
-    var colors = null, menu = null, layout = null;
+    var colors = null, menu = null, pool = null;
     fields.forEach(function (f) {
       if (f.indexOf("C=") === 0) {
         var parts = f.substring(2).split(",");
@@ -464,19 +642,15 @@
         }
       } else if (f.indexOf("M=") === 0) {
         menu = f.substring(2).split(",").filter(function (x) { return MENU_KEYS.indexOf(x) !== -1; });
-      } else if (f.indexOf("B=") === 0) {
+      } else if (f.indexOf("P=") === 0) {
         var tokens = f.substring(2).split(",");
-        var validCount = tokens.filter(function (t) { return BASIC_TOKENS.indexOf(t) !== -1; }).length;
-        if (tokens.length === BASIC_TOKENS.length && validCount === BASIC_TOKENS.length) {
-          layout = tokens;
-        }
+        if (validPermutation(tokens, REQUIRED_POOL)) { pool = tokens; }
       }
     });
-    if (!colors && !menu && !layout) { return null; }
-    return { colors: colors, menu: menu, layout: layout };
+    if (!colors && !menu && !pool) { return null; }
+    return { colors: colors, menu: menu, pool: pool };
   }
 
-  renderPresets();
   document.getElementById("genBtn").addEventListener("click", function () {
     document.getElementById("seedOut").value = generateSeed();
     document.getElementById("copiedMsg").textContent = "";
@@ -507,21 +681,25 @@
       return;
     }
     state.activePreset = null;
+    selection = null;
     if (parsed.colors) { state.colors = parsed.colors; }
-    if (parsed.layout) { state.layout = parsed.layout; }
     if (parsed.menu) {
       MENU_KEYS.forEach(function (k) { state.enabled[k] = parsed.menu.indexOf(k) !== -1; });
       reorderFromEnabledFirst(parsed.menu);
     }
-    renderPresets();
-    renderColors();
-    renderGrid();
-    renderMenu();
+    if (parsed.pool) {
+      var offset = 0;
+      SCREENS.forEach(function (key) {
+        var arr = screenArrays[key];
+        var slice = parsed.pool.slice(offset, offset + arr.length);
+        arr.splice(0, arr.length, ...slice);
+        offset += arr.length;
+      });
+    }
+    renderAll();
   });
 
-  renderColors();
-  renderGrid();
-  renderMenu();
+  renderAll();
 })();
 </script>
 

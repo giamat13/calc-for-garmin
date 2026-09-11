@@ -49,9 +49,12 @@ function testMenuHubNavigation(logger as Test.Logger) as Boolean {
         logger.debug("expected SCREEN_VAR after var, got " + v.screen);
         return false;
     }
-    v.activate(new CalcButton("BACK", "varBack"));
+    // The var screen's own BACK button now generates plain "menu" (the
+    // "varBack" action was folded into it - identical destination, one
+    // less action string).
+    v.activate(new CalcButton("BACK", "menu"));
     if (v.screen != v.SCREEN_MENU) {
-        logger.debug("expected varBack to return to SCREEN_MENU, got " + v.screen);
+        logger.debug("expected var's BACK to return to SCREEN_MENU, got " + v.screen);
         return false;
     }
     v.activate(new CalcButton("fx", "sci"));

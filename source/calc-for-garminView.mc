@@ -193,29 +193,93 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     // Maps one SeedConfig.basicLayout token to the button it represents.
-    private function basicButtonFor(token as String) as CalcButton {
-        if (token.equals("c")) {
-            return new CalcButton("C", "clear");
-        } else if (token.equals("del")) {
-            return new CalcButton("DEL", "back");
-        } else if (token.equals("pct")) {
-            return new CalcButton("%", "op:%");
-        } else if (token.equals("div")) {
-            return new CalcButton("/", "op:/");
-        } else if (token.equals("mul")) {
-            return new CalcButton("*", "op:*");
-        } else if (token.equals("sub")) {
-            return new CalcButton("-", "op:-");
-        } else if (token.equals("add")) {
-            return new CalcButton("+", "op:+");
-        } else if (token.equals("dot")) {
-            return new CalcButton(".", "digit:.");
-        } else if (token.equals("eq")) {
-            return new CalcButton("=", "equals");
-        } else if (token.equals("menu")) {
-            return new CalcButton("MENU", "menu");
-        }
+    // Every button on every customizable screen (basic/sci/adv/var/units)
+    // comes from ONE shared token vocabulary, because SeedConfig treats
+    // all of them as a single pool a button can be moved between screens
+    // out of - a "sin" token from the scientific screen can just as well
+    // end up on the basic keypad, and this is the one place that needs to
+    // know what every token in that pool actually is. Every action here
+    // is self-contained (a plain screen switch, or an engine op that
+    // doesn't care what screen triggered it), so nothing breaks no matter
+    // which screen a given token is drawn on.
+    private function tokenToButton(token as String) as CalcButton {
+        if (token.equals("blank")) { return new CalcButton("", ""); }
+        else if (token.equals("c")) { return new CalcButton("C", "clear"); }
+        else if (token.equals("del")) { return new CalcButton("DEL", "back"); }
+        else if (token.equals("pct")) { return new CalcButton("%", "op:%"); }
+        else if (token.equals("div")) { return new CalcButton("/", "op:/"); }
+        else if (token.equals("mul")) { return new CalcButton("*", "op:*"); }
+        else if (token.equals("sub")) { return new CalcButton("-", "op:-"); }
+        else if (token.equals("add")) { return new CalcButton("+", "op:+"); }
+        else if (token.equals("dot")) { return new CalcButton(".", "digit:."); }
+        else if (token.equals("eq")) { return new CalcButton("=", "equals"); }
+        else if (token.equals("menu")) { return new CalcButton("MENU", "menu"); }
+        else if (token.equals("sin")) { return new CalcButton("sin", "func:sin"); }
+        else if (token.equals("cos")) { return new CalcButton("cos", "func:cos"); }
+        else if (token.equals("tan")) { return new CalcButton("tan", "func:tan"); }
+        else if (token.equals("sqrt")) { return new CalcButton("sqrt", "func:sqrt"); }
+        else if (token.equals("log")) { return new CalcButton("log", "func:log"); }
+        else if (token.equals("ln")) { return new CalcButton("ln", "func:ln"); }
+        else if (token.equals("sqr")) { return new CalcButton("x2", "sqr"); }
+        else if (token.equals("x")) { return new CalcButton("x", "const:X"); }
+        else if (token.equals("open")) { return new CalcButton("(", "open"); }
+        else if (token.equals("close")) { return new CalcButton(")", "close"); }
+        else if (token.equals("pow")) { return new CalcButton("^", "op:^"); }
+        else if (token.equals("pi")) { return new CalcButton("pi", "const:π"); }
+        else if (token.equals("e")) { return new CalcButton("e", "const:e"); }
+        else if (token.equals("adv")) { return new CalcButton("ADV", "adv"); }
+        else if (token.equals("uc")) { return new CalcButton("UC", "units"); }
+        else if (token.equals("rnd")) { return new CalcButton("RND", "random"); }
+        else if (token.equals("tip")) { return new CalcButton("TIP", "tip"); }
+        else if (token.equals("eqIns")) { return new CalcButton("EQ", "eq"); }
+        else if (token.equals("ans")) { return new CalcButton("Ans", "ans"); }
+        else if (token.equals("curl")) { return new CalcButton("<", "curLeft"); }
+        else if (token.equals("curr")) { return new CalcButton(">", "curRight"); }
+        else if (token.equals("backMenu")) { return new CalcButton("BACK", "menu"); }
+        else if (token.equals("asin")) { return new CalcButton("asin", "func:asin"); }
+        else if (token.equals("acos")) { return new CalcButton("acos", "func:acos"); }
+        else if (token.equals("atan")) { return new CalcButton("atan", "func:atan"); }
+        else if (token.equals("fact")) { return new CalcButton("x!", "fact"); }
+        else if (token.equals("inv")) { return new CalcButton("1/x", "inv"); }
+        else if (token.equals("cbrt")) { return new CalcButton("cbrt", "func:cbrt"); }
+        else if (token.equals("absv")) { return new CalcButton("|x|", "func:abs"); }
+        else if (token.equals("mod")) { return new CalcButton("mod", "op:mod"); }
+        else if (token.equals("ee")) { return new CalcButton("EE", "ee"); }
+        else if (token.equals("cube")) { return new CalcButton("x3", "cube"); }
+        else if (token.equals("floor")) { return new CalcButton("floor", "func:floor"); }
+        else if (token.equals("ceil")) { return new CalcButton("ceil", "func:ceil"); }
+        else if (token.equals("pow10")) { return new CalcButton("10x", "pow10"); }
+        else if (token.equals("var")) { return new CalcButton("VAR", "var"); }
+        else if (token.equals("backSci")) { return new CalcButton("BACK", "sci"); }
+        else if (token.equals("stoA")) { return new CalcButton("STO A", "sto:A"); }
+        else if (token.equals("stoB")) { return new CalcButton("STO B", "sto:B"); }
+        else if (token.equals("stoC")) { return new CalcButton("STO C", "sto:C"); }
+        else if (token.equals("stoD")) { return new CalcButton("STO D", "sto:D"); }
+        else if (token.equals("rclA")) { return new CalcButton("RCL A", "rcl:A"); }
+        else if (token.equals("rclB")) { return new CalcButton("RCL B", "rcl:B"); }
+        else if (token.equals("rclC")) { return new CalcButton("RCL C", "rcl:C"); }
+        else if (token.equals("rclD")) { return new CalcButton("RCL D", "rcl:D"); }
+        else if (token.equals("clr")) { return new CalcButton("CLR", "varClear"); }
+        else if (token.equals("dist")) { return new CalcButton("DIST", "cat:dist"); }
+        else if (token.equals("wt")) { return new CalcButton("WT", "cat:weight"); }
+        else if (token.equals("temp")) { return new CalcButton("TEMP", "cat:temp"); }
+        else if (token.equals("spd")) { return new CalcButton("SPD", "cat:speed"); }
+        else if (token.equals("pace")) { return new CalcButton("PACE", "cat:pace"); }
+        else if (token.equals("vol")) { return new CalcButton("VOL", "cat:vol"); }
+        else if (token.equals("area")) { return new CalcButton("AREA", "cat:area"); }
+        else if (token.equals("time")) { return new CalcButton("TIME", "cat:time"); }
+        else if (token.equals("pres")) { return new CalcButton("PRES", "cat:pres"); }
+        else if (token.equals("enrg")) { return new CalcButton("ENRG", "cat:energy"); }
+        else if (token.equals("cur")) { return new CalcButton("CUR", "cat:cur"); }
         return new CalcButton(token, "digit:" + token);
+    }
+
+    private function buttonsFromTokens(tokens as Array<String>) as Array<CalcButton> {
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < tokens.size(); i++) {
+            defs.add(tokenToButton(tokens[i]));
+        }
+        return defs;
     }
 
     // Home screen: a plain, familiar 4-function calculator - digits, the
@@ -225,12 +289,7 @@ class calc_for_garminView extends WatchUi.View {
     // Which button sits in which of the 20 cells comes from SeedConfig
     // (set via the setup web page's SEED code). 4 cols x 5 rows.
     private function basicButtons() as Array<CalcButton> {
-        var tokens = SeedConfig.get().basicLayout;
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < tokens.size(); i++) {
-            defs.add(basicButtonFor(tokens[i]));
-        }
-        return defs;
+        return buttonsFromTokens(SeedConfig.get().basicLayout);
     }
 
     // Tool hub: every advanced tool is one tap away from here instead of
@@ -271,60 +330,27 @@ class calc_for_garminView extends WatchUi.View {
 
     // Scientific screen: functions, parentheses, general powers, cursor
     // movement and Ans (relocated here from the old basic screen), plus EQ
-    // for building equations, 4 cols x 6 rows.
+    // for building equations. BACK is just another token in the pool now
+    // (not pinned), so it can be moved like anything else. 4 cols x 6 rows.
     private function scientificButtons() as Array<CalcButton> {
-        return [
-            new CalcButton("sin", "func:sin"), new CalcButton("cos", "func:cos"), new CalcButton("tan", "func:tan"), new CalcButton("sqrt", "func:sqrt"),
-            new CalcButton("log", "func:log"), new CalcButton("ln", "func:ln"), new CalcButton("x2", "sqr"), new CalcButton("x", "const:X"),
-            new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("^", "op:^"), new CalcButton("pi", "const:π"),
-            new CalcButton("e", "const:e"), new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("ADV", "adv"),
-            new CalcButton("BACK", "menu"), new CalcButton("UC", "units"), new CalcButton("RND", "random"), new CalcButton("TIP", "tip"),
-            new CalcButton("EQ", "eq"), new CalcButton("Ans", "ans"), new CalcButton("<", "curLeft"), new CalcButton(">", "curRight"),
-        ] as Array<CalcButton>;
+        return buttonsFromTokens(SeedConfig.get().sciLayout);
     }
 
     // Advanced screen: inverse trig, roots, integer/rounding ops and the
-    // ×10^x shortcut for entering numbers in scientific notation, 4 cols x 5 rows.
+    // ×10^x shortcut for entering numbers in scientific notation. 4 cols x 5 rows.
     private function advancedButtons() as Array<CalcButton> {
-        return [
-            new CalcButton("asin", "func:asin"), new CalcButton("acos", "func:acos"), new CalcButton("atan", "func:atan"), new CalcButton("x!", "fact"),
-            new CalcButton("1/x", "inv"), new CalcButton("cbrt", "func:cbrt"), new CalcButton("|x|", "func:abs"), new CalcButton("mod", "op:mod"),
-            new CalcButton("EE", "ee"), new CalcButton("x3", "cube"), new CalcButton("floor", "func:floor"), new CalcButton("ceil", "func:ceil"),
-            new CalcButton("C", "clear"), new CalcButton("DEL", "back"), new CalcButton("10x", "pow10"), new CalcButton("VAR", "var"),
-            new CalcButton("BACK", "sci"),
-        ] as Array<CalcButton>;
+        return buttonsFromTokens(SeedConfig.get().advLayout);
     }
 
     // Named-variable screen: store the currently typed value under A/B/C/D,
     // or recall one back into the expression at the cursor. 2 cols x 5 rows.
     private function varButtons() as Array<CalcButton> {
-        var defs = [] as Array<CalcButton>;
-        var names = ["A", "B", "C", "D"];
-        for (var i = 0; i < names.size(); i++) {
-            defs.add(new CalcButton("STO " + names[i], "sto:" + names[i]));
-            defs.add(new CalcButton("RCL " + names[i], "rcl:" + names[i]));
-        }
-        defs.add(new CalcButton("CLR", "varClear"));
-        defs.add(new CalcButton("BACK", "varBack"));
-        return defs;
+        return buttonsFromTokens(SeedConfig.get().varLayout);
     }
 
     // Step 1 of the unit converter: pick WHAT to measure. 3 cols x 4 rows.
     private function unitCategoryButtons() as Array<CalcButton> {
-        return [
-            new CalcButton("DIST",  "cat:dist"),
-            new CalcButton("WT",    "cat:weight"),
-            new CalcButton("TEMP",  "cat:temp"),
-            new CalcButton("SPD",   "cat:speed"),
-            new CalcButton("PACE",  "cat:pace"),
-            new CalcButton("VOL",   "cat:vol"),
-            new CalcButton("AREA",  "cat:area"),
-            new CalcButton("TIME",  "cat:time"),
-            new CalcButton("PRES",  "cat:pres"),
-            new CalcButton("ENRG",  "cat:energy"),
-            new CalcButton("CUR",   "cat:cur"),
-            new CalcButton("BACK",  "menu"),
-        ] as Array<CalcButton>;
+        return buttonsFromTokens(SeedConfig.get().unitsLayout);
     }
 
     // The unit keys that belong to each measurement category, in display order.
@@ -569,17 +595,26 @@ class calc_for_garminView extends WatchUi.View {
             rows = 1;
         }
 
-        // BACK always lands in the grid's bottom-right corner, regardless of
-        // how many other buttons come before it or whether the last row is
-        // fully packed - otherwise its position shifts from screen to
-        // screen, which is what made it confusing to find.
+        // BACK lands in the grid's bottom-right corner on every screen
+        // EXCEPT the fully customizable ones (basic/sci/adv/var/units),
+        // where BACK is just another token in SeedConfig's pool and can be
+        // moved anywhere like any other button - otherwise a user-chosen
+        // BACK position would be silently overridden right back to the
+        // corner. Elsewhere it's still pinned so it doesn't shift from
+        // screen to screen, which is what made it confusing to find.
+        var customizableScreen = screen == SCREEN_BASIC || screen == SCREEN_SCIENTIFIC ||
+            screen == SCREEN_ADVANCED || screen == SCREEN_VAR || screen == SCREEN_UNITS;
         var backBtn = null as CalcButton?;
         var others = [] as Array<CalcButton>;
-        for (var oi = 0; oi < defs.size(); oi++) {
-            if (backBtn == null && defs[oi].label.equals("BACK")) {
-                backBtn = defs[oi];
-            } else {
-                others.add(defs[oi]);
+        if (customizableScreen) {
+            others = defs;
+        } else {
+            for (var oi = 0; oi < defs.size(); oi++) {
+                if (backBtn == null && defs[oi].label.equals("BACK")) {
+                    backBtn = defs[oi];
+                } else {
+                    others.add(defs[oi]);
+                }
             }
         }
 
@@ -790,9 +825,6 @@ class calc_for_garminView extends WatchUi.View {
             return;
         } else if (action.equals("var")) {
             switchScreen(SCREEN_VAR);
-            return;
-        } else if (action.equals("varBack")) {
-            switchScreen(SCREEN_MENU);
             return;
         } else if (action.equals("varClear")) {
             engine.clearVariables();
@@ -1179,7 +1211,12 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     private function buttonColor(action as String) as Number {
-        if (action.equals("equals") || action.equals("eq")) {
+        if (action.equals("")) {
+            // "blank" token - a button the user deliberately deleted via
+            // the setup page; blend it into the background instead of
+            // drawing an empty tile in a loud color.
+            return BG_TOP;
+        } else if (action.equals("equals") || action.equals("eq")) {
             return ACCENT_EQUALS;
         } else if (action.equals("clear") || action.equals("back") || action.equals("varClear")) {
             return ACCENT_DESTRUCTIVE;
