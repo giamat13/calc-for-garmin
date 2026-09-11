@@ -5,6 +5,8 @@ import Toybox.System;
 import Toybox.Communications;
 import Toybox.Application.Storage;
 import Toybox.Math;
+import Toybox.Time;
+import Toybox.Time.Gregorian;
 
 class CalcButton {
     var label as String;
@@ -40,6 +42,9 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_VAR = 9;         // named variables: store/recall A/B/C/D
     const SCREEN_MENU = 10;       // tool hub: jump straight to any advanced tool
     const SCREEN_PERSONALIZE = 11; // QR code + link to the setup web page (theme/menu SEED)
+    const SCREEN_PCT = 12;         // advanced %: discount / markup / margin
+    const SCREEN_DATE = 13;        // date tool: days until a date, or exact age
+    const SCREEN_MORE = 14;        // overflow hub off the Scientific screen: VAR/PCT+/DATE
 
     const SETUP_URL = "https://giamat13.github.io/calc-for-garmin/";
 
@@ -94,6 +99,25 @@ class calc_for_garminView extends WatchUi.View {
     private var tipStage as Number = 0;
     private var tipBill as Double = 0.0d;
     private var tipPct as Double = 0.0d;
+
+    // Advanced % state. pctStage: 0 = pick MODE, 1 = BASE, 2 = PERCENT.
+    // pctMode: 0 = discount, 1 = markup, 2 = margin.
+    private var pctStage as Number = 0;
+    private var pctMode as Number = 0;
+    private var pctBase as Double = 0.0d;
+
+    // Date tool state. dateStage: 0 = pick MODE, then Y/M/D entry stages -
+    // 3 of them (1-3) for UNTIL/AGE's single date, 6 (1-6) for DIFF's two
+    // dates. dateMode: 0 = days until a future date, 1 = exact age from a
+    // birth date, 2 = days between two arbitrary dates.
+    private var dateStage as Number = 0;
+    private var dateMode as Number = 0;
+    private var dateYear as Number = 0;
+    private var dateMonth as Number = 0;
+    private var dateDay as Number = 0;
+    private var dateYear2 as Number = 0;
+    private var dateMonth2 as Number = 0;
+    private var dateDay2 as Number = 0;
 
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
@@ -313,6 +337,10 @@ class calc_for_garminView extends WatchUi.View {
                 defs.add(new CalcButton("RND", "random"));
             } else if (item.equals("var")) {
                 defs.add(new CalcButton("VAR", "var"));
+            } else if (item.equals("apct")) {
+                defs.add(new CalcButton("PCT+", "apct"));
+            } else if (item.equals("date")) {
+                defs.add(new CalcButton("DATE", "date"));
             }
         }
         defs.add(new CalcButton("BACK", "basic"));
@@ -522,6 +550,46 @@ class calc_for_garminView extends WatchUi.View {
         return keypadButtons("tipBack", tipStage == 2 ? "GO" : "NEXT", tipStage == 2 ? "tipGo" : "tipNext");
     }
 
+    // Advanced % screen: pick DISCOUNT/MARKUP/MARGIN, then reuse the same
+    // keypad for BASE and PERCENT. GO splices the computed price back into
+    // the pending expression.
+    private function pctButtons() as Array<CalcButton> {
+        if (pctStage == 0) {
+            return [
+                new CalcButton("DISCOUNT", "pctMode:0"),
+                new CalcButton("MARKUP", "pctMode:1"),
+                new CalcButton("MARGIN", "pctMode:2"),
+                new CalcButton("BACK", "pctBack"),
+            ] as Array<CalcButton>;
+        }
+        return keypadButtons("pctBack", pctStage == 2 ? "GO" : "NEXT", pctStage == 2 ? "pctGo" : "pctNext");
+    }
+
+    // Date screen: pick UNTIL (days remaining to a future date), AGE (exact
+    // age from a birth date), or DIFF (days between two arbitrary dates),
+    // then the same keypad for Y/M/D - twice, for DIFF's two dates.
+    private function dateButtons() as Array<CalcButton> {
+        if (dateStage == 0) {
+            return [
+                new CalcButton("UNTIL", "dateMode:0"),
+                new CalcButton("AGE", "dateMode:1"),
+                new CalcButton("DIFF", "dateMode:2"),
+                new CalcButton("BACK", "dateBack"),
+            ] as Array<CalcButton>;
+        }
+        var lastStage = dateMode == 2 ? 6 : 3;
+        return keypadButtons("dateBack", dateStage == lastStage ? "GO" : "NEXT", dateStage == lastStage ? "dateGo" : "dateNext");
+    }
+
+    // Overflow hub, one tap off the Scientific screen's "MORE" corner
+    // button: the less-everyday tools that got moved off the default MENU.
+    private function moreButtons() as Array<CalcButton> {
+        return [
+            new CalcButton("PCT+", "apct"), new CalcButton("DATE", "date"),
+            new CalcButton("VAR", "var"), new CalcButton("BACK", "moreBack"),
+        ] as Array<CalcButton>;
+    }
+
     // Compact 4x4 numeric keypad shared by the random and tip screens.
     private function keypadButtons(backAction as String, nextLabel as String, nextAction as String) as Array<CalcButton> {
         var defs = [] as Array<CalcButton>;
@@ -580,6 +648,18 @@ class calc_for_garminView extends WatchUi.View {
         } else if (screen == SCREEN_TIP) {
             defs = tipButtons();
             cols = 4;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_PCT) {
+            defs = pctButtons();
+            cols = pctStage == 0 ? 2 : 4;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_DATE) {
+            defs = dateButtons();
+            cols = dateStage == 0 ? 2 : 4;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_MORE) {
+            defs = moreButtons();
+            cols = 2;
             rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_VAR) {
             defs = varButtons();
@@ -660,6 +740,18 @@ class calc_for_garminView extends WatchUi.View {
             setupBtn.w = setupSize;
             setupBtn.h = setupSize;
             others.add(setupBtn);
+        }
+        // MORE is the door to the overflow tools (VAR/PCT+/DATE) that got
+        // moved off the default MENU - lives in the header corner, same
+        // trick as SET above, so it doesn't eat a slot in the sci grid.
+        if (screen == SCREEN_SCIENTIFIC) {
+            var moreSize = (headerH * 0.5).toNumber();
+            var moreBtn = new CalcButton("MORE", "more");
+            moreBtn.x = safeX + safeW - moreSize - 4;
+            moreBtn.y = safeY + 4;
+            moreBtn.w = moreSize;
+            moreBtn.h = moreSize;
+            others.add(moreBtn);
         }
         buttons = others;
         if (selectedIndex >= buttons.size()) {
@@ -926,6 +1018,85 @@ class calc_for_garminView extends WatchUi.View {
         } else if (action.equals("tipBack")) {
             switchScreen(SCREEN_MENU);
             return;
+        } else if (action.equals("apct")) {
+            enterEmbeddedFlow();
+            pctStage = 0;
+            switchScreen(SCREEN_PCT);
+            return;
+        } else if (action.equals("pctNext")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull == null) {
+                return;
+            }
+            pctBase = entryOrNull as Double;
+            engine.clear();
+            goToPctStage(2);
+            return;
+        } else if (action.equals("pctGo")) {
+            var pctOrNull = readEntry();
+            if (pctOrNull == null) {
+                return;
+            }
+            engine.setResult(computePct(pctMode, pctBase, pctOrNull as Double));
+            exitEmbeddedFlow(engine.expr);
+            switchScreen(SCREEN_BASIC);
+            return;
+        } else if (action.equals("pctBack")) {
+            switchScreen(SCREEN_MORE);
+            return;
+        } else if (action.equals("date")) {
+            enterEmbeddedFlow();
+            dateStage = 0;
+            switchScreen(SCREEN_DATE);
+            return;
+        } else if (action.equals("dateNext")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull == null) {
+                return;
+            }
+            var whole = (Math.round(entryOrNull as Double) as Numeric).toNumber();
+            if (dateStage == 1) {
+                dateYear = whole;
+            } else if (dateStage == 2) {
+                dateMonth = whole;
+            } else if (dateStage == 3) {
+                dateDay = whole;
+            } else if (dateStage == 4) {
+                dateYear2 = whole;
+            } else {
+                dateMonth2 = whole;
+            }
+            engine.clear();
+            goToDateStage(dateStage + 1);
+            return;
+        } else if (action.equals("dateGo")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull == null) {
+                return;
+            }
+            var whole = (Math.round(entryOrNull as Double) as Numeric).toNumber();
+            if (dateMode == 0) {
+                dateDay = whole;
+                engine.setResult(daysUntil(dateYear, dateMonth, dateDay).toDouble());
+            } else if (dateMode == 1) {
+                dateDay = whole;
+                engine.setResult(ageInYears(dateYear, dateMonth, dateDay).toDouble());
+            } else {
+                dateDay2 = whole;
+                engine.setResult(daysBetween(dateYear, dateMonth, dateDay, dateYear2, dateMonth2, dateDay2).toDouble());
+            }
+            exitEmbeddedFlow(engine.expr);
+            switchScreen(SCREEN_BASIC);
+            return;
+        } else if (action.equals("dateBack")) {
+            switchScreen(SCREEN_MORE);
+            return;
+        } else if (action.equals("more")) {
+            switchScreen(SCREEN_MORE);
+            return;
+        } else if (action.equals("moreBack")) {
+            switchScreen(SCREEN_SCIENTIFIC);
+            return;
         }
 
         var idxOrNull = action.find(":");
@@ -974,6 +1145,14 @@ class calc_for_garminView extends WatchUi.View {
             engine.storeVar(value);
         } else if (prefix.equals("rcl")) {
             engine.recallVar(value);
+        } else if (prefix.equals("pctMode")) {
+            pctMode = value.toNumber() as Number;
+            engine.clear();
+            goToPctStage(1);
+        } else if (prefix.equals("dateMode")) {
+            dateMode = value.toNumber() as Number;
+            engine.clear();
+            goToDateStage(1);
         }
     }
 
@@ -1037,6 +1216,18 @@ class calc_for_garminView extends WatchUi.View {
         layoutButtons();
     }
 
+    private function goToPctStage(stage as Number) as Void {
+        pctStage = stage;
+        selectedIndex = 0;
+        layoutButtons();
+    }
+
+    private function goToDateStage(stage as Number) as Void {
+        dateStage = stage;
+        selectedIndex = 0;
+        layoutButtons();
+    }
+
     // Rolls a random whole number in [min, max] (bounds are rounded and
     // swapped if entered backwards) and shows it via the engine's display.
     private function rollRandom() as Void {
@@ -1053,6 +1244,65 @@ class calc_for_garminView extends WatchUi.View {
             r = r + range;
         }
         engine.setResult((lo + r).toDouble());
+    }
+
+    // mode: 0 = discount (price after taking pct off base), 1 = markup
+    // (price after adding pct on top of base), 2 = margin (the price a
+    // cost of `base` must be sold at to hit a pct profit margin).
+    private function computePct(mode as Number, base as Double, pct as Double) as Double {
+        if (mode == 0) {
+            return base * (1.0d - pct / 100.0d);
+        } else if (mode == 1) {
+            return base * (1.0d + pct / 100.0d);
+        }
+        var denom = 1.0d - pct / 100.0d;
+        if (denom <= 0.0d) {
+            denom = 0.01d;
+        }
+        return base / denom;
+    }
+
+    // Whole days from today until the given date (negative if it's past).
+    private function daysUntil(year as Number, month as Number, day as Number) as Number {
+        var target = Gregorian.moment({
+            :year => year, :month => clampRange(month, 1, 12), :day => clampRange(day, 1, 31),
+            :hour => 0, :minute => 0, :second => 0
+        });
+        var diffSeconds = target.value() - Time.now().value();
+        return (diffSeconds / 86400.0d).toNumber();
+    }
+
+    // Whole years elapsed between the given date and today - standard
+    // "hasn't had this year's birthday yet" calendar age.
+    private function ageInYears(year as Number, month as Number, day as Number) as Number {
+        var today = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+        var m = clampRange(month, 1, 12);
+        var d = clampRange(day, 1, 31);
+        var age = today.year - year;
+        if (today.month < m || (today.month == m && today.day < d)) {
+            age -= 1;
+        }
+        return age < 0 ? 0 : age;
+    }
+
+    // Whole days between two arbitrary dates, order-independent.
+    private function daysBetween(y1 as Number, m1 as Number, d1 as Number, y2 as Number, m2 as Number, d2 as Number) as Number {
+        var a = Gregorian.moment({
+            :year => y1, :month => clampRange(m1, 1, 12), :day => clampRange(d1, 1, 31),
+            :hour => 0, :minute => 0, :second => 0
+        });
+        var b = Gregorian.moment({
+            :year => y2, :month => clampRange(m2, 1, 12), :day => clampRange(d2, 1, 31),
+            :hour => 0, :minute => 0, :second => 0
+        });
+        var diff = ((b.value() - a.value()) / 86400.0d).toNumber();
+        return diff < 0 ? -diff : diff;
+    }
+
+    private function clampRange(v as Number, lo as Number, hi as Number) as Number {
+        if (v < lo) { return lo; }
+        if (v > hi) { return hi; }
+        return v;
     }
 
     private function convertValue(category as String, from as String, to as String, v as Double) as Double {
@@ -1274,6 +1524,38 @@ class calc_for_garminView extends WatchUi.View {
                     text = "TIP%? " + text;
                 } else {
                     text = "PPL? " + text;
+                }
+            } else if (screen == SCREEN_PCT) {
+                if (pctStage == 0) {
+                    text = "DISCOUNT / MARKUP / MARGIN?";
+                } else if (pctStage == 1) {
+                    text = "BASE? " + text;
+                } else {
+                    text = "PCT? " + text;
+                }
+            } else if (screen == SCREEN_DATE) {
+                if (dateStage == 0) {
+                    text = "UNTIL / AGE / DIFF?";
+                } else if (dateMode == 2) {
+                    if (dateStage == 1) {
+                        text = "DATE1 Y? " + text;
+                    } else if (dateStage == 2) {
+                        text = "DATE1 M? " + text;
+                    } else if (dateStage == 3) {
+                        text = "DATE1 D? " + text;
+                    } else if (dateStage == 4) {
+                        text = "DATE2 Y? " + text;
+                    } else if (dateStage == 5) {
+                        text = "DATE2 M? " + text;
+                    } else {
+                        text = "DATE2 D? " + text;
+                    }
+                } else if (dateStage == 1) {
+                    text = (dateMode == 0 ? "TARGET Y? " : "BIRTH Y? ") + text;
+                } else if (dateStage == 2) {
+                    text = "M? " + text;
+                } else {
+                    text = "D? " + text;
                 }
             }
             // Regular text fonts, not FONT_NUMBER_*: the expression can

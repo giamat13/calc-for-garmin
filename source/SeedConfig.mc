@@ -35,8 +35,12 @@ class SeedConfig {
     private static var instance as SeedConfig?;
 
     static const DEFAULT_COLORS = [0x23233A, 0xFFB020, 0x00D68F, 0xFF5470, 0x7C4DFF, 0x14141F] as Array<Number>;
-    static const DEFAULT_MENU = ["sci", "units", "tip", "rnd", "var"] as Array<String>;
-    static const VALID_MENU_ITEMS = ["sci", "units", "tip", "rnd", "var"] as Array<String>;
+    // "var"/"apct"/"date" stay VALID (a pasted SEED can still put them
+    // directly on MENU) but default off it - they're tucked behind the
+    // "MORE" corner button on the Scientific screen instead, to keep the
+    // default MENU to the tools used every day.
+    static const DEFAULT_MENU = ["sci", "units", "tip", "rnd"] as Array<String>;
+    static const VALID_MENU_ITEMS = ["sci", "units", "tip", "rnd", "var", "apct", "date"] as Array<String>;
 
     static const BASIC_LEN = 20;
     static const SCI_LEN = 24;

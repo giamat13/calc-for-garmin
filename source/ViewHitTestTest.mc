@@ -32,6 +32,37 @@ function testMenuScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 10) && checkAllButtonsTappable(logger, true, 10);
 }
 
+(:test)
+function testPctAndDateScreensAreTappable(logger as Test.Logger) as Boolean {
+    return checkAllButtonsTappable(logger, false, 12) && checkAllButtonsTappable(logger, true, 12) &&
+        checkAllButtonsTappable(logger, false, 13) && checkAllButtonsTappable(logger, true, 13);
+}
+
+(:test)
+function testMoreScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
+    return checkAllButtonsTappable(logger, false, 14) && checkAllButtonsTappable(logger, true, 14);
+}
+
+// PCT+/DATE/VAR moved off the default MENU behind a "MORE" corner button on
+// the Scientific screen; this pins that door and its own BACK still works.
+(:test)
+function testSciMoreNavigatesToOverflowTools(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("fx", "sci"));
+    if (v.screen != v.SCREEN_SCIENTIFIC) {
+        logger.debug("expected SCREEN_SCIENTIFIC after sci, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("MORE", "more"));
+    if (v.screen != v.SCREEN_MORE) {
+        logger.debug("expected SCREEN_MORE after more, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "moreBack"));
+    return v.screen == v.SCREEN_SCIENTIFIC;
+}
+
 // The home screen is a plain 4-function calculator with a single "MENU"
 // door into every advanced tool; each tool's BACK returns to that menu
 // (not to each other), and the menu's own BACK returns home.
@@ -109,6 +140,60 @@ function testTipSplitEmbedsResultAtCursor(logger as Test.Logger) as Boolean {
     return pressAndExpect(logger, v,
         ["clear", "digit:1", "op:+", "tip", "digit:1", "digit:0", "digit:0", "tipNext", "digit:1", "digit:0", "tipNext", "digit:2", "tipGo"],
         "1+55");
+}
+
+// Advanced %: 100 with a 10% discount is 90, spliced into "1+" -> "1+90".
+(:test)
+function testAdvancedPercentDiscountEmbedsResultAtCursor(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v,
+        ["clear", "digit:1", "op:+", "apct", "pctMode:0", "digit:1", "digit:0", "digit:0", "pctNext", "digit:1", "digit:0", "pctGo"],
+        "1+90");
+}
+
+// A target date almost 75 years out should always be thousands of days
+// away, regardless of what "today" actually is when the test runs.
+(:test)
+function testDateDaysUntilIsPositiveForAFutureYear(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "date"));
+    v.activate(new CalcButton("", "dateMode:0"));
+    v.activate(new CalcButton("", "digit:2"));
+    v.activate(new CalcButton("", "digit:0"));
+    v.activate(new CalcButton("", "digit:9"));
+    v.activate(new CalcButton("", "digit:9"));
+    v.activate(new CalcButton("", "dateNext"));
+    v.activate(new CalcButton("", "digit:1"));
+    v.activate(new CalcButton("", "dateNext"));
+    v.activate(new CalcButton("", "digit:1"));
+    v.activate(new CalcButton("", "dateGo"));
+    var got = v.engine.displayText().toNumber();
+    if (got == null || (got as Number) < 1000) {
+        logger.debug("expected many days until year 2099, got " + v.engine.displayText());
+        return false;
+    }
+    return true;
+}
+
+// DIFF mode compares two fixed, typed-in dates rather than "today", so the
+// expected day count is deterministic regardless of when the test runs.
+// 2024-01-01 -> 2024-01-11 is exactly 10 days (2024 being a leap year
+// doesn't matter here, both dates are in January).
+(:test)
+function testDateDiffBetweenTwoFixedDates(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v,
+        ["clear", "date", "dateMode:2",
+            "digit:2", "digit:0", "digit:2", "digit:4", "dateNext",
+            "digit:1", "dateNext",
+            "digit:1", "dateNext",
+            "digit:2", "digit:0", "digit:2", "digit:4", "dateNext",
+            "digit:1", "dateNext",
+            "digit:1", "digit:1", "dateGo"],
+        "10");
 }
 
 // 12 kph is a 5:00/km pace, and the "m:ss" result converts back.
