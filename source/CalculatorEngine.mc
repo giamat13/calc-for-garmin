@@ -253,11 +253,17 @@ class CalculatorEngine {
         insertAtCursor(v < 0.0d ? "(" + s + ")" : s);
     }
 
-    // Inserts the last plain "=" result at the cursor, like any other value.
-    function insertAns() as Void {
+    // Inserts an arbitrary computed value at the cursor, like any other
+    // value being typed - used by Ans and by recalling a history entry.
+    function insertValue(v as Double) as Void {
         resetIfNeeded(true);
-        var s = formatNumber(lastAnswer);
-        insertAtCursor(lastAnswer < 0.0d ? "(" + s + ")" : s);
+        var s = formatNumber(v);
+        insertAtCursor(v < 0.0d ? "(" + s + ")" : s);
+    }
+
+    // Inserts the last plain "=" result at the cursor.
+    function insertAns() as Void {
+        insertValue(lastAnswer);
     }
 
     // The EQ button inserts a literal "=" (building "LHS=RHS" to solve);

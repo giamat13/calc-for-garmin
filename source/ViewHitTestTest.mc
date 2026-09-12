@@ -152,6 +152,17 @@ function testAdvancedPercentDiscountEmbedsResultAtCursor(logger as Test.Logger) 
         "1+90");
 }
 
+// "=" records a history entry; recalling it later splices that result back
+// in at the cursor, same as Ans.
+(:test)
+function testHistoryRecordsAndRecallsLastResult(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v,
+        ["clear", "digit:1", "digit:2", "op:+", "digit:3", "equals", "op:+", "history", "hist:0"],
+        "15+15");
+}
+
 // A target date almost 75 years out should always be thousands of days
 // away, regardless of what "today" actually is when the test runs.
 (:test)

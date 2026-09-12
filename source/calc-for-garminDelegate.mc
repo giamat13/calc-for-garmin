@@ -45,6 +45,8 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
             view.engine.moveCursorLeft();
         } else if (dir == WatchUi.SWIPE_RIGHT) {
             view.engine.moveCursorRight();
+        } else if (dir == WatchUi.SWIPE_UP) {
+            view.switchScreen(view.SCREEN_HISTORY);
         } else {
             return false;
         }
@@ -95,6 +97,10 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
                 return true;
             } else if (view.screen == view.SCREEN_VAR) {
                 view.switchScreen(view.SCREEN_MENU);
+                WatchUi.requestUpdate();
+                return true;
+            } else if (view.screen == view.SCREEN_HISTORY) {
+                view.switchScreen(view.SCREEN_BASIC);
                 WatchUi.requestUpdate();
                 return true;
             } else if (view.screen == view.SCREEN_SCIENTIFIC) {
