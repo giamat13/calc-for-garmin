@@ -21,4 +21,10 @@ A screen that's a fixed grid instead (like VAR or NAV) isn't part of this pool a
 
 ## Old SEED codes must keep working
 
-From now on, a SEED code someone already generated and pasted into their watch settings must keep working after future updates - it should not silently fall back to defaults just because the app changed. Before changing anything that affects the SEED format (`SeedConfig.mc`'s pool layout/size, `VALID_MENU_ITEMS`, the `"1|...` version prefix, or the equivalent `web/index.html` registries), check whether the change would invalidate existing pasted seeds, and if so, prefer a backward-compatible approach (e.g. only appending new tokens/screens rather than resizing or reordering existing ones, or bumping the format version and still parsing the old one) over one that breaks them. Flag it to the user before doing anything that would break existing seeds.
+From now on, a SEED code someone already generated and pasted into their watch settings must keep working after future updates - it should not silently fall back to defaults just because the app changed. Before changing anything that affects the SEED format (`SeedConfig.mc`'s pool layout/size, `VALID_MENU_ITEMS`, the `"1|...` version prefix, or the equivalent `web/index.html` registries), check whether the change would invalidate existing pasted seeds.
+
+It's fine to reshape the format itself (resize/reorder the pool, bump the version prefix, restructure a registry) as long as both sides keep parsing old seeds correctly:
+- `web/index.html`'s "Load SEED" import still recognizes and correctly loads seeds in every previous format/version.
+- The watch's `SeedConfig.mc` parser still recognizes and correctly applies seeds in every previous format/version.
+
+In practice this usually means keeping the old parser path alongside the new one, branching on the version prefix (or the pool size/shape) rather than deleting old handling. What's not okay is a change that makes an old seed parse into something silently wrong or fall back to defaults - if you can't keep both sides truly reading it correctly, flag it to the user before doing anything that would break existing seeds.
