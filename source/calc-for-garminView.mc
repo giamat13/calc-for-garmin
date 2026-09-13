@@ -48,6 +48,9 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_NAV = 15;         // editing helpers off MENU: cursor arrows, Ans, brackets
     const SCREEN_HISTORY = 16;     // last few "=" results: swipe up, or HIST off NAV
     const SCREEN_HISTORY_DETAIL = 17; // step-by-step solution for one history entry
+    const SCREEN_GRAPH = 18;       // plots the typed expression over X, off MORE
+    const SCREEN_BASE = 19;        // dec/hex/oct/bin view + bitwise ops, off MORE
+    const SCREEN_COLOR = 20;       // R/G/B entry -> swatch + #HEX, off MORE
 
     const SETUP_URL = "https://giamat13.github.io/calc-for-garmin/";
 
@@ -139,6 +142,35 @@ class calc_for_garminView extends WatchUi.View {
     // How far the current scrollable list (SCREEN_HISTORY or
     // SCREEN_HISTORY_DETAIL) is scrolled - index of the first visible row.
     private var scrollOffset as Number = 0;
+
+    // The expression captured off the keypad when GRAPH was tapped (see
+    // "graph" in activate()) - plotted over X on SCREEN_GRAPH. A fixed
+    // [-10,10] window keeps this simple; the value itself never contains X
+    // substituted in, only the raw formula text, so it's replotted fresh
+    // each frame with a swept X.
+    private var graphExpr as String = "";
+    private const GRAPH_MIN_X = -10.0d;
+    private const GRAPH_MAX_X = 10.0d;
+
+    // The integer being viewed/bit-twiddled on SCREEN_BASE - seeded from
+    // whatever's typed on the keypad when BASE is tapped (see "base" in
+    // activate()), then mutated in place by NOT/<</>> until USE splices it
+    // back in as a decimal, or BACK discards it.
+    private var baseValue as Number = 0;
+
+    // baseStage: 1 = the normal DEC/HEX/OCT/BIN/custom view (NOT/<</>>/USE/
+    // C/RDX/BACK buttons); 0 = typing a new custom radix (2-36), a nested
+    // embedded flow (see "baseRdx" in activate()) so typing digits here
+    // never touches the main expression being calculated on the keypad.
+    private var baseStage as Number = 1;
+    private var baseRadix as Number = 5;
+
+    // RGB tool state. colorStage: 0/1/2 = entering R/G/B (0-255 each), 3 =
+    // showing the resulting swatch + #HEX (see drawColorSwatch()).
+    private var colorStage as Number = 0;
+    private var colorR as Number = 0;
+    private var colorG as Number = 0;
+    private var colorB as Number = 0;
 
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
@@ -627,8 +659,42 @@ class calc_for_garminView extends WatchUi.View {
     private function moreButtons() as Array<CalcButton> {
         return [
             new CalcButton("PCT+", "apct"), new CalcButton("DATE", "date"),
-            new CalcButton("VAR", "var"), new CalcButton("BACK", "moreBack"),
+            new CalcButton("VAR", "var"), new CalcButton("GRAPH", "graph"),
+            new CalcButton("BASE", "base"), new CalcButton("COLOR", "color"),
+            new CalcButton("BACK", "moreBack"),
         ] as Array<CalcButton>;
+    }
+
+    // Graph screen's only real control - BACK returns to MORE, the same
+    // hub GRAPH is tapped from. The plot itself is drawn in onUpdate() over
+    // the (enlarged, see headerFraction()) header area, not as buttons.
+    private function graphButtons() as Array<CalcButton> {
+        return [new CalcButton("BACK", "graphBack")] as Array<CalcButton>;
+    }
+
+    // Base/bitwise tool: NOT/<</>> mutate baseValue in place (see
+    // drawBaseView() for where dec/hex/oct/bin/custom actually get shown),
+    // RDX opens the radix-entry keypad below, USE splices baseValue back
+    // into the main expression as a decimal, C resets it to 0, BACK
+    // discards it and returns to MORE.
+    private function baseButtons() as Array<CalcButton> {
+        if (baseStage == 0) {
+            return keypadButtons("baseBack", "SET", "baseRdxSet");
+        }
+        return [
+            new CalcButton("NOT", "baseNot"), new CalcButton("<<", "baseShl"), new CalcButton(">>", "baseShr"),
+            new CalcButton("RDX", "baseRdx"), new CalcButton("USE", "baseUse"), new CalcButton("C", "baseClear"),
+            new CalcButton("BACK", "baseBack"),
+        ] as Array<CalcButton>;
+    }
+
+    // RGB tool: same 4x4 numeric keypad as random/tip/pct/date for the
+    // three 0-255 entries, then a swatch-only BACK once colorStage hits 3.
+    private function colorButtons() as Array<CalcButton> {
+        if (colorStage < 3) {
+            return keypadButtons("colorBack", colorStage == 2 ? "SHOW" : "NEXT", colorStage == 2 ? "colorShow" : "colorNext");
+        }
+        return [new CalcButton("BACK", "colorBack")] as Array<CalcButton>;
     }
 
     // Editing-helper screen off MENU: cursor arrows, Ans and the smart
@@ -770,6 +836,18 @@ class calc_for_garminView extends WatchUi.View {
             defs = personalizeButtons();
             cols = 2;
             rows = 1;
+        } else if (screen == SCREEN_GRAPH) {
+            defs = graphButtons();
+            cols = 1;
+            rows = 1;
+        } else if (screen == SCREEN_BASE) {
+            defs = baseButtons();
+            cols = baseStage == 0 ? 4 : 3;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_COLOR) {
+            defs = colorButtons();
+            cols = colorStage < 3 ? 4 : 1;
+            rows = colorStage < 3 ? (defs.size() + cols - 1) / cols : 1;
         }
 
         // BACK lands in the grid's bottom-right corner on every screen
@@ -951,10 +1029,15 @@ class calc_for_garminView extends WatchUi.View {
         layoutButtons();
     }
 
-    // The personalize screen shows a QR code instead of the expression, so
-    // it gets most of the screen instead of the usual thin header band.
+    // The personalize screen shows a QR code, and the graph screen its
+    // plot, instead of the expression - both get most of the screen instead
+    // of the usual thin header band.
     private function headerFraction() as Float {
-        return screen == SCREEN_PERSONALIZE ? 0.62 : 0.24;
+        if (screen == SCREEN_PERSONALIZE) { return 0.62; }
+        if (screen == SCREEN_GRAPH) { return 0.82; }
+        if (screen == SCREEN_BASE && baseStage == 1) { return 0.62; }
+        if (screen == SCREEN_COLOR && colorStage == 3) { return 0.7; }
+        return 0.24;
     }
 
     // Public wrapper so App.onSettingsChanged() can rebuild the button grid
@@ -1310,6 +1393,107 @@ class calc_for_garminView extends WatchUi.View {
             return;
         } else if (action.equals("moreBack")) {
             switchScreen(SCREEN_SCIENTIFIC);
+            return;
+        } else if (action.equals("graph")) {
+            // Whatever's currently typed (e.g. "X^2-3") becomes the plotted
+            // formula; an empty/errored expression has nothing to plot, so
+            // just stay put rather than opening a blank graph.
+            if (engine.expr.length() > 0 && !engine.errorState) {
+                graphExpr = engine.expr;
+                computeGraphSamples();
+                switchScreen(SCREEN_GRAPH);
+            }
+            return;
+        } else if (action.equals("graphBack")) {
+            switchScreen(SCREEN_MORE);
+            return;
+        } else if (action.equals("base")) {
+            var vOrNull = readEntry();
+            baseValue = vOrNull != null ? (Math.round(vOrNull as Double) as Numeric).toNumber() : 0;
+            baseStage = 1;
+            switchScreen(SCREEN_BASE);
+            return;
+        } else if (action.equals("baseNot")) {
+            baseValue = ~baseValue;
+            return;
+        } else if (action.equals("baseShl")) {
+            baseValue = baseValue << 1;
+            return;
+        } else if (action.equals("baseShr")) {
+            baseValue = baseValue >> 1;
+            return;
+        } else if (action.equals("baseClear")) {
+            baseValue = 0;
+            return;
+        } else if (action.equals("baseUse")) {
+            engine.setResult(baseValue.toDouble());
+            switchScreen(SCREEN_BASIC);
+            return;
+        } else if (action.equals("baseRdx")) {
+            // Nested embedded flow: the main expression (whatever's typed
+            // on the real keypad, untouched since entering BASE) is stashed
+            // again so this sub-keypad can type the new radix on a blank
+            // slate without corrupting it - see enterEmbeddedFlow().
+            enterEmbeddedFlow();
+            baseStage = 0;
+            selectedIndex = 0;
+            layoutButtons();
+            return;
+        } else if (action.equals("baseRdxSet")) {
+            var rOrNull = readEntry();
+            var r = rOrNull != null ? (Math.round(rOrNull as Double) as Numeric).toNumber() : baseRadix;
+            baseRadix = clampRange(r, 2, 36);
+            exitEmbeddedFlow(null);
+            baseStage = 1;
+            selectedIndex = 0;
+            layoutButtons();
+            return;
+        } else if (action.equals("baseBack")) {
+            if (baseStage == 0) {
+                exitEmbeddedFlow(null);
+                baseStage = 1;
+                selectedIndex = 0;
+                layoutButtons();
+            } else {
+                switchScreen(SCREEN_MORE);
+            }
+            return;
+        } else if (action.equals("color")) {
+            enterEmbeddedFlow();
+            colorStage = 0;
+            colorR = 0;
+            colorG = 0;
+            colorB = 0;
+            switchScreen(SCREEN_COLOR);
+            return;
+        } else if (action.equals("colorNext")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull == null) {
+                return;
+            }
+            var whole = clampRange((Math.round(entryOrNull as Double) as Numeric).toNumber(), 0, 255);
+            if (colorStage == 0) {
+                colorR = whole;
+            } else {
+                colorG = whole;
+            }
+            engine.clear();
+            colorStage += 1;
+            selectedIndex = 0;
+            layoutButtons();
+            return;
+        } else if (action.equals("colorShow")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull == null) {
+                return;
+            }
+            colorB = clampRange((Math.round(entryOrNull as Double) as Numeric).toNumber(), 0, 255);
+            colorStage = 3;
+            selectedIndex = 0;
+            layoutButtons();
+            return;
+        } else if (action.equals("colorBack")) {
+            switchScreen(SCREEN_MORE);
             return;
         }
 
@@ -1719,6 +1903,154 @@ class calc_for_garminView extends WatchUi.View {
         }
     }
 
+    // Re-parsing graphExpr from scratch at every pixel column, on every
+    // redraw, is what tripped the watchdog on-device: onUpdate can fire
+    // many times a second, and a full recursive-descent parse (lots of
+    // String.substring() allocation) per column adds up to real seconds of
+    // work on watch-class hardware. So the expression is sampled exactly
+    // ONCE, right when GRAPH is entered (see computeGraphSamples(), called
+    // from the "graph" action) - onUpdate/drawGraph then only ever replays
+    // this small cached array, however often it's asked to redraw.
+    private const GRAPH_SAMPLES = 60;
+    private var graphYs as Array<Double?> = [] as Array<Double?>;
+    private var graphLo as Double = 0.0d;
+    private var graphHi as Double = 1.0d;
+    private var graphHasData as Boolean = false;
+
+    // Evaluates graphExpr at one X, or null if the parser errored there
+    // (e.g. "1/X" at X=0).
+    private function sampleGraph(x as Double) as Double? {
+        var parser = new ExprParser(graphExpr, x, engine.variables);
+        var v = parser.parse();
+        return parser.error ? null : v;
+    }
+
+    private function computeGraphSamples() as Void {
+        var ys = new [GRAPH_SAMPLES] as Array<Double?>;
+        var minY = null as Double?;
+        var maxY = null as Double?;
+        for (var i = 0; i < GRAPH_SAMPLES; i++) {
+            var x = GRAPH_MIN_X + (GRAPH_MAX_X - GRAPH_MIN_X) * i / (GRAPH_SAMPLES - 1);
+            var v = sampleGraph(x);
+            ys[i] = v;
+            if (v != null) {
+                if (minY == null || (v as Double) < (minY as Double)) { minY = v; }
+                if (maxY == null || (v as Double) > (maxY as Double)) { maxY = v; }
+            }
+        }
+        graphYs = ys;
+        graphHasData = minY != null;
+        var lo = minY == null ? 0.0d : minY as Double;
+        var hi = maxY == null ? 1.0d : maxY as Double;
+        if (hi - lo < 0.0001d) {
+            lo -= 1.0d;
+            hi += 1.0d;
+        }
+        graphLo = lo;
+        graphHi = hi;
+    }
+
+    private function drawGraph(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
+        if (w < 2) {
+            return;
+        }
+        if (!graphHasData) {
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(x0 + w / 2, y0 + h / 2, Graphics.FONT_TINY, "no plot", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            return;
+        }
+        var lo = graphLo;
+        var hi = graphHi;
+        if (lo <= 0.0d && hi >= 0.0d) {
+            var zeroY = y0 + h - ((0.0d - lo) / (hi - lo) * h).toNumber();
+            dc.setColor(0x444455, Graphics.COLOR_TRANSPARENT);
+            dc.drawLine(x0, zeroY, x0 + w, zeroY);
+        }
+        dc.setColor(ACCENT_EQUALS, Graphics.COLOR_TRANSPARENT);
+        var prevX = -1;
+        var prevY = -1;
+        for (var i = 0; i < graphYs.size(); i++) {
+            var v = graphYs[i];
+            if (v == null) {
+                prevX = -1;
+                continue;
+            }
+            var px = x0 + (w * i / (graphYs.size() - 1));
+            var py = y0 + h - (((v as Double) - lo) / (hi - lo) * h).toNumber();
+            if (prevX >= 0) {
+                dc.drawLine(prevX, prevY, px, py);
+            }
+            prevX = px;
+            prevY = py;
+        }
+    }
+
+    // Digit-by-digit conversion of a signed Number into any base 2-36 via
+    // repeated division - the sign is peeled off first and reattached at
+    // the end, since Monkey C's %/ on a negative Number would otherwise
+    // produce a negative remainder mid-conversion.
+    private function toBaseString(v as Number, radix as Number) as String {
+        if (v == 0) {
+            return "0";
+        }
+        var neg = v < 0;
+        var n = neg ? -v : v;
+        var digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var s = "";
+        while (n > 0) {
+            var d = n % radix;
+            s = digits.substring(d, d + 1) + s;
+            n = n / radix;
+        }
+        return neg ? "-" + s : s;
+    }
+
+    // Test-only hook, same reasoning as colorHex(): the custom-radix line
+    // only ever gets pixel-compared on a real Dc, so tests assert on this
+    // string directly instead.
+    function baseCustomString() as String {
+        return "R" + baseRadix.toString() + " " + toBaseString(baseValue, baseRadix);
+    }
+
+    private function drawBaseView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
+        var lines = [
+            "DEC " + baseValue.toString(),
+            "HEX " + toBaseString(baseValue, 16),
+            "OCT " + toBaseString(baseValue, 8),
+            "BIN " + toBaseString(baseValue, 2),
+            "R" + baseRadix.toString() + " " + toBaseString(baseValue, baseRadix),
+        ] as Array<String>;
+        var rowH = h / lines.size();
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        for (var i = 0; i < lines.size(); i++) {
+            dc.drawText(x0 + w / 2, y0 + rowH * i + rowH / 2, Graphics.FONT_SMALL, lines[i],
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+    }
+
+    // Two hex digits for one 0-255 channel, zero-padded (unlike
+    // toBaseString(), a color hex code needs the leading zero - "00" not "").
+    private function hexByte(v as Number) as String {
+        var digits = "0123456789ABCDEF";
+        return digits.substring((v / 16) % 16, (v / 16) % 16 + 1) + digits.substring(v % 16, v % 16 + 1);
+    }
+
+    // Test-only hook: the swatch itself only ever gets pixel-compared on a
+    // real Dc, so tests instead assert on this #HEX string directly.
+    function colorHex() as String {
+        return "#" + hexByte(colorR) + hexByte(colorG) + hexByte(colorB);
+    }
+
+    private function drawColorSwatch(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
+        var packed = (colorR << 16) | (colorG << 8) | colorB;
+        var swatchH = (h * 0.7).toNumber();
+        dc.setColor(packed, packed);
+        dc.fillRectangle(x0, y0, w, swatchH);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(x0 + w / 2, y0 + swatchH + (h - swatchH) / 2, Graphics.FONT_SMALL,
+            colorHex(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
     function onUpdate(dc as Dc) as Void {
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
@@ -1735,6 +2067,12 @@ class calc_for_garminView extends WatchUi.View {
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             dc.drawText(safeX + safeW / 2, safeY + headerHBg - 16, Graphics.FONT_XTINY,
                 "Scan or tap OPEN", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else if (screen == SCREEN_GRAPH) {
+            drawGraph(dc, safeX, safeY, safeW, headerHBg);
+        } else if (screen == SCREEN_BASE && baseStage == 1) {
+            drawBaseView(dc, safeX, safeY, safeW, headerHBg);
+        } else if (screen == SCREEN_COLOR && colorStage == 3) {
+            drawColorSwatch(dc, safeX, safeY, safeW, headerHBg);
         } else {
             dc.setColor(Graphics.COLOR_WHITE, BG_TOP);
             var text = engine.displayText();
@@ -1790,6 +2128,10 @@ class calc_for_garminView extends WatchUi.View {
                 } else {
                     text = "D? " + text;
                 }
+            } else if (screen == SCREEN_COLOR) {
+                text = (colorStage == 0 ? "R (0-255)? " : colorStage == 1 ? "G (0-255)? " : "B (0-255)? ") + text;
+            } else if (screen == SCREEN_BASE) {
+                text = "RADIX (2-36)? " + text;
             }
             // Regular text fonts, not FONT_NUMBER_*: the expression can
             // contain letters and symbols (X, =, sin, etc.), and the

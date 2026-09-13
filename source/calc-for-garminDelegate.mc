@@ -113,6 +113,12 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
             view.switchScreen(view.SCREEN_BASIC);
         } else if (view.screen == view.SCREEN_HISTORY_DETAIL) {
             view.switchScreen(view.SCREEN_HISTORY);
+        } else if (view.screen == view.SCREEN_BASE) {
+            // BASE's own BACK is stage-aware (cancels out of radix entry
+            // first, then exits to MORE) - reuse that instead of duplicating it.
+            view.activate(new CalcButton("BACK", "baseBack"));
+        } else if (view.screen == view.SCREEN_GRAPH || view.screen == view.SCREEN_COLOR) {
+            view.switchScreen(view.SCREEN_MORE);
         } else if (view.screen == view.SCREEN_SCIENTIFIC) {
             view.switchScreen(view.SCREEN_MENU);
         } else if (view.screen == view.SCREEN_MENU) {

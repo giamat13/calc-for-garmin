@@ -43,6 +43,104 @@ function testMoreScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 14) && checkAllButtonsTappable(logger, true, 14);
 }
 
+// GRAPH/BASE/COLOR (18/19/20) are non-customizable tool screens off MORE,
+// same as VAR/NAV - pin that their buttons are actually tappable too.
+(:test)
+function testGraphBaseColorScreensAreTappable(logger as Test.Logger) as Boolean {
+    return checkAllButtonsTappable(logger, false, 18) && checkAllButtonsTappable(logger, true, 18) &&
+        checkAllButtonsTappable(logger, false, 19) && checkAllButtonsTappable(logger, true, 19) &&
+        checkAllButtonsTappable(logger, false, 20) && checkAllButtonsTappable(logger, true, 20);
+}
+
+// Typing "X^2" then GRAPH captures that formula, doesn't touch the main
+// expression, and BACK returns to MORE (the hub GRAPH is opened from).
+(:test)
+function testGraphCapturesExpressionAndBackReturnsToMore(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "digit:5"));
+    v.activate(new CalcButton("", "graph"));
+    if (v.screen != v.SCREEN_GRAPH) {
+        logger.debug("expected SCREEN_GRAPH after graph, got " + v.screen);
+        return false;
+    }
+    if (!v.engine.displayText().equals("5")) {
+        logger.debug("graph should not alter the main expression, got " + v.engine.displayText());
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "graphBack"));
+    return v.screen == v.SCREEN_MORE;
+}
+
+// Typing 12, tapping BASE reads it as the seed integer; NOT flips every
+// bit (12 -> -13 for a two's-complement Number), and USE splices the
+// result back onto the keypad as a plain decimal.
+(:test)
+function testBaseNotAndUseRoundTrip(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v, ["clear", "digit:1", "digit:2", "base", "baseNot", "baseUse"], "-13");
+}
+
+// Shifting 1 left three times is 8, decimal.
+(:test)
+function testBaseShiftLeft(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v,
+        ["clear", "digit:1", "base", "baseShl", "baseShl", "baseShl", "baseUse"], "8");
+}
+
+// RDX opens a nested numeric entry for an arbitrary radix (2-36) without
+// disturbing baseValue or the main expression; 12 in base 3 is "110".
+(:test)
+function testBaseCustomRadixConversion(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "digit:1"));
+    v.activate(new CalcButton("", "digit:2"));
+    v.activate(new CalcButton("", "base"));
+    v.activate(new CalcButton("", "baseRdx"));
+    v.activate(new CalcButton("", "digit:3"));
+    v.activate(new CalcButton("", "baseRdxSet"));
+    if (!v.baseCustomString().equals("R3 110")) {
+        logger.debug("expected R3 110, got " + v.baseCustomString());
+        return false;
+    }
+    // Cancelling out of radix entry (BACK) returns to the base view rather
+    // than exiting all the way to MORE.
+    v.activate(new CalcButton("", "baseRdx"));
+    v.activate(new CalcButton("BACK", "baseBack"));
+    if (v.screen != v.SCREEN_BASE) {
+        logger.debug("expected BACK from radix entry to stay on SCREEN_BASE, got " + v.screen);
+        return false;
+    }
+    // BACK from the main base view still exits to MORE, and baseValue
+    // itself was never disturbed by the radix sub-flow.
+    return pressAndExpect(logger, v, ["baseUse"], "12");
+}
+
+// R=255 G=0 B=0 is pure red -> #FF0000, shown once colorStage hits 3;
+// BACK from there still lands on MORE, same as the input stages.
+(:test)
+function testColorRgbEntryProducesHexAndBackReturnsToMore(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "color"));
+    v.activate(new CalcButton("", "digit:2"));
+    v.activate(new CalcButton("", "digit:5"));
+    v.activate(new CalcButton("", "digit:5"));
+    v.activate(new CalcButton("", "colorNext"));
+    v.activate(new CalcButton("", "colorNext")); // G left at 0
+    v.activate(new CalcButton("", "colorShow")); // B left at 0
+    if (!v.colorHex().equals("#FF0000")) {
+        logger.debug("expected #FF0000, got " + v.colorHex());
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "colorBack"));
+    return v.screen == v.SCREEN_MORE;
+}
+
 // PCT+/DATE/VAR moved off the default MENU behind a "MORE" corner button on
 // the Scientific screen; this pins that door and its own BACK still works.
 (:test)
