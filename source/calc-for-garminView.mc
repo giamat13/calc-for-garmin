@@ -889,7 +889,10 @@ class calc_for_garminView extends WatchUi.View {
         var gridTop = safeY + headerH;
         var gridH = safeH - headerH;
 
-        var totalRows = gridH / HISTORY_MIN_ROW_H;
+        // Capped by screen size: a flat 44px left a 218px screen
+        // (vivoactive 4S) room for just one row, hiding every step after it.
+        var minRowH = safeH / 6 < HISTORY_MIN_ROW_H ? safeH / 6 : HISTORY_MIN_ROW_H;
+        var totalRows = gridH / minRowH;
         if (totalRows < 2) {
             totalRows = 2; // always room for at least one entry plus the footer
         }
@@ -1359,7 +1362,7 @@ class calc_for_garminView extends WatchUi.View {
             // its own paste action.
             var hoIdx = value.toNumber() as Number;
             historySteps = (hoIdx >= 0 && hoIdx < historyBefore.size()) ?
-                engine.computeSolutionSteps(historyBefore[hoIdx]) : ([] as Array<String>);
+                engine.computeSolutionSteps(historyBefore[hoIdx], historyAfter[hoIdx]) : ([] as Array<String>);
             switchScreen(SCREEN_HISTORY_DETAIL);
         } else if (prefix.equals("histStep")) {
             var hsIdx = value.toNumber() as Number;

@@ -398,7 +398,7 @@ function testToggleFractionOnIntegerIsUnchanged(logger as Test.Logger) as Boolea
 function testComputeSolutionStepsRespectsPrecedence(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
     e.clearVariables();
-    var steps = e.computeSolutionSteps("2+3*4");
+    var steps = e.computeSolutionSteps("2+3*4", null);
     if (steps.size() != 3 || !steps[0].equals("2+3*4") || !steps[1].equals("2+12") || !steps[2].equals("14")) {
         logger.debug("expected ['2+3*4','2+12','14'] got " + joinSteps(steps));
         return false;
@@ -411,7 +411,7 @@ function testComputeSolutionStepsRespectsPrecedence(logger as Test.Logger) as Bo
 function testComputeSolutionStepsInnermostParensFirst(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
     e.clearVariables();
-    var steps = e.computeSolutionSteps("(2+3)*4");
+    var steps = e.computeSolutionSteps("(2+3)*4", null);
     if (steps.size() != 3 || !steps[0].equals("(2+3)*4") || !steps[1].equals("(5)*4") || !steps[2].equals("20")) {
         logger.debug("expected ['(2+3)*4','(5)*4','20'] got " + joinSteps(steps));
         return false;
@@ -424,7 +424,7 @@ function testComputeSolutionStepsInnermostParensFirst(logger as Test.Logger) as 
 function testComputeSolutionStepsFunctionCall(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
     e.clearVariables();
-    var steps = e.computeSolutionSteps("sqrt(9)+1");
+    var steps = e.computeSolutionSteps("sqrt(9)+1", null);
     if (steps.size() != 3 || !steps[0].equals("sqrt(9)+1") || !steps[1].equals("3+1") || !steps[2].equals("4")) {
         logger.debug("expected ['sqrt(9)+1','3+1','4'] got " + joinSteps(steps));
         return false;
@@ -438,9 +438,28 @@ function testComputeSolutionStepsFunctionCall(logger as Test.Logger) as Boolean 
 function testComputeSolutionStepsEquation(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
     e.clearVariables();
-    var steps = e.computeSolutionSteps("2X+3=7");
+    var steps = e.computeSolutionSteps("2X+3=7", null);
     if (steps.size() != 2 || !steps[0].equals("2X+3=7") || !steps[1].equals("X=2")) {
         logger.debug("expected ['2X+3=7','X=2'] got " + joinSteps(steps));
+        return false;
+    }
+    return true;
+}
+
+// If the step walk can't fully resolve an expression, the already-known
+// answer (recorded in history when it was first computed) must still show
+// up as the final step rather than leaving the user with no answer at all.
+(:test)
+function testComputeSolutionStepsFallsBackToKnownAnswer(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    var steps = e.computeSolutionSteps("2+3*4", "14");
+    if (!steps[steps.size() - 1].equals("14")) {
+        logger.debug("expected last step '14' got " + joinSteps(steps));
+        return false;
+    }
+    if (steps.size() != 3) {
+        logger.debug("known answer already reached by the walk shouldn't be duplicated, got " + joinSteps(steps));
         return false;
     }
     return true;

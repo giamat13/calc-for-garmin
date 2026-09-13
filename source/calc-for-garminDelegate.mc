@@ -27,8 +27,8 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     // Some devices report a quick press as a hold rather than a tap; handle
     // both the same way so a tap always registers. (A long-press gesture
     // isn't used for anything here: physical buttons have no equivalent -
-    // InputDelegate.onKey fires once per press with no hold/duration info -
-    // so inserting "=" is a plain button (EQ, on the scientific screen)
+    // onKey fires once per press with no hold/duration info - so inserting
+    // "=" is a plain button (EQ, on the scientific screen)
     // instead, which works identically for touch and physical navigation.)
     function onHold(clickEvent as WatchUi.ClickEvent) as Boolean {
         var coords = clickEvent.getCoordinates();
@@ -80,62 +80,50 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
             WatchUi.requestUpdate();
             return true;
         } else if (key == WatchUi.KEY_ESC) {
-            if (view.screen == view.SCREEN_CUR_RESULTS) {
-                view.goToScreen(view.SCREEN_CUR_LETTER);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_CUR_LETTER) {
-                view.goToScreen(view.SCREEN_UNIT_PICK);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_UNIT_PICK) {
-                view.switchScreen(view.SCREEN_UNITS);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_RANDOM || view.screen == view.SCREEN_TIP) {
-                view.switchScreen(view.SCREEN_MENU);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_PCT || view.screen == view.SCREEN_DATE) {
-                view.switchScreen(view.SCREEN_MORE);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_MORE) {
-                view.switchScreen(view.SCREEN_SCIENTIFIC);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_UNITS) {
-                view.switchScreen(view.SCREEN_MENU);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_VAR) {
-                view.switchScreen(view.SCREEN_MENU);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_HISTORY) {
-                view.switchScreen(view.SCREEN_BASIC);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_HISTORY_DETAIL) {
-                view.switchScreen(view.SCREEN_HISTORY);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_SCIENTIFIC) {
-                view.switchScreen(view.SCREEN_MENU);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen == view.SCREEN_MENU) {
-                view.switchScreen(view.SCREEN_BASIC);
-                WatchUi.requestUpdate();
-                return true;
-            } else if (view.screen != view.SCREEN_BASIC) {
-                view.switchScreen(view.screen - 1);
-                WatchUi.requestUpdate();
-                return true;
-            }
-            return false;
+            return goBack();
         }
         return false;
+    }
+
+    // Steps `view.screen` back one logical screen. Returns false only from
+    // SCREEN_BASIC, letting the platform's default Back (pop/exit) proceed.
+    private function goBack() as Boolean {
+        if (view.screen == view.SCREEN_CUR_RESULTS) {
+            view.goToScreen(view.SCREEN_CUR_LETTER);
+        } else if (view.screen == view.SCREEN_CUR_LETTER) {
+            view.goToScreen(view.SCREEN_UNIT_PICK);
+        } else if (view.screen == view.SCREEN_UNIT_PICK) {
+            view.switchScreen(view.SCREEN_UNITS);
+        } else if (view.screen == view.SCREEN_RANDOM || view.screen == view.SCREEN_TIP) {
+            view.switchScreen(view.SCREEN_MENU);
+        } else if (view.screen == view.SCREEN_PCT || view.screen == view.SCREEN_DATE) {
+            view.switchScreen(view.SCREEN_MORE);
+        } else if (view.screen == view.SCREEN_MORE) {
+            view.switchScreen(view.SCREEN_SCIENTIFIC);
+        } else if (view.screen == view.SCREEN_UNITS) {
+            view.switchScreen(view.SCREEN_MENU);
+        } else if (view.screen == view.SCREEN_VAR) {
+            view.switchScreen(view.SCREEN_MENU);
+        } else if (view.screen == view.SCREEN_NAV) {
+            // Falls into the generic screen-1 fallback below otherwise,
+            // landing on SCREEN_MORE (14) - but NAV is only ever entered
+            // from MENU (see the "nav" action in activate()).
+            view.switchScreen(view.SCREEN_MENU);
+        } else if (view.screen == view.SCREEN_HISTORY) {
+            view.switchScreen(view.SCREEN_BASIC);
+        } else if (view.screen == view.SCREEN_HISTORY_DETAIL) {
+            view.switchScreen(view.SCREEN_HISTORY);
+        } else if (view.screen == view.SCREEN_SCIENTIFIC) {
+            view.switchScreen(view.SCREEN_MENU);
+        } else if (view.screen == view.SCREEN_MENU) {
+            view.switchScreen(view.SCREEN_BASIC);
+        } else if (view.screen != view.SCREEN_BASIC) {
+            view.switchScreen(view.screen - 1);
+        } else {
+            return false;
+        }
+        WatchUi.requestUpdate();
+        return true;
     }
 
     private function handleTapAt(x as Number, y as Number) as Boolean {

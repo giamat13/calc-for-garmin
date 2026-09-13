@@ -336,7 +336,16 @@ class CalculatorEngine {
     // calculation can be shown solved one step at a time, each with its own
     // paste button. Pure function of its argument - doesn't touch this
     // engine's own expr/cursor/errorState.
-    function computeSolutionSteps(startExpr as String) as Array<String> {
+    //
+    // `knownAnswer` is the result already recorded in history for this
+    // expression (from the original evaluate() call). The symbolic walk
+    // below re-derives the same thing step by step, but on some devices it
+    // can bail out early (e.g. a StepSolver quirk on a particular
+    // expression shape) - when that happens we'd otherwise show just the
+    // raw expression with no answer at all. Since the real answer is
+    // already known, always make sure it ends up as the last step even if
+    // the walk itself couldn't get there.
+    function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
         var steps = [] as Array<String>;
         if (startExpr.length() == 0) {
             return steps;
@@ -349,7 +358,7 @@ class CalculatorEngine {
             if (solved != null) {
                 steps.add(solved as String);
             }
-            return steps;
+            return ensureFinalAnswer(steps, knownAnswer);
         }
         var current = startExpr;
         // One collapse per iteration, same order-of-operations walk -
@@ -358,7 +367,7 @@ class CalculatorEngine {
             var solver = new StepSolver(closeUnmatchedParens(current), 0.0d, variables);
             var root = solver.buildTree();
             if (solver.error || root == null) {
-                return steps;
+                return ensureFinalAnswer(steps, knownAnswer);
             }
             var node = findFirstStepNode(root as StepNode);
             if (node == null) {
@@ -368,6 +377,19 @@ class CalculatorEngine {
                 (current.substring(node.end, current.length()) as String);
             steps.add(current);
         }
+        return ensureFinalAnswer(steps, knownAnswer);
+    }
+
+    // Appends `knownAnswer` to `steps` unless it's empty/null or already the
+    // last entry - see computeSolutionSteps().
+    private function ensureFinalAnswer(steps as Array<String>, knownAnswer as String?) as Array<String> {
+        if (knownAnswer == null || (knownAnswer as String).length() == 0) {
+            return steps;
+        }
+        if (steps.size() > 0 && (steps[steps.size() - 1] as String).equals(knownAnswer as String)) {
+            return steps;
+        }
+        steps.add(knownAnswer as String);
         return steps;
     }
 
