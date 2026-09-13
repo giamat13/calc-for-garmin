@@ -76,7 +76,7 @@ class calc_for_garminView extends WatchUi.View {
     // that currency). Falls back to the last successfully fetched rates
     // (persisted in Storage), or to this hardcoded table on first-ever use
     // with no internet and no stored rates.
-    const CURRENCY_KEYS = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"] as Array<String>;
+    const CURRENCY_KEYS = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "BTC"] as Array<String>;
     const DEFAULT_CURRENCY_RATES = {
         "USD" => 1.0d,
         "EUR" => 0.92d,
@@ -84,6 +84,9 @@ class calc_for_garminView extends WatchUi.View {
         "JPY" => 149.5d,
         "CAD" => 1.36d,
         "AUD" => 1.52d,
+        // BTC isn't in the fiat-rate API below, so it's refreshed separately
+        // (see refreshBitcoinRate()); this is just a stale-but-sane seed.
+        "BTC" => 0.000009d,
     } as Dictionary<String, Double>;
     private var currencyRates as Dictionary<String, Double> = DEFAULT_CURRENCY_RATES;
 
@@ -206,6 +209,41 @@ class calc_for_garminView extends WatchUi.View {
         Communications.makeWebRequest("https://open.er-api.com/v6/latest/USD", null, options, method(:onCurrencyRatesResponse));
     }
 
+    // BTC isn't a fiat currency, so open.er-api never returns it - it needs
+    // its own fetch. Merged into the same currencyRates dict (as "units of
+    // BTC per 1 USD") so convertValue()'s generic cur-category math handles
+    // it exactly like any other code, no special-casing there.
+    private function refreshBitcoinRate() as Void {
+        var options = {
+            :method => Communications.HTTP_REQUEST_METHOD_GET,
+            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON,
+        };
+        Communications.makeWebRequest(
+            "https://api.coingecko.com/api/v3/simple/price",
+            { "ids" => "bitcoin", "vs_currencies" => "usd" },
+            options,
+            method(:onBitcoinRateResponse)
+        );
+    }
+
+    function onBitcoinRateResponse(responseCode as Number, data as Dictionary?) as Void {
+        if (responseCode != 200 || data == null) {
+            return;
+        }
+        var btc = (data as Dictionary)["bitcoin"];
+        if (btc == null) {
+            return;
+        }
+        var usdPerBtc = (btc as Dictionary)["usd"];
+        if (usdPerBtc == null || (usdPerBtc as Numeric).toDouble() == 0.0d) {
+            return;
+        }
+        currencyRates["BTC"] = 1.0d / (usdPerBtc as Numeric).toDouble();
+        Storage.setValue("currencyRates", currencyRates);
+        layoutButtons();
+        WatchUi.requestUpdate();
+    }
+
     function onCurrencyRatesResponse(responseCode as Number, data as Dictionary?) as Void {
         if (responseCode != 200 || data == null) {
             return;
@@ -229,6 +267,12 @@ class calc_for_garminView extends WatchUi.View {
         }
         if (fresh.size() == 0) {
             return;
+        }
+        // Preserve any already-fetched BTC rate - it comes from a separate
+        // request (refreshBitcoinRate()) and isn't part of this response.
+        var existingBtc = currencyRates["BTC"];
+        if (existingBtc != null) {
+            fresh["BTC"] = existingBtc;
         }
         currencyRates = fresh;
         Storage.setValue("currencyRates", fresh);
@@ -1536,6 +1580,7 @@ class calc_for_garminView extends WatchUi.View {
             switchScreen(SCREEN_UNIT_PICK);
             if (value.equals("cur")) {
                 refreshCurrencyRates();
+                refreshBitcoinRate();
             }
         } else if (prefix.equals("unit")) {
             if (handleUnitTap(value)) {
