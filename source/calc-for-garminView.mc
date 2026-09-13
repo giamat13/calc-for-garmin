@@ -47,6 +47,7 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_MORE = 14;        // overflow hub off the Scientific screen: VAR/PCT+/DATE
     const SCREEN_NAV = 15;         // editing helpers off MENU: cursor arrows, Ans, brackets
     const SCREEN_HISTORY = 16;     // last few "=" results: swipe up, or HIST off NAV
+    const SCREEN_HISTORY_DETAIL = 17; // step-by-step solution for one history entry
 
     const SETUP_URL = "https://giamat13.github.io/calc-for-garmin/";
 
@@ -121,11 +122,23 @@ class calc_for_garminView extends WatchUi.View {
     private var dateMonth2 as Number = 0;
     private var dateDay2 as Number = 0;
 
-    // Last few "=" results, newest first, capped at HISTORY_MAX. Not
-    // persisted - a fresh app launch starts with an empty list, same as Ans.
-    private const HISTORY_MAX = 5;
-    private var historyLabels as Array<String> = [] as Array<String>;
-    private var historyValues as Array<Double> = [] as Array<Double>;
+    // Last few "=" results, newest first, capped at HISTORY_MAX and
+    // persisted in Storage (see persistHistory()) so they survive leaving
+    // and returning to the app. The list scrolls (see layoutHistoryList())
+    // instead of being squeezed to fit, so it can hold more than a
+    // one-screen-tall grid ever could.
+    private const HISTORY_MAX = 30;
+    private var historyBefore as Array<String> = [] as Array<String>;
+    private var historyAfter as Array<String> = [] as Array<String>;
+
+    // The step-by-step breakdown currently shown on SCREEN_HISTORY_DETAIL
+    // (see computeSolutionSteps()) - recomputed each time a history entry
+    // is opened, not persisted itself.
+    private var historySteps as Array<String> = [] as Array<String>;
+
+    // How far the current scrollable list (SCREEN_HISTORY or
+    // SCREEN_HISTORY_DETAIL) is scrolled - index of the first visible row.
+    private var scrollOffset as Number = 0;
 
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
@@ -140,6 +153,12 @@ class calc_for_garminView extends WatchUi.View {
         var stored = Storage.getValue("currencyRates");
         if (stored != null) {
             currencyRates = stored as Dictionary<String, Double>;
+        }
+        var storedHistBefore = Storage.getValue("calcHistoryBefore");
+        var storedHistAfter = Storage.getValue("calcHistoryAfter");
+        if (storedHistBefore != null && storedHistAfter != null) {
+            historyBefore = storedHistBefore as Array<String>;
+            historyAfter = storedHistAfter as Array<String>;
         }
         refreshTheme();
     }
@@ -623,33 +642,41 @@ class calc_for_garminView extends WatchUi.View {
         ] as Array<CalcButton>;
     }
 
-    // Last few "=" results - one tap inserts that result at the cursor,
-    // like Ans, then returns to the basic screen. CLR wipes the list.
-    private function historyButtons() as Array<CalcButton> {
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < historyLabels.size(); i++) {
-            defs.add(new CalcButton(historyLabels[i], "hist:" + i));
+    // The compact preview label for history row `i` - just the exercise and
+    // its answer, no solving steps (those live on SCREEN_HISTORY_DETAIL,
+    // opened by tapping this row). Split onto two lines so a long
+    // expression gets its own full-width line instead of being squeezed
+    // next to "=answer" in the same line.
+    private function historyRowLabel(i as Number) as String {
+        var before = historyBefore[i];
+        var after = historyAfter[i];
+        if (before.find("=") != null) {
+            // An equation's own solved form ("X=5") already reads fine on
+            // its own - "2X+3=7=X=2" would be nonsense.
+            return after;
         }
-        defs.add(new CalcButton("CLR", "histClear"));
-        defs.add(new CalcButton("BACK", "basic"));
-        return defs;
+        return before + "\n=" + after;
     }
 
     // Records a completed "=" (or solved equation) into the history list,
-    // most recent first. `before` is what was typed, `afterExpr` is what
-    // evaluate() turned it into ("5" for a plain calc, "X=5" for an
-    // equation) - an equation's own label already reads fine on its own,
-    // a plain calc gets "before=after" so the input isn't lost.
-    private function recordHistory(before as String, afterExpr as String, value as Double) as Void {
-        var label = before.find("=") != null ? afterExpr : before + "=" + afterExpr;
-        var newLabels = [label] as Array<String>;
-        var newValues = [value] as Array<Double>;
-        for (var i = 0; i < historyLabels.size() && newLabels.size() < HISTORY_MAX; i++) {
-            newLabels.add(historyLabels[i]);
-            newValues.add(historyValues[i]);
+    // most recent first, and persists it. `before` is what was typed,
+    // `afterExpr` is what evaluate() turned it into ("5" for a plain calc,
+    // "X=5" for an equation).
+    private function recordHistory(before as String, afterExpr as String) as Void {
+        var newBefore = [before] as Array<String>;
+        var newAfter = [afterExpr] as Array<String>;
+        for (var i = 0; i < historyBefore.size() && newBefore.size() < HISTORY_MAX; i++) {
+            newBefore.add(historyBefore[i]);
+            newAfter.add(historyAfter[i]);
         }
-        historyLabels = newLabels;
-        historyValues = newValues;
+        historyBefore = newBefore;
+        historyAfter = newAfter;
+        persistHistory();
+    }
+
+    private function persistHistory() as Void {
+        Storage.setValue("calcHistoryBefore", historyBefore);
+        Storage.setValue("calcHistoryAfter", historyAfter);
     }
 
     // Compact 4x4 numeric keypad shared by the random and tip screens.
@@ -675,6 +702,10 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     private function layoutButtons() as Void {
+        if (screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL) {
+            layoutHistoryList();
+            return;
+        }
         var defs = basicButtons();
         var cols = 4;
         var rows = 5;
@@ -727,10 +758,6 @@ class calc_for_garminView extends WatchUi.View {
             defs = navButtons();
             cols = 3;
             rows = (defs.size() + cols - 1) / cols;
-        } else if (screen == SCREEN_HISTORY) {
-            defs = historyButtons();
-            cols = 1;
-            rows = defs.size();
         } else if (screen == SCREEN_VAR) {
             defs = varButtons();
             cols = 5;
@@ -830,6 +857,97 @@ class calc_for_garminView extends WatchUi.View {
         }
     }
 
+    // Below this, a list row would be too short to read comfortably - so
+    // rather than always cramming every entry into the screen (shrinking
+    // rows without limit as the list grows), only this many rows' worth of
+    // height is ever shown at once and the rest scrolls (see scrollOffset).
+    private const HISTORY_MIN_ROW_H = 44;
+
+    // Custom layout for SCREEN_HISTORY (past results) and
+    // SCREEN_HISTORY_DETAIL (one entry's step-by-step solution): a fixed
+    // footer row (CLR+BACK, or just BACK) under a scrollable single-column
+    // list, sized so each visible row keeps a comfortable minimum height no
+    // matter how long the list gets. Scrolls via swipe up/down or the
+    // hardware up/down keys (see calc-for-garminDelegate.mc).
+    private function layoutHistoryList() as Void {
+        var items = [] as Array<CalcButton>;
+        var footer = [] as Array<CalcButton>;
+        if (screen == SCREEN_HISTORY) {
+            for (var i = 0; i < historyBefore.size(); i++) {
+                items.add(new CalcButton(historyRowLabel(i), "histOpen:" + i));
+            }
+            footer.add(new CalcButton("CLR", "histClear"));
+            footer.add(new CalcButton("BACK", "basic"));
+        } else {
+            for (var i = 0; i < historySteps.size(); i++) {
+                items.add(new CalcButton(historySteps[i], "histStep:" + i));
+            }
+            footer.add(new CalcButton("BACK", "history"));
+        }
+
+        var headerH = (safeH * headerFraction()).toNumber();
+        var gridTop = safeY + headerH;
+        var gridH = safeH - headerH;
+
+        var totalRows = gridH / HISTORY_MIN_ROW_H;
+        if (totalRows < 2) {
+            totalRows = 2; // always room for at least one entry plus the footer
+        }
+        var visibleRows = totalRows - 1;
+        if (items.size() > 0 && visibleRows > items.size()) {
+            visibleRows = items.size();
+        }
+        if (visibleRows < 1) {
+            visibleRows = 1;
+        }
+        var maxOffset = items.size() > visibleRows ? items.size() - visibleRows : 0;
+        if (scrollOffset > maxOffset) {
+            scrollOffset = maxOffset;
+        }
+        if (scrollOffset < 0) {
+            scrollOffset = 0;
+        }
+        var rowsShown = items.size() > 0 ? visibleRows : 0;
+        var listRowH = rowsShown > 0 ? gridH / (rowsShown + 1) : gridH;
+        var footerY = gridTop + rowsShown * listRowH;
+        var footerH = gridH - rowsShown * listRowH;
+
+        var others = [] as Array<CalcButton>;
+        for (var i = 0; i < rowsShown; i++) {
+            var b = items[scrollOffset + i];
+            b.x = safeX;
+            b.y = gridTop + i * listRowH;
+            b.w = safeW;
+            b.h = listRowH;
+            others.add(b);
+        }
+        var footCellW = safeW / footer.size();
+        for (var i = 0; i < footer.size(); i++) {
+            var b = footer[i];
+            b.x = safeX + i * footCellW;
+            b.y = footerY;
+            b.w = footCellW;
+            b.h = footerH;
+            var iconId = iconFor(b.action, b.label);
+            if (iconId != null) {
+                b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
+            }
+            others.add(b);
+        }
+        buttons = others;
+        if (selectedIndex >= buttons.size()) {
+            selectedIndex = 0;
+        }
+    }
+
+    // Scrolls the current history/history-detail list by `delta` rows -
+    // clamped to valid range inside layoutHistoryList(). No-op on any other
+    // screen (nothing reads scrollOffset there).
+    function scrollList(delta as Number) as Void {
+        scrollOffset += delta;
+        layoutButtons();
+    }
+
     // The personalize screen shows a QR code instead of the expression, so
     // it gets most of the screen instead of the usual thin header band.
     private function headerFraction() as Float {
@@ -867,6 +985,7 @@ class calc_for_garminView extends WatchUi.View {
         }
         screen = newScreen;
         selectedIndex = 0;
+        scrollOffset = 0;
         fromUnitKey = null;
         layoutButtons();
     }
@@ -927,6 +1046,7 @@ class calc_for_garminView extends WatchUi.View {
     function goToScreen(newScreen as Number) as Void {
         screen = newScreen;
         selectedIndex = 0;
+        scrollOffset = 0;
         layoutButtons();
     }
 
@@ -950,7 +1070,7 @@ class calc_for_garminView extends WatchUi.View {
             var exprBefore = engine.expr;
             engine.evaluate();
             if (!engine.errorState) {
-                recordHistory(exprBefore, engine.expr, engine.lastAnswer);
+                recordHistory(exprBefore, engine.expr);
             }
             return;
         } else if (action.equals("sci")) {
@@ -1000,8 +1120,10 @@ class calc_for_garminView extends WatchUi.View {
             switchScreen(SCREEN_HISTORY);
             return;
         } else if (action.equals("histClear")) {
-            historyLabels = [] as Array<String>;
-            historyValues = [] as Array<Double>;
+            historyBefore = [] as Array<String>;
+            historyAfter = [] as Array<String>;
+            persistHistory();
+            scrollOffset = 0;
             layoutButtons();
             return;
         } else if (action.equals("varClear")) {
@@ -1230,10 +1352,23 @@ class calc_for_garminView extends WatchUi.View {
             } else {
                 goToScreen(SCREEN_CUR_RESULTS);
             }
-        } else if (prefix.equals("hist")) {
-            var hidx = value.toNumber() as Number;
-            if (hidx >= 0 && hidx < historyValues.size()) {
-                engine.insertValue(historyValues[hidx]);
+        } else if (prefix.equals("histOpen")) {
+            // Tapping a history entry no longer pastes it straight away -
+            // it opens the step-by-step solution, where every stage
+            // (including the original exercise and the final answer) has
+            // its own paste action.
+            var hoIdx = value.toNumber() as Number;
+            historySteps = (hoIdx >= 0 && hoIdx < historyBefore.size()) ?
+                engine.computeSolutionSteps(historyBefore[hoIdx]) : ([] as Array<String>);
+            switchScreen(SCREEN_HISTORY_DETAIL);
+        } else if (prefix.equals("histStep")) {
+            var hsIdx = value.toNumber() as Number;
+            if (hsIdx >= 0 && hsIdx < historySteps.size()) {
+                var stepText = historySteps[hsIdx];
+                // Wrap a negative step in parens before splicing it into an
+                // existing expression, same as insertValue() does for Ans -
+                // otherwise e.g. "5-" + "-4" would misparse as "5--4".
+                engine.appendRaw(stepText.substring(0, 1).equals("-") ? "(" + stepText + ")" : stepText);
             }
             switchScreen(SCREEN_BASIC);
         } else if (prefix.equals("sto")) {
@@ -1673,7 +1808,7 @@ class calc_for_garminView extends WatchUi.View {
         // cell and bleeds into neighboring buttons.
         var isSmallCellScreen = screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER ||
             screen == SCREEN_CUR_RESULTS || screen == SCREEN_VAR || screen == SCREEN_ADVANCED || screen == SCREEN_SCIENTIFIC ||
-            screen == SCREEN_HISTORY;
+            screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL;
         var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (isSmallCellScreen ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];
@@ -1716,8 +1851,24 @@ class calc_for_garminView extends WatchUi.View {
                 // smaller font so it doesn't overflow its cell.
                 var labelFont = (b.action.equals("setup") || (screen == SCREEN_BASIC && b.label.equals("MENU"))) ?
                     Graphics.FONT_XTINY : buttonFont;
+                var nlIdx = b.label.find("\n");
+                if ((screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL) && nlIdx == null) {
+                    // A single-line row (a step, or an equation's "X=5"
+                    // preview) still shrinks further once it's long, since
+                    // these rows have no fixed short vocabulary like digits.
+                    labelFont = b.label.length() > 14 ? Graphics.FONT_XTINY : labelFont;
+                }
                 dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(b.x + b.w / 2, b.y + b.h / 2, labelFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                if (nlIdx != null) {
+                    var nl = nlIdx as Number;
+                    var line1 = b.label.substring(0, nl) as String;
+                    var line2 = b.label.substring(nl + 1, b.label.length()) as String;
+                    var lineFont = (line1.length() > 14 || line2.length() > 14) ? Graphics.FONT_XTINY : labelFont;
+                    dc.drawText(b.x + b.w / 2, b.y + b.h / 2 - b.h / 5, lineFont, line1, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                    dc.drawText(b.x + b.w / 2, b.y + b.h / 2 + b.h / 5, lineFont, line2, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                } else {
+                    dc.drawText(b.x + b.w / 2, b.y + b.h / 2, labelFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                }
             }
         }
     }

@@ -152,14 +152,15 @@ function testAdvancedPercentDiscountEmbedsResultAtCursor(logger as Test.Logger) 
         "1+90");
 }
 
-// "=" records a history entry; recalling it later splices that result back
-// in at the cursor, same as Ans.
+// "=" records a history entry; opening it shows its solution steps, and
+// pasting the final step splices that result back in at the cursor, same
+// as Ans.
 (:test)
 function testHistoryRecordsAndRecallsLastResult(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
     return pressAndExpect(logger, v,
-        ["clear", "digit:1", "digit:2", "op:+", "digit:3", "equals", "op:+", "history", "hist:0"],
+        ["clear", "digit:1", "digit:2", "op:+", "digit:3", "equals", "op:+", "history", "histOpen:0", "histStep:1"],
         "15+15");
 }
 

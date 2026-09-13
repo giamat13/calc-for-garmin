@@ -329,6 +329,48 @@ class CalculatorEngine {
         cursorPos = expr.length();
     }
 
+    // Replays the order-of-operations walk for an already-typed expression
+    // (as stored in history), returning every intermediate stage from the
+    // raw input through to the final result - e.g. "2+3*4" ->
+    // ["2+3*4", "2+12", "14"]. Used by the history detail screen so a past
+    // calculation can be shown solved one step at a time, each with its own
+    // paste button. Pure function of its argument - doesn't touch this
+    // engine's own expr/cursor/errorState.
+    function computeSolutionSteps(startExpr as String) as Array<String> {
+        var steps = [] as Array<String>;
+        if (startExpr.length() == 0) {
+            return steps;
+        }
+        steps.add(startExpr);
+        if (startExpr.find("=") != null) {
+            // Equation-solving isn't an order-of-operations walk - just show
+            // the equation and its solved form.
+            var solved = solveEquationForDisplay(startExpr);
+            if (solved != null) {
+                steps.add(solved as String);
+            }
+            return steps;
+        }
+        var current = startExpr;
+        // One collapse per iteration, same order-of-operations walk -
+        // capped so a pathological/unexpected input can't loop forever.
+        for (var guard = 0; guard < 64; guard++) {
+            var solver = new StepSolver(closeUnmatchedParens(current), 0.0d, variables);
+            var root = solver.buildTree();
+            if (solver.error || root == null) {
+                return steps;
+            }
+            var node = findFirstStepNode(root as StepNode);
+            if (node == null) {
+                break;
+            }
+            current = (current.substring(0, node.start) as String) + formatNumber(node.value) +
+                (current.substring(node.end, current.length()) as String);
+            steps.add(current);
+        }
+        return steps;
+    }
+
     // Flips the just-shown "=" result between decimal and a/b fraction
     // form. A second press flips it back - it doesn't affect anything
     // else, so typing after it (or a fresh "=") always starts decimal.
@@ -424,17 +466,45 @@ class CalculatorEngine {
     // third sample point catches non-linear formulas instead of silently
     // returning a wrong answer.
     private function solveEquation() as Void {
-        var eqIdxOrNull = expr.find("=");
-        if (eqIdxOrNull == null) {
+        var resultOrNull = solveEquationForDisplay(expr);
+        if (resultOrNull == null) {
             errorState = true;
             return;
         }
+        var result = resultOrNull as String;
+        var eqIdxOrNull = result.find("=");
+        if (eqIdxOrNull != null) {
+            var letter = result.substring(0, eqIdxOrNull as Number) as String;
+            var value = (result.substring((eqIdxOrNull as Number) + 1, result.length()) as String).toDouble() as Double;
+            // Solving always overwrites: a fresh equation for the same
+            // letter (long-press "=" again to build a new one) redefines it
+            // freely.
+            variables[letter] = value;
+            persistVariables();
+            lastAnswer = value;
+        } else {
+            lastAnswer = result.toDouble() as Double;
+        }
+        expr = result;
+        justEvaluated = true;
+        cursorPos = expr.length();
+    }
+
+    // The pure math behind solveEquation() - "letter=value" for an unknown,
+    // or a plain number (the LHS-RHS difference) when both sides are
+    // already known - or null if unsolvable. Never mutates `variables` or
+    // Storage, so computeSolutionSteps() can reuse it just to show what an
+    // already-recorded equation solved to, without redefining anything.
+    private function solveEquationForDisplay(equationExpr as String) as String? {
+        var eqIdxOrNull = equationExpr.find("=");
+        if (eqIdxOrNull == null) {
+            return null;
+        }
         var eqIdx = eqIdxOrNull as Number;
-        var lhs = closeUnmatchedParens(expr.substring(0, eqIdx) as String);
-        var rhs = closeUnmatchedParens(expr.substring(eqIdx + 1, expr.length()) as String);
+        var lhs = closeUnmatchedParens(equationExpr.substring(0, eqIdx) as String);
+        var rhs = closeUnmatchedParens(equationExpr.substring(eqIdx + 1, equationExpr.length()) as String);
         if (lhs.length() == 0 || rhs.length() == 0) {
-            errorState = true;
-            return;
+            return null;
         }
         var letterOrNull = findVariableLetter(lhs);
         if (letterOrNull == null) {
@@ -445,15 +515,7 @@ class CalculatorEngine {
             // solve, just two values to compare, so show their difference
             // instead of erroring (0 means they're actually equal).
             var diff = evalDiff("x", lhs, rhs, 0.0d);
-            if (diff == null) {
-                errorState = true;
-                return;
-            }
-            expr = formatNumber(diff as Double);
-            lastAnswer = diff as Double;
-            justEvaluated = true;
-            cursorPos = expr.length();
-            return;
+            return diff == null ? null : formatNumber(diff as Double);
         }
         var letter = letterOrNull as String;
 
@@ -461,32 +523,22 @@ class CalculatorEngine {
         var f1 = evalDiff(letter, lhs, rhs, 1.0d);
         var f2 = evalDiff(letter, lhs, rhs, 2.0d);
         if (f0 == null || f1 == null || f2 == null) {
-            errorState = true;
-            return;
+            return null;
         }
         var b = f0 as Double;
         var a = (f1 as Double) - b;
         if (a == 0.0d) {
-            errorState = true;
-            return;
+            return null;
         }
         var residual = (f2 as Double) - (2.0d * a + b);
         if (residual < 0.0d) {
             residual = -residual;
         }
         if (residual > 0.0001d) {
-            errorState = true;
-            return;
+            return null;
         }
         var solved = -b / a;
-        expr = letter + "=" + formatNumber(solved);
-        lastAnswer = solved;
-        // Solving always overwrites: a fresh equation for the same letter
-        // (long-press "=" again to build a new one) redefines it freely.
-        variables[letter] = solved;
-        persistVariables();
-        justEvaluated = true;
-        cursorPos = expr.length();
+        return letter + "=" + formatNumber(solved);
     }
 
     // Substitutes `trial` for `letter` via a scratch copy of `variables`

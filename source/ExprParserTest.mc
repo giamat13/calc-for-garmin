@@ -392,6 +392,68 @@ function testToggleFractionOnIntegerIsUnchanged(logger as Test.Logger) as Boolea
     return !e.errorState && e.expr.equals("4");
 }
 
+// computeSolutionSteps() walks "2+3*4" precedence-first: 3*4 before 2+...,
+// then the final answer - used by the history detail screen.
+(:test)
+function testComputeSolutionStepsRespectsPrecedence(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    var steps = e.computeSolutionSteps("2+3*4");
+    if (steps.size() != 3 || !steps[0].equals("2+3*4") || !steps[1].equals("2+12") || !steps[2].equals("14")) {
+        logger.debug("expected ['2+3*4','2+12','14'] got " + joinSteps(steps));
+        return false;
+    }
+    return true;
+}
+
+// Parens are solved before anything outside them, one step at a time.
+(:test)
+function testComputeSolutionStepsInnermostParensFirst(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    var steps = e.computeSolutionSteps("(2+3)*4");
+    if (steps.size() != 3 || !steps[0].equals("(2+3)*4") || !steps[1].equals("(5)*4") || !steps[2].equals("20")) {
+        logger.debug("expected ['(2+3)*4','(5)*4','20'] got " + joinSteps(steps));
+        return false;
+    }
+    return true;
+}
+
+// A function call only collapses once its argument is a plain number.
+(:test)
+function testComputeSolutionStepsFunctionCall(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    var steps = e.computeSolutionSteps("sqrt(9)+1");
+    if (steps.size() != 3 || !steps[0].equals("sqrt(9)+1") || !steps[1].equals("3+1") || !steps[2].equals("4")) {
+        logger.debug("expected ['sqrt(9)+1','3+1','4'] got " + joinSteps(steps));
+        return false;
+    }
+    return true;
+}
+
+// An equation isn't an order-of-operations walk - just the equation and its
+// solved form, two steps total.
+(:test)
+function testComputeSolutionStepsEquation(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    var steps = e.computeSolutionSteps("2X+3=7");
+    if (steps.size() != 2 || !steps[0].equals("2X+3=7") || !steps[1].equals("X=2")) {
+        logger.debug("expected ['2X+3=7','X=2'] got " + joinSteps(steps));
+        return false;
+    }
+    return true;
+}
+
+function joinSteps(steps as Array<String>) as String {
+    var out = "";
+    for (var i = 0; i < steps.size(); i++) {
+        out += (i > 0 ? "," : "") + steps[i];
+    }
+    return out;
+}
+
 function near(a as Double, b as Double, logger as Test.Logger) as Boolean {
     var d = a - b;
     if (d < 0.0d) {

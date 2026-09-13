@@ -41,7 +41,12 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     // simply never fires there.
     function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
         var dir = swipeEvent.getDirection();
-        if (dir == WatchUi.SWIPE_LEFT) {
+        var onListScreen = view.screen == view.SCREEN_HISTORY || view.screen == view.SCREEN_HISTORY_DETAIL;
+        if (onListScreen && dir == WatchUi.SWIPE_UP) {
+            view.scrollList(1);
+        } else if (onListScreen && dir == WatchUi.SWIPE_DOWN) {
+            view.scrollList(-1);
+        } else if (dir == WatchUi.SWIPE_LEFT) {
             view.engine.moveCursorLeft();
         } else if (dir == WatchUi.SWIPE_RIGHT) {
             view.engine.moveCursorRight();
@@ -59,11 +64,19 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
         if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
             return pressSelected();
         } else if (key == WatchUi.KEY_DOWN) {
-            view.moveSelection(1);
+            if (view.screen == view.SCREEN_HISTORY || view.screen == view.SCREEN_HISTORY_DETAIL) {
+                view.scrollList(1);
+            } else {
+                view.moveSelection(1);
+            }
             WatchUi.requestUpdate();
             return true;
         } else if (key == WatchUi.KEY_UP) {
-            view.moveSelection(-1);
+            if (view.screen == view.SCREEN_HISTORY || view.screen == view.SCREEN_HISTORY_DETAIL) {
+                view.scrollList(-1);
+            } else {
+                view.moveSelection(-1);
+            }
             WatchUi.requestUpdate();
             return true;
         } else if (key == WatchUi.KEY_ESC) {
@@ -101,6 +114,10 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
                 return true;
             } else if (view.screen == view.SCREEN_HISTORY) {
                 view.switchScreen(view.SCREEN_BASIC);
+                WatchUi.requestUpdate();
+                return true;
+            } else if (view.screen == view.SCREEN_HISTORY_DETAIL) {
+                view.switchScreen(view.SCREEN_HISTORY);
                 WatchUi.requestUpdate();
                 return true;
             } else if (view.screen == view.SCREEN_SCIENTIFIC) {
