@@ -120,12 +120,16 @@ function testBaseCustomRadixConversion(logger as Test.Logger) as Boolean {
     return pressAndExpect(logger, v, ["baseUse"], "12");
 }
 
-// R=255 G=0 B=0 is pure red -> #FF0000, shown once colorStage hits 3;
-// BACK from there still lands on MORE, same as the input stages.
+// COLOR lives as an "RGB" corner shortcut on the UNITS converter screen
+// (see the RGB button block in layoutButtons()), not its own seed-editable
+// category - so it's reached via "units" then "color", and BACK from it
+// returns to UNITS, same as any other converter sub-flow.
+// R=255 G=0 B=0 is pure red -> #FF0000, shown once colorStage hits 3.
 (:test)
-function testColorRgbEntryProducesHexAndBackReturnsToMore(logger as Test.Logger) as Boolean {
+function testColorRgbEntryProducesHexAndBackReturnsToUnits(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "units"));
     v.activate(new CalcButton("", "color"));
     v.activate(new CalcButton("", "digit:2"));
     v.activate(new CalcButton("", "digit:5"));
@@ -138,7 +142,28 @@ function testColorRgbEntryProducesHexAndBackReturnsToMore(logger as Test.Logger)
         return false;
     }
     v.activate(new CalcButton("BACK", "colorBack"));
-    return v.screen == v.SCREEN_MORE;
+    return v.screen == v.SCREEN_UNITS;
+}
+
+// Opening COLOR from mid-expression ("1+") must not lose that expression -
+// a real bug risk here, since "units" already stashed it via its own
+// embedded flow before COLOR's keypad ever touches engine.expr.
+(:test)
+function testColorDoesNotLoseInProgressExpression(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "digit:1"));
+    v.activate(new CalcButton("", "op:+"));
+    v.activate(new CalcButton("", "units"));
+    v.activate(new CalcButton("", "color"));
+    v.activate(new CalcButton("", "digit:9"));
+    v.activate(new CalcButton("", "colorNext"));
+    v.activate(new CalcButton("", "colorNext"));
+    v.activate(new CalcButton("", "colorShow"));
+    v.activate(new CalcButton("", "colorBack"));
+    v.activate(new CalcButton("", "unitCatBack"));
+    v.activate(new CalcButton("", "basic"));
+    return v.engine.displayText().equals("1+");
 }
 
 // PCT+/DATE/VAR moved off the default MENU behind a "MORE" corner button on

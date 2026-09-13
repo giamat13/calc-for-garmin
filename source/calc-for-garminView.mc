@@ -50,7 +50,7 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_HISTORY_DETAIL = 17; // step-by-step solution for one history entry
     const SCREEN_GRAPH = 18;       // plots the typed expression over X, off MORE
     const SCREEN_BASE = 19;        // dec/hex/oct/bin view + bitwise ops, off MORE
-    const SCREEN_COLOR = 20;       // R/G/B entry -> swatch + #HEX, off MORE
+    const SCREEN_COLOR = 20;       // R/G/B entry -> swatch + #HEX, off the RGB corner button on UNITS
 
     const SETUP_URL = "https://giamat13.github.io/calc-for-garmin/";
 
@@ -660,8 +660,7 @@ class calc_for_garminView extends WatchUi.View {
         return [
             new CalcButton("PCT+", "apct"), new CalcButton("DATE", "date"),
             new CalcButton("VAR", "var"), new CalcButton("GRAPH", "graph"),
-            new CalcButton("BASE", "base"), new CalcButton("COLOR", "color"),
-            new CalcButton("BACK", "moreBack"),
+            new CalcButton("BASE", "base"), new CalcButton("BACK", "moreBack"),
         ] as Array<CalcButton>;
     }
 
@@ -928,6 +927,21 @@ class calc_for_garminView extends WatchUi.View {
             moreBtn.w = moreSize;
             moreBtn.h = moreSize;
             others.add(moreBtn);
+        }
+        // COLOR is one more converter, right alongside distance/weight/etc,
+        // but RGB isn't a real "unit" with a from/to pair the way those are
+        // (no second unit to convert INTO) - so instead of forcing it into
+        // that seed-editable category pool (which would mean resizing it
+        // and bumping the SEED format version just for this), it's a fixed
+        // corner shortcut on the same screen, same trick as SET/MORE above.
+        if (screen == SCREEN_UNITS) {
+            var colorSize = (headerH * 0.5).toNumber();
+            var colorBtn = new CalcButton("RGB", "color");
+            colorBtn.x = safeX + safeW - colorSize - 4;
+            colorBtn.y = safeY + 4;
+            colorBtn.w = colorSize;
+            colorBtn.h = colorSize;
+            others.add(colorBtn);
         }
         buttons = others;
         if (selectedIndex >= buttons.size()) {
@@ -1459,7 +1473,12 @@ class calc_for_garminView extends WatchUi.View {
             }
             return;
         } else if (action.equals("color")) {
-            enterEmbeddedFlow();
+            // No enterEmbeddedFlow() here - COLOR only ever opens from the
+            // RGB corner button on SCREEN_UNITS, which already stashed the
+            // real expression when UC was tapped (see "units" above).
+            // Re-stashing here would overwrite that with this screen's
+            // already-blank scratch value and lose it for good.
+            engine.clear();
             colorStage = 0;
             colorR = 0;
             colorG = 0;
@@ -1493,7 +1512,7 @@ class calc_for_garminView extends WatchUi.View {
             layoutButtons();
             return;
         } else if (action.equals("colorBack")) {
-            switchScreen(SCREEN_MORE);
+            switchScreen(SCREEN_UNITS);
             return;
         }
 
