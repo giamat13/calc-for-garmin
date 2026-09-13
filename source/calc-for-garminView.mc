@@ -527,6 +527,47 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     // Compact integer display for the random screen's MIN/MAX hints.
+    // Digit-grouping for on-screen numbers only (never touches engine.expr
+    // itself, which stays comma-free so ExprParser keeps working). Groups
+    // every run of digits not immediately preceded by '.' or 'e'/'E', so
+    // decimal fractions and exponents are left alone.
+    private function groupThousands(s as String) as String {
+        var out = "";
+        var i = 0;
+        var n = s.length();
+        while (i < n) {
+            var c = s.substring(i, i + 1) as String;
+            if ("0123456789".find(c) != null) {
+                var j = i;
+                while (j < n && "0123456789".find(s.substring(j, j + 1) as String) != null) {
+                    j++;
+                }
+                var run = s.substring(i, j) as String;
+                var prevChar = i > 0 ? (s.substring(i - 1, i) as String) : "";
+                var skip = prevChar.equals(".") || prevChar.equals("e") || prevChar.equals("E");
+                out += (!skip && run.length() > 3) ? insertCommas(run) : run;
+                i = j;
+            } else {
+                out += c;
+                i++;
+            }
+        }
+        return out;
+    }
+
+    private function insertCommas(digits as String) as String {
+        var n = digits.length();
+        var firstGroup = n % 3;
+        if (firstGroup == 0) { firstGroup = 3; }
+        var out = digits.substring(0, firstGroup) as String;
+        var i = firstGroup;
+        while (i < n) {
+            out += "," + (digits.substring(i, i + 3) as String);
+            i += 3;
+        }
+        return out;
+    }
+
     private function formatWhole(v as Double) as String {
         return ((Math.round(v) as Numeric).toNumber()).toString();
     }
@@ -2200,6 +2241,7 @@ class calc_for_garminView extends WatchUi.View {
             // Regular text fonts, not FONT_NUMBER_*: the expression can
             // contain letters and symbols (X, =, sin, etc.), and the
             // digit-only number fonts have no glyphs for those.
+            text = groupThousands(text);
             var font = text.length() > 10 ? Graphics.FONT_TINY : (text.length() > 6 ? Graphics.FONT_SMALL : Graphics.FONT_LARGE);
             dc.drawText(safeX + safeW / 2, safeY + headerHBg / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             var setVars = "";
