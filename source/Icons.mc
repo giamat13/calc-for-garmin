@@ -12,6 +12,8 @@ function iconFor(action as String, label as String) as ResourceId? {
         "back" => Rez.Drawables.ic_del,
         "adv" => Rez.Drawables.ic_adv,
         "units" => Rez.Drawables.ic_units,
+        "formulaCat:tools" => Rez.Drawables.ic_units,
+        "formulaCatMore:tools" => Rez.Drawables.ic_units,
         "random" => Rez.Drawables.ic_dice,
         "randGen" => Rez.Drawables.ic_dice,
         "tip" => Rez.Drawables.ic_tip,
@@ -36,6 +38,13 @@ function iconFor(action as String, label as String) as ResourceId? {
         "curLeft" => Rez.Drawables.ic_larr,
         "curRight" => Rez.Drawables.ic_rarr,
         "const:π" => Rez.Drawables.ic_pi,
+        "formulas" => Rez.Drawables.ic_formula,
+        "formulaCat:geom" => Rez.Drawables.ic_cat_geom,
+        "formulaCatMore:geom" => Rez.Drawables.ic_cat_geom,
+        "formulaCat:phys" => Rez.Drawables.ic_cat_phys,
+        "formulaCatMore:phys" => Rez.Drawables.ic_cat_phys,
+        "formulaCat:custom" => Rez.Drawables.ic_cat_custom,
+        "formulaCatMore:custom" => Rez.Drawables.ic_cat_custom,
     };
     return ids[action];
 }

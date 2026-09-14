@@ -111,6 +111,26 @@
     text-align: center;
   }
 
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 50;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal-sheet {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 16px 16px 0 0; padding: 16px; width: 100%; max-width: 420px;
+    max-height: 70vh; overflow-y: auto;
+  }
+  .modal-sheet h3 { margin: 0 0 10px; font-size: 1.05rem; }
+  .picker-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .picker-item {
+    background: #12121e; border-radius: 10px; padding: 10px 4px;
+    text-align: center; font-size: 0.85rem; cursor: pointer; color: var(--text);
+  }
+  .picker-item .from { display: block; color: var(--muted); font-size: 0.68rem; margin-top: 2px; }
+
   .list { display: flex; flex-direction: column; gap: 8px; }
   .list-item {
     display: flex;
@@ -129,6 +149,39 @@
   .list-item .tag {
     font-size: 0.72rem;
     color: var(--muted);
+  }
+  .formula-cat-heading {
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 14px 0 2px;
+  }
+  .formula-cat-heading:first-child { margin-top: 0; }
+  .custom-formula-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .custom-formula-row input[type=text] {
+    flex: 1;
+    min-width: 0;
+    background: #12121e;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+  .custom-formula-remove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    flex-shrink: 0;
   }
 
   textarea, .seed-box {
@@ -204,8 +257,15 @@
 
 <div class="card">
   <h2><span class="step-badge">3</span>Main Screen Keypad</h2>
-  <p class="hint">Tap one button, then tap a second one - even on a different screen below (Scientific / Advanced / Categories) - to swap them. Any button can move anywhere, including BACK and the digits. ✕ in a button's corner deletes it entirely (it disappears from the watch); drag another button there to bring it back.</p>
+  <p class="hint">Tap one button, then tap a second one - even on a different screen below (Scientific / Advanced / Categories) - to swap them. Any button can move anywhere, including BACK and the digits. ✕ in a button's corner deletes it entirely, leaving an empty dashed slot; tap that empty slot to pick a button to put there.</p>
   <div class="grid" id="grid"></div>
+</div>
+
+<div class="modal-backdrop" id="tokenPickerBackdrop" hidden>
+  <div class="modal-sheet">
+    <h3>Add a button here</h3>
+    <div class="picker-grid" id="tokenPickerGrid"></div>
+  </div>
 </div>
 
 <div class="card">
@@ -238,7 +298,22 @@
 </div>
 
 <div class="card">
-  <h2><span class="step-badge">9</span>Get Your SEED Code</h2>
+  <h2><span class="step-badge">9</span>Formulas (FORM)</h2>
+  <p class="hint">Check which built-in formulas show right on the FORMULAS screen - anything left unchecked still exists, just one tap away behind its category's "MORE" button.</p>
+  <div class="list" id="formulasList"></div>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge">10</span>Custom Formulas</h2>
+  <p class="hint">Add your own - a name and a formula, using a single letter per value to fill in (e.g. "R" for radius): <code>π*R^2</code>. These always show on the watch's FORMULAS screen, under "Custom". No on-device validation - a typo just shows as an error when used, it won't break anything else.</p>
+  <div id="customFormulasList"></div>
+  <div class="row">
+    <button class="secondary" id="addCustomFormulaBtn">+ Add Formula</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2><span class="step-badge">11</span>Get Your SEED Code</h2>
   <div class="row">
     <button class="primary" id="genBtn">Generate SEED</button>
   </div>
@@ -279,6 +354,38 @@
     date: "Date (Days Until / Age / Date Difference)",
     nav: "Cursor Arrows, Ans & Brackets"
   };
+
+  // Mirrors calc-for-garminView.FORMULA_CATALOG on the watch - ids must
+  // match exactly, since "F=" just ships a list of these ids. Only ids and
+  // categories matter here; the actual fill-in template lives on the
+  // device (this page never needs to know it to build the SEED field).
+  var FORMULA_CATEGORIES = [
+    { id: "geom", label: "Geometry" },
+    { id: "phys", label: "Physics" },
+    { id: "tools", label: "Tools" }
+  ];
+  var FORMULA_CATALOG = [
+    { id: "circleArea", label: "Circle Area (πR²)", cat: "geom" },
+    { id: "circleCircumference", label: "Circle Circumference (2πR)", cat: "geom" },
+    { id: "pythagorean", label: "Pythagorean Theorem", cat: "geom" },
+    { id: "rectangleArea", label: "Rectangle Area (L×W)", cat: "geom" },
+    { id: "triangleArea", label: "Triangle Area (½B×H)", cat: "geom" },
+    { id: "trapezoidArea", label: "Trapezoid Area (½(A+B)×H)", cat: "geom" },
+    { id: "parallelogramArea", label: "Parallelogram Area (B×H)", cat: "geom" },
+    { id: "rectanglePerimeter", label: "Rectangle Perimeter (2(L+W))", cat: "geom" },
+    { id: "sphereVolume", label: "Sphere Volume", cat: "geom" },
+    { id: "sphereSurfaceArea", label: "Sphere Surface Area (4πR²)", cat: "geom" },
+    { id: "cubeVolume", label: "Cube Volume (S³)", cat: "geom" },
+    { id: "cylinderVolume", label: "Cylinder Volume", cat: "geom" },
+    { id: "cylinderSurfaceArea", label: "Cylinder Surface Area", cat: "geom" },
+    { id: "coneVolume", label: "Cone Volume", cat: "geom" },
+    { id: "distanceBetweenPoints", label: "Distance Between 2 Points", cat: "geom" },
+    { id: "speedDistTime", label: "Speed (D÷T)", cat: "phys" },
+    { id: "force", label: "Force (F=M×A)", cat: "phys" },
+    { id: "kineticEnergy", label: "Kinetic Energy (½MV²)", cat: "phys" },
+    { id: "unitConv", label: "Unit Conversion (shortcut)", cat: "tools" }
+  ];
+  var DEFAULT_FORMULA_SUBSET = ["circleArea", "circleCircumference", "pythagorean", "rectangleArea", "speedDistTime"];
 
   // ONE shared pool of every button on every customizable screen. A
   // button can be moved not just within its own screen but to any of the
@@ -376,7 +483,10 @@
     unitsLayout: UNITS_DEFAULT.slice(),
     order: MENU_KEYS.slice(),
     enabled: {},
-    activePreset: "classic"
+    activePreset: "classic",
+    formulaEnabled: {},
+    // Each {label, tpl}, freely added/removed/edited - no fixed count.
+    customFormulas: []
   };
 
   // The 5 screens as one registry, keyed the same way everywhere (seed
@@ -397,6 +507,10 @@
 
   function tileClicked(screenKey, index) {
     if (selection === null) {
+      if (screenArrays[screenKey][index] === "blank") {
+        openTokenPicker(screenKey, index);
+        return;
+      }
       selection = { screen: screenKey, index: index };
     } else if (selection.screen === screenKey && selection.index === index) {
       selection = null;
@@ -435,6 +549,42 @@
     });
     tile.appendChild(del);
   }
+
+  // Tapping an empty ("blank") slot with nothing else selected opens this
+  // picker instead of just marking the blank itself as selected - finding
+  // a button by name in a list is faster than hunting for it by sight
+  // across 4 screens. Picking one swaps it in from wherever it currently
+  // lives (same swap the two-tap flow does), so the pool stays a valid
+  // permutation - nothing is ever duplicated or lost.
+  function openTokenPicker(screenKey, index) {
+    var grid = document.getElementById("tokenPickerGrid");
+    grid.innerHTML = "";
+    var screenNames = { basic: "Main", sci: "Sci", adv: "Adv", units: "Units" };
+    Object.keys(screenArrays).forEach(function (fromKey) {
+      screenArrays[fromKey].forEach(function (token, fromIndex) {
+        if (token === "blank") { return; }
+        var item = document.createElement("div");
+        item.className = "picker-item";
+        item.innerHTML = labelFor(token) + '<span class="from">' + screenNames[fromKey] + "</span>";
+        item.addEventListener("click", function () {
+          screenArrays[screenKey][index] = token;
+          screenArrays[fromKey][fromIndex] = "blank";
+          closeTokenPicker();
+          renderAll();
+        });
+        grid.appendChild(item);
+      });
+    });
+    document.getElementById("tokenPickerBackdrop").hidden = false;
+  }
+
+  function closeTokenPicker() {
+    document.getElementById("tokenPickerBackdrop").hidden = true;
+  }
+
+  document.getElementById("tokenPickerBackdrop").addEventListener("click", function (ev) {
+    if (ev.target === ev.currentTarget) { closeTokenPicker(); }
+  });
 
   function renderBasicGrid() {
     var el = document.getElementById("grid");
@@ -493,6 +643,7 @@
 
   MENU_KEYS.forEach(function (k) { state.enabled[k] = PRESETS.classic.menu.indexOf(k) !== -1; });
   reorderFromEnabledFirst(PRESETS.classic.menu);
+  FORMULA_CATALOG.forEach(function (f) { state.formulaEnabled[f.id] = DEFAULT_FORMULA_SUBSET.indexOf(f.id) !== -1; });
 
   function reorderFromEnabledFirst(enabledOrder) {
     var rest = MENU_KEYS.filter(function (k) { return enabledOrder.indexOf(k) === -1; });
@@ -587,11 +738,87 @@
     });
   }
 
+  function renderFormulas() {
+    var el = document.getElementById("formulasList");
+    el.innerHTML = "";
+    FORMULA_CATEGORIES.forEach(function (cat) {
+      var items = FORMULA_CATALOG.filter(function (f) { return f.cat === cat.id; });
+      if (items.length === 0) { return; }
+      var h = document.createElement("div");
+      h.className = "formula-cat-heading";
+      h.textContent = cat.label;
+      el.appendChild(h);
+      items.forEach(function (f) {
+        var row = document.createElement("div");
+        row.className = "list-item" + (state.formulaEnabled[f.id] ? "" : " disabled");
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = state.formulaEnabled[f.id];
+        cb.addEventListener("change", function () { state.formulaEnabled[f.id] = cb.checked; renderFormulas(); });
+        var name = document.createElement("div");
+        name.className = "name";
+        name.textContent = f.label;
+        row.appendChild(cb);
+        row.appendChild(name);
+        el.appendChild(row);
+      });
+    });
+  }
+
+  // The watch splices a custom formula's template straight into the
+  // expression as typed (CalculatorEngine.appendRaw) - no on-device
+  // validation - so a typo here just shows up as an "Error" on the watch
+  // rather than crashing anything. "|", ";", and "~" are stripped because
+  // those are the SEED's own field/entry/label-template separators; a
+  // custom formula containing one would otherwise corrupt the SEED string
+  // itself, not just fail to compute.
+  function sanitizeFormulaField(s) {
+    return (s || "").replace(/[|;~]/g, "").trim();
+  }
+
+  function renderCustomFormulas() {
+    var el = document.getElementById("customFormulasList");
+    el.innerHTML = "";
+    state.customFormulas.forEach(function (f, i) {
+      var row = document.createElement("div");
+      row.className = "custom-formula-row";
+      var label = document.createElement("input");
+      label.type = "text";
+      label.placeholder = "Name (e.g. Circle Area)";
+      label.value = f.label;
+      label.addEventListener("input", function () { f.label = label.value; });
+      var tpl = document.createElement("input");
+      tpl.type = "text";
+      tpl.placeholder = "Formula (e.g. π*R^2)";
+      tpl.value = f.tpl;
+      tpl.addEventListener("input", function () { f.tpl = tpl.value; });
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "custom-formula-remove";
+      del.textContent = "✕";
+      del.addEventListener("click", function () {
+        state.customFormulas.splice(i, 1);
+        renderCustomFormulas();
+      });
+      row.appendChild(label);
+      row.appendChild(tpl);
+      row.appendChild(del);
+      el.appendChild(row);
+    });
+  }
+
+  function addCustomFormula() {
+    state.customFormulas.push({ label: "", tpl: "" });
+    renderCustomFormulas();
+  }
+
   function renderAll() {
     renderPresets();
     renderColors();
     renderAllGrids();
     renderMenu();
+    renderFormulas();
+    renderCustomFormulas();
   }
 
   function generateSeed() {
@@ -600,7 +827,21 @@
     var mStr = "M=" + enabledOrdered.join(",");
     var pool = [].concat(state.layout, state.sciLayout, state.advLayout, state.unitsLayout);
     var pStr = "P=" + pool.join(",");
-    return "1|" + cStr + "|" + mStr + "|" + pStr;
+    // Custom formulas are always shown by default (the user just typed
+    // them in on purpose - there's no separate "hide in More" step for
+    // them) - so every valid one goes straight into F= too, as "customN"
+    // where N is its position in the filtered U= list itself (the same
+    // list SeedConfig.parseCustomFormulas() will build on the watch), not
+    // its position before blanks were dropped.
+    var validCustom = state.customFormulas
+      .map(function (f) { return { label: sanitizeFormulaField(f.label), tpl: sanitizeFormulaField(f.tpl) }; })
+      .filter(function (f) { return f.label && f.tpl; });
+    var customStr = "U=" + validCustom.map(function (f) { return f.label + "~" + f.tpl; }).join(";");
+    var formulaIds = FORMULA_CATALOG.filter(function (f) { return state.formulaEnabled[f.id]; })
+      .map(function (f) { return f.id; })
+      .concat(validCustom.map(function (f, i) { return "custom" + i; }));
+    var fStr = "F=" + formulaIds.join(",");
+    return "1|" + cStr + "|" + mStr + "|" + pStr + "|" + fStr + "|" + customStr;
   }
 
   // Validates a token list against a required multiset (a full
@@ -626,7 +867,7 @@
     seed = (seed || "").trim();
     if (seed.substring(0, 2) !== "1|") { return null; }
     var fields = seed.substring(2).split("|");
-    var colors = null, menu = null, pool = null;
+    var colors = null, menu = null, pool = null, formulas = null, customFormulas = null;
     fields.forEach(function (f) {
       if (f.indexOf("C=") === 0) {
         var parts = f.substring(2).split(",");
@@ -639,11 +880,21 @@
       } else if (f.indexOf("P=") === 0) {
         var tokens = f.substring(2).split(",");
         if (validPermutation(tokens, REQUIRED_POOL)) { pool = tokens; }
+      } else if (f.indexOf("F=") === 0) {
+        formulas = f.substring(2).length ? f.substring(2).split(",") : [];
+      } else if (f.indexOf("U=") === 0) {
+        customFormulas = f.substring(2).length ? f.substring(2).split(";").map(function (entry) {
+          var sep = entry.indexOf("~");
+          if (sep === -1) { return null; }
+          return { label: entry.substring(0, sep), tpl: entry.substring(sep + 1) };
+        }).filter(function (x) { return x && x.label && x.tpl; }) : [];
       }
     });
-    if (!colors && !menu && !pool) { return null; }
-    return { colors: colors, menu: menu, pool: pool };
+    if (!colors && !menu && !pool && !formulas && !customFormulas) { return null; }
+    return { colors: colors, menu: menu, pool: pool, formulas: formulas, customFormulas: customFormulas };
   }
+
+  document.getElementById("addCustomFormulaBtn").addEventListener("click", addCustomFormula);
 
   document.getElementById("genBtn").addEventListener("click", function () {
     document.getElementById("seedOut").value = generateSeed();
@@ -689,6 +940,12 @@
         arr.splice(0, arr.length, ...slice);
         offset += arr.length;
       });
+    }
+    if (parsed.customFormulas) {
+      state.customFormulas.splice(0, state.customFormulas.length, ...parsed.customFormulas);
+    }
+    if (parsed.formulas) {
+      FORMULA_CATALOG.forEach(function (f) { state.formulaEnabled[f.id] = parsed.formulas.indexOf(f.id) !== -1; });
     }
     renderAll();
   });

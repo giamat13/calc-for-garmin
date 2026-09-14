@@ -218,8 +218,60 @@ function testStoredVariableIsNotTreatedAsUnknown(logger as Test.Logger) as Boole
     return true;
 }
 
+// Backspacing right after a freshly-opened function call ("1+log(" with
+// nothing typed inside yet) should remove the whole "log(" in one press,
+// not walk it out letter by letter.
 (:test)
-function testNonlinearEquationErrors(logger as Test.Logger) as Boolean {
+function testBackspaceRemovesWholeFunctionCallInOnePress(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendDigit("1");
+    e.appendOperator("+");
+    e.appendFunction("log");
+    if (!e.expr.equals("1+log(")) {
+        logger.debug("setup expected '1+log(' got '" + e.expr + "'");
+        return false;
+    }
+    e.backspace();
+    if (!e.expr.equals("1+")) {
+        logger.debug("expected one backspace to remove the whole call, got '" + e.expr + "'");
+        return false;
+    }
+    return true;
+}
+
+// Once something's been typed inside the call, backspace goes back to
+// deleting one character at a time - only a just-opened, still-empty call
+// gets removed atomically.
+(:test)
+function testBackspaceInsideFunctionArgDeletesOneCharacter(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendFunction("log");
+    e.appendDigit("3");
+    e.backspace();
+    return e.expr.equals("log(");
+}
+
+// A function name that's a suffix of another one ("sin" inside "asin(")
+// must not get swallowed - the whole, correct name ("asin(") is what
+// backspace removes.
+(:test)
+function testBackspaceRemovesLongerFunctionNameNotJustSuffix(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendFunction("asin");
+    e.backspace();
+    return e.expr.equals("");
+}
+
+// X^2=4 isn't affine, so the old fit-only solver rejected it outright. Now
+// that solveEquationForDisplay() falls back to solveNumeric() for anything
+// non-affine, this - and any other equation with a real root - solves
+// instead of erroring. The scan runs from very negative to very positive,
+// so it lands on the x<0 branch's root (-2) before the x>0 branch's (2).
+(:test)
+function testNonlinearEquationNowSolvesInsteadOfErroring(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
     e.clearVariables();
     e.appendConstant("X");
@@ -228,8 +280,12 @@ function testNonlinearEquationErrors(logger as Test.Logger) as Boolean {
     e.insertEquals();
     e.appendDigit("4");
     e.evaluate();
-    if (!e.errorState) {
-        logger.debug("expected nonlinear equation to error, got '" + e.expr + "'");
+    if (e.errorState) {
+        logger.debug("expected x^2=4 to solve, got error");
+        return false;
+    }
+    if (!e.expr.equals("X=-2")) {
+        logger.debug("expected 'X=-2' got '" + e.expr + "'");
         return false;
     }
     return true;
@@ -355,6 +411,127 @@ function testSolveWithNoVariableEqualSidesGivesZero(logger as Test.Logger) as Bo
     e.appendDigit("5");
     e.evaluate();
     return !e.errorState && e.expr.equals("0");
+}
+
+// The unknown in a denominator ("3/x") isn't affine, so the old
+// three-sample-point fit rejected it (and sampling at x=0 first would have
+// hit the division-by-zero guard anyway). solveEquationForDisplay()'s
+// numeric fallback (solveAffine -> solveNumeric/bisectRoot) must still find
+// the one real root: 8/1=3/x -> x=3/8.
+(:test)
+function testSolveEquationWithVariableInDenominator(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendDigit("8");
+    e.appendOperator("/");
+    e.appendDigit("1");
+    e.insertEquals();
+    e.appendDigit("3");
+    e.appendOperator("/");
+    e.appendConstant("X");
+    e.evaluate();
+    if (e.errorState) {
+        logger.debug("expected 8/1=3/x to solve, got error");
+        return false;
+    }
+    if (!e.expr.equals("X=0.375")) {
+        logger.debug("expected 'X=0.375' got '" + e.expr + "'");
+        return false;
+    }
+    return true;
+}
+
+// The unknown on both sides, with a reciprocal on one of them, is also
+// non-affine ("x+2=8/x" clears to x^2+2x-8=0, i.e. (x+4)(x-2)=0). The
+// numeric fallback scans from very negative to very positive, so it finds
+// the x<0 branch's single root (-4) before the x>0 branch's (2).
+(:test)
+function testSolveEquationWithVariableOnBothSidesNonlinear(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendConstant("X");
+    e.appendOperator("+");
+    e.appendDigit("2");
+    e.insertEquals();
+    e.appendDigit("8");
+    e.appendOperator("/");
+    e.appendConstant("X");
+    e.evaluate();
+    if (e.errorState) {
+        logger.debug("expected x+2=8/x to solve, got error");
+        return false;
+    }
+    if (!e.expr.equals("X=-4")) {
+        logger.debug("expected 'X=-4' got '" + e.expr + "'");
+        return false;
+    }
+    return true;
+}
+
+// A plain affine equation with the unknown on both sides already worked
+// before this fix (the fast solveAffine path handles it exactly) - pinned
+// here as a regression guard now that solveEquationForDisplay routes
+// through solveAffine/solveNumeric instead of one inline fit.
+(:test)
+function testSolveEquationWithVariableOnBothSidesLinear(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendDigit("2");
+    e.appendConstant("X");
+    e.appendOperator("+");
+    e.appendDigit("3");
+    e.insertEquals();
+    e.appendDigit("5");
+    e.appendConstant("X");
+    e.appendOperator("-");
+    e.appendDigit("1");
+    e.evaluate();
+    return !e.errorState && e.expr.equals("X=1.333333");
+}
+
+// Every letter but E is now offered on the VAR screen (calc-for-garminView
+// .VAR_LETTERS), including ones that are the first letter of a real
+// function name (S/C/T/L/A/F/M) - solving an equation for one of those
+// must work exactly like any other letter.
+(:test)
+function testSolveEquationForPreviouslyExcludedLetter(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendConstant("S");
+    e.appendOperator("+");
+    e.appendDigit("2");
+    e.insertEquals();
+    e.appendDigit("1");
+    e.appendDigit("0");
+    e.evaluate();
+    return !e.errorState && e.expr.equals("S=8");
+}
+
+// appendConstant() must insert an explicit "*" between two letters typed
+// back-to-back, so tapping e.g. "S" then "I" then "N" from the VAR screen
+// multiplies three variables instead of silently parsing as sin(...) -
+// the reason all 26-minus-E letters can safely be offered as variables.
+(:test)
+function testAppendConstantInsertsMultiplyBetweenAdjacentLetters(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    e.appendConstant("X");
+    e.appendConstant("Y");
+    if (!e.expr.equals("X*Y")) {
+        logger.debug("expected 'X*Y' got '" + e.expr + "'");
+        return false;
+    }
+    // A letter after a digit/operator/paren must NOT get an extra "*" -
+    // implicit multiplication and explicit operators already cover those.
+    var e2 = new CalculatorEngine();
+    e2.clearVariables();
+    e2.appendDigit("2");
+    e2.appendConstant("X");
+    if (!e2.expr.equals("2X")) {
+        logger.debug("expected '2X' got '" + e2.expr + "'");
+        return false;
+    }
+    return true;
 }
 
 // toggleFraction() flips the last "=" result between decimal and a/b, and

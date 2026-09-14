@@ -21,7 +21,7 @@ const ICONS = [
   ['del', 'back', { d: 'M8 5 L21 5 L21 19 L8 19 L2 12 Z M11.5 9 L17 15 M17 9 L11.5 15' }],
   ['back', [], { d: 'M9 6 L3 12 L9 18 M3 12 L14 12 Q20 12 20 6' }],
   ['adv', 'adv', { d: 'M6 6 L12 12 L6 18 M13 6 L19 12 L13 18' }],
-  ['units', 'units', { d: 'M4 8 L18 8 M14 4 L18 8 L14 12 M20 16 L6 16 M10 12 L6 16 L10 20' }],
+  ['units', ['units', 'formulaCat:tools', 'formulaCatMore:tools'], { d: 'M4 8 L18 8 M14 4 L18 8 L14 12 M20 16 L6 16 M10 12 L6 16 L10 20' }],
   ['dice', ['random', 'randGen'], { d: 'M4 4 L20 4 L20 20 L4 20 Z', dots: [[8.5, 8.5, 1.7], [12, 12, 1.7], [15.5, 15.5, 1.7]] }],
   ['tip', 'tip', { d: 'M5 3 L19 3 L19 21 L16.7 19.5 L14.3 21 L12 19.5 L9.7 21 L7.3 19.5 L5 21 Z M9 15.5 L15 6.5', rings: [[9.3, 8, 1.4], [14.7, 14, 1.4]] }],
   ['cat_dist', 'cat:dist', { d: 'M3 16 L16 3 L21 8 L8 21 Z M7 12 L9 14 M10 9 L12.5 11.5 M13 6 L15 8' }],
@@ -43,6 +43,10 @@ const ICONS = [
   ['larr', 'curLeft', { d: 'M15 4 L7 12 L15 20' }],
   ['rarr', 'curRight', { d: 'M9 4 L17 12 L9 20' }],
   ['pi', 'const:π', { d: 'M4 8 L20 8 M8 8 L7 20 M15 8 L15 17 Q15 20 18 19.6' }],
+  ['formula', 'formulas', { d: 'M6 5 L18 5 L12 12 L18 19 L6 19' }],
+  ['cat_geom', ['formulaCat:geom', 'formulaCatMore:geom'], { d: 'M4 20 L4 4 L20 20 Z M4 4 L8 4 L8 8 L4 8 Z' }],
+  ['cat_phys', ['formulaCat:phys', 'formulaCatMore:phys'], { d: 'M12 3 L12 21 M3 12 L21 12', rings: [[12, 12, 4]] }],
+  ['cat_custom', ['formulaCat:custom', 'formulaCatMore:custom'], { d: 'M4 20 L4 16 L16 4 L20 8 L8 20 Z M13 7 L17 11' }],
 ];
 
 const r = (n) => +n.toFixed(2);

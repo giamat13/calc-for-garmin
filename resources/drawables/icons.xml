@@ -25,4 +25,8 @@
     <bitmap id="ic_larr" filename="icons/larr.svg" scaleX="8%" scaleY="8%" dithering="none"/>
     <bitmap id="ic_rarr" filename="icons/rarr.svg" scaleX="8%" scaleY="8%" dithering="none"/>
     <bitmap id="ic_pi" filename="icons/pi.svg" scaleX="8%" scaleY="8%" dithering="none"/>
+    <bitmap id="ic_formula" filename="icons/formula.svg" scaleX="8%" scaleY="8%" dithering="none"/>
+    <bitmap id="ic_cat_geom" filename="icons/cat_geom.svg" scaleX="8%" scaleY="8%" dithering="none"/>
+    <bitmap id="ic_cat_phys" filename="icons/cat_phys.svg" scaleX="8%" scaleY="8%" dithering="none"/>
+    <bitmap id="ic_cat_custom" filename="icons/cat_custom.svg" scaleX="8%" scaleY="8%" dithering="none"/>
 </resources>

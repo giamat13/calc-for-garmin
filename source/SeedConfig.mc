@@ -36,6 +36,21 @@ class SeedConfig {
     // alphabet, not a customizable slice of the pool (see
     // calc-for-garminView.VAR_LETTERS).
 
+    // Which built-in formula ids (calc-for-garminView.FORMULA_CATALOG) show
+    // directly on the FORMULAS screen - anything not listed still exists,
+    // just tucked behind its category's "MORE" button. A generated
+    // "customN" id (N = index into customFormulas) can appear here too.
+    // Independent of the P= pool - it's a variable-length subset pick, not
+    // a fixed-grid permutation - so it's its own field ("F=") and adding it
+    // needed no SEED version bump (see parseFormulas()).
+    var formulaSubset as Array<String>;
+    // User-authored formulas from the setup page's custom-formula editor
+    // ("U="), each a {label, tpl} pair - tpl is inserted into the
+    // expression exactly like a built-in formula's template (see
+    // calc-for-garminView.activate()'s "formula:" handling). No device-side
+    // limit; the SEED string is the only practical ceiling.
+    var customFormulas as Array<Dictionary<String, String> >;
+
     private static var instance as SeedConfig?;
 
     static const DEFAULT_COLORS = [0x23233A, 0xFFB020, 0x00D68F, 0xFF5470, 0x7C4DFF, 0x14141F] as Array<Number>;
@@ -47,6 +62,12 @@ class SeedConfig {
     // helper, not an occasional tool.
     static const DEFAULT_MENU = ["sci", "units", "tip", "rnd", "nav"] as Array<String>;
     static const VALID_MENU_ITEMS = ["sci", "units", "tip", "rnd", "var", "apct", "date", "nav"] as Array<String>;
+
+    // Kept small on purpose - the rest of calc-for-garminView.FORMULA_CATALOG
+    // lives one tap away behind each category's "MORE" button.
+    static const DEFAULT_FORMULA_SUBSET = [
+        "circleArea", "circleCircumference", "pythagorean", "rectangleArea", "speedDistTime"
+    ] as Array<String>;
 
     static const BASIC_LEN = 20;
     static const SCI_LEN = 24;
@@ -100,6 +121,8 @@ class SeedConfig {
         sciLayout = DEFAULT_SCI_LAYOUT;
         advLayout = DEFAULT_ADV_LAYOUT;
         unitsLayout = DEFAULT_UNITS_LAYOUT;
+        formulaSubset = DEFAULT_FORMULA_SUBSET;
+        customFormulas = [] as Array<Dictionary<String, String> >;
         if (seed == null || seed.length() < 2 || !seed.substring(0, 2).equals("1|")) {
             return;
         }
@@ -126,6 +149,10 @@ class SeedConfig {
                     advLayout = sliceArr(p, offset, ADV_LEN); offset += ADV_LEN;
                     unitsLayout = sliceArr(p, offset, UNITS_LEN);
                 }
+            } else if (f.length() >= 2 && f.substring(0, 2).equals("F=")) {
+                formulaSubset = parseFormulas(f.substring(2, f.length()));
+            } else if (f.length() >= 2 && f.substring(0, 2).equals("U=")) {
+                customFormulas = parseCustomFormulas(f.substring(2, f.length()));
             }
         }
     }
@@ -192,6 +219,53 @@ class SeedConfig {
             if (containsStr(VALID_MENU_ITEMS, parts[i]) && !containsStr(out, parts[i])) {
                 out.add(parts[i]);
             }
+        }
+        return out;
+    }
+
+    // Unlike parseMenu(), there's no fixed whitelist to check against here
+    // - the valid id set is built-in formulas PLUS however many custom
+    // ones this same seed defines via "U=", which calc-for-garminView
+    // resolves at render time. An id that doesn't resolve to anything is
+    // just silently skipped when the FORMULAS screen is built - same
+    // "ignore what you don't recognize" tolerance as the rest of this
+    // parser - so this only needs to dedupe and drop empties.
+    private function parseFormulas(s as String) as Array<String> {
+        var out = [] as Array<String>;
+        if (s.length() == 0) {
+            return out;
+        }
+        var parts = splitStr(s, ",");
+        for (var i = 0; i < parts.size(); i++) {
+            if (parts[i].length() > 0 && !containsStr(out, parts[i])) {
+                out.add(parts[i]);
+            }
+        }
+        return out;
+    }
+
+    // "label~template;label~template;..." - the setup page's custom-
+    // formula editor sanitizes both halves to strip "|", ";", and "~"
+    // before building the seed, so no escaping is needed here. A malformed
+    // entry (missing "~", or an empty half) is just dropped.
+    private function parseCustomFormulas(s as String) as Array<Dictionary<String, String> > {
+        var out = [] as Array<Dictionary<String, String> >;
+        if (s.length() == 0) {
+            return out;
+        }
+        var entries = splitStr(s, ";");
+        for (var i = 0; i < entries.size(); i++) {
+            var entry = entries[i];
+            var sepIdx = entry.find("~");
+            if (sepIdx == null) {
+                continue;
+            }
+            var label = entry.substring(0, sepIdx as Number) as String;
+            var tpl = entry.substring((sepIdx as Number) + 1, entry.length()) as String;
+            if (label.length() == 0 || tpl.length() == 0) {
+                continue;
+            }
+            out.add({"label" => label, "tpl" => tpl} as Dictionary<String, String>);
         }
         return out;
     }

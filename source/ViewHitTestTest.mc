@@ -1,5 +1,6 @@
 import Toybox.Test;
 import Toybox.Lang;
+import Toybox.Math;
 
 // Verifies that every visible button is actually tappable at its own
 // on-screen center, for both round and rectangular layouts, and for both
@@ -43,13 +44,199 @@ function testMoreScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 14) && checkAllButtonsTappable(logger, true, 14);
 }
 
-// GRAPH/BASE/COLOR (18/19/20) are non-customizable tool screens off MORE,
-// same as VAR/NAV - pin that their buttons are actually tappable too.
+// GRAPH/BASE/COLOR/COUNTER (18/19/20/21) are non-customizable tool screens
+// off MORE, same as VAR/NAV - pin that their buttons are actually tappable too.
 (:test)
 function testGraphBaseColorScreensAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 18) && checkAllButtonsTappable(logger, true, 18) &&
         checkAllButtonsTappable(logger, false, 19) && checkAllButtonsTappable(logger, true, 19) &&
-        checkAllButtonsTappable(logger, false, 20) && checkAllButtonsTappable(logger, true, 20);
+        checkAllButtonsTappable(logger, false, 20) && checkAllButtonsTappable(logger, true, 20) &&
+        checkAllButtonsTappable(logger, false, 21) && checkAllButtonsTappable(logger, true, 21);
+}
+
+// The FORMULAS (22) and "MORE formulas" (24) category pickers are plain
+// grids reachable directly, same as any other fixed tool screen.
+(:test)
+function testFormulasCategoryScreensAreTappable(logger as Test.Logger) as Boolean {
+    return checkAllButtonsTappable(logger, false, 22) && checkAllButtonsTappable(logger, true, 22) &&
+        checkAllButtonsTappable(logger, false, 24) && checkAllButtonsTappable(logger, true, 24);
+}
+
+// SCREEN_FORMULA_LIST (23) and SCREEN_FORMULA_MORE_LIST (25) need a
+// category selected first (via activate()) before there's anything but a
+// bare BACK row to lay out - checkAllButtonsTappable() always constructs
+// its own fresh view, so it can't be reused here; this inlines the same
+// center-hit assertion after picking "Geometry" on each screen.
+(:test)
+function testFormulaListScreensAreTappable(logger as Test.Logger) as Boolean {
+    return checkFormulaListTappable(logger, false, "formulaCat:geom") &&
+        checkFormulaListTappable(logger, true, "formulaCat:geom") &&
+        checkFormulaListTappable(logger, false, "formulaCatMore:geom") &&
+        checkFormulaListTappable(logger, true, "formulaCatMore:geom");
+}
+
+function checkFormulaListTappable(logger as Test.Logger, round as Boolean, categoryAction as String) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, round);
+    v.activate(new CalcButton("Geometry", categoryAction));
+    var buttons = v.getButtons();
+    if (buttons.size() == 0) {
+        logger.debug("formula list produced zero buttons for '" + categoryAction + "'");
+        return false;
+    }
+    for (var i = 0; i < buttons.size(); i++) {
+        var b = buttons[i];
+        if (b.w <= 0 || b.h <= 0) {
+            logger.debug("formula list button '" + b.label + "' has non-positive size " + b.w + "x" + b.h);
+            return false;
+        }
+        var cx = b.x + b.w / 2;
+        var cy = b.y + b.h / 2;
+        var idx = v.buttonAt(cx, cy);
+        if (idx == null || (idx as Number) != i) {
+            logger.debug("formula list button '" + b.label + "' center did not resolve back to index " + i);
+            return false;
+        }
+    }
+    return true;
+}
+
+// MENU -> FORMULAS -> a category -> its list -> BACK, and the "MORE"
+// branch alongside it, following testMenuHubNavigation's pin-the-chain shape.
+(:test)
+function testFormulasNavigation(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("MENU", "menu"));
+    v.activate(new CalcButton("FORM", "formulas"));
+    if (v.screen != v.SCREEN_FORMULAS) {
+        logger.debug("expected SCREEN_FORMULAS after formulas, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("Geometry", "formulaCat:geom"));
+    if (v.screen != v.SCREEN_FORMULA_LIST) {
+        logger.debug("expected SCREEN_FORMULA_LIST after formulaCat:geom, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "formulaListBack"));
+    if (v.screen != v.SCREEN_FORMULAS) {
+        logger.debug("expected formula list BACK to return to SCREEN_FORMULAS, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("MORE", "formulasMore"));
+    if (v.screen != v.SCREEN_FORMULAS_MORE) {
+        logger.debug("expected SCREEN_FORMULAS_MORE after formulasMore, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("Geometry", "formulaCatMore:geom"));
+    if (v.screen != v.SCREEN_FORMULA_MORE_LIST) {
+        logger.debug("expected SCREEN_FORMULA_MORE_LIST after formulaCatMore:geom, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "formulaMoreListBack"));
+    if (v.screen != v.SCREEN_FORMULAS_MORE) {
+        logger.debug("expected more-list BACK to return to SCREEN_FORMULAS_MORE, got " + v.screen);
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "formulas"));
+    return v.screen == v.SCREEN_FORMULAS;
+}
+
+// Tapping a formula injects its template with the cursor left right after
+// the first fill-in letter (see calc-for-garminView's "formula:" action) -
+// the letter itself is still there, a stand-in the user backspaces before
+// typing over it (same as clearing any other character), not something
+// digits silently replace. Pin one single-blank formula (circle area) end
+// to end, and one multi-blank one (Pythagorean) below.
+(:test)
+function testCircleAreaFormulaInjectsTemplateAndSolves(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v,
+        ["clear", "formula:circleArea", "back", "digit:3", "equals"],
+        v.engine.formatNumber((Math.PI.toDouble() as Double) * 9.0d));
+}
+
+(:test)
+function testPythagoreanFormulaLeavesCursorAfterFirstBlank(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "clear"));
+    v.activate(new CalcButton("", "formula:pythagorean"));
+    if (!v.engine.expr.equals("sqrt(A^2+B^2)")) {
+        logger.debug("expected template 'sqrt(A^2+B^2)' got '" + v.engine.expr + "'");
+        return false;
+    }
+    // The cursor should sit right after "A" (index 6), ready to backspace
+    // it and type a value - not at the end of the whole template.
+    if (v.engine.cursorPos != 6) {
+        logger.debug("expected cursor at 6 (right after 'A') got " + v.engine.cursorPos);
+        return false;
+    }
+    return true;
+}
+
+// A formula id that no longer resolves (e.g. a stale seed-picked custom
+// formula after the custom list shrank) must fail safe, not crash.
+(:test)
+function testUnknownFormulaIdFallsBackToBasicScreen(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "formula:doesNotExist"));
+    return v.screen == v.SCREEN_BASIC;
+}
+
+// +1/-1 tally the running count; RESET zeros it; BACK returns to MORE.
+(:test)
+function testCounterIncDecAndReset(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "counter"));
+    v.activate(new CalcButton("", "counterInc"));
+    v.activate(new CalcButton("", "counterInc"));
+    v.activate(new CalcButton("", "counterDec"));
+    if (!v.counterValueString().equals("1")) {
+        logger.debug("expected 1 after +1 +1 -1, got " + v.counterValueString());
+        return false;
+    }
+    v.activate(new CalcButton("", "counterReset"));
+    if (!v.counterValueString().equals("0")) {
+        logger.debug("expected 0 after RESET, got " + v.counterValueString());
+        return false;
+    }
+    v.activate(new CalcButton("BACK", "counterBack"));
+    return v.screen == v.SCREEN_MORE;
+}
+
+// "+N" opens a nested keypad (like baseRdx) to type a bulk amount (clamped
+// 1-100); ADD applies it once and remembers it as the step that a
+// long-press on -1 (see the delegate's onHold) later subtracts in one go.
+(:test)
+function testCounterMultiAddClampsAndFeedsLongPressDecrement(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    v.activate(new CalcButton("", "counter"));
+    v.activate(new CalcButton("", "counterMulti"));
+    v.activate(new CalcButton("", "digit:9"));
+    v.activate(new CalcButton("", "digit:9"));
+    v.activate(new CalcButton("", "digit:9")); // 999 -> clamped to 100
+    v.activate(new CalcButton("", "counterMultiAdd"));
+    if (v.screen != v.SCREEN_COUNTER || !v.counterValueString().equals("100")) {
+        logger.debug("expected COUNTER at 100 after +N 999 (clamped), got screen " + v.screen + " value " + v.counterValueString());
+        return false;
+    }
+    // Long-press decrement (delegate maps a hold on -1 to counterDecMulti)
+    // should subtract the remembered step (100), not just 1.
+    v.activate(new CalcButton("-1", "counterDecMulti"));
+    if (!v.counterValueString().equals("0")) {
+        logger.debug("expected 0 after subtracting the 100 step, got " + v.counterValueString());
+        return false;
+    }
+    // Cancelling out of "+N" entry (BACK) returns to the counter view, not
+    // all the way to MORE.
+    v.activate(new CalcButton("", "counterMulti"));
+    v.activate(new CalcButton("BACK", "counterBack"));
+    return v.screen == v.SCREEN_COUNTER;
 }
 
 // Typing "X^2" then GRAPH captures that formula, doesn't touch the main

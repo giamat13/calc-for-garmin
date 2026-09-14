@@ -33,7 +33,12 @@ class calc_for_garminApp extends Application.AppBase {
         // widget loop, where the system owns Back (exit to watch face) and
         // up/down swipes (next widget). Show an entry page there and push the
         // calculator as its own view, which does get Back and swipes.
-        return [ new CalcLaunchView(), new CalcLaunchDelegate(v) ];
+        // CalcLaunchView auto-pushes it the first time it's shown, so this
+        // doesn't cost an extra tap to get in - only Back-ing all the way
+        // out (which pops the calculator back to this splash) leaves it
+        // showing, at which point it behaves like a normal launcher tile
+        // and a further Back or a tap/START does what you'd expect.
+        return [ new CalcLaunchView(v), new CalcLaunchDelegate(v) ];
     }
 
     // Fires when the phone pushes a Settings change (e.g. a new SEED code
@@ -53,8 +58,23 @@ class calc_for_garminApp extends Application.AppBase {
 
 class CalcLaunchView extends WatchUi.View {
 
-    function initialize() {
+    private var calcView as calc_for_garminView;
+    // Only auto-enter the very first time this is shown - if the user
+    // backs all the way out of the calculator (popping it back to here),
+    // showing again should behave like a normal launcher tile, not
+    // immediately shove them back in.
+    private var autoEntered as Boolean = false;
+
+    function initialize(v as calc_for_garminView) {
         View.initialize();
+        calcView = v;
+    }
+
+    function onShow() as Void {
+        if (!autoEntered) {
+            autoEntered = true;
+            WatchUi.pushView(calcView, new calc_for_garminDelegate(calcView), WatchUi.SLIDE_IMMEDIATE);
+        }
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {

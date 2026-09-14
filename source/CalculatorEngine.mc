@@ -28,6 +28,15 @@ class CalculatorEngine {
     // decimal - see toggleFraction().
     private var fractionMode as Boolean = false;
 
+    // Every function name appendFunction() can insert as "name(" - used by
+    // backspace() to delete a freshly-opened call in one press instead of
+    // walking it out letter by letter. ("fact" has no button of its own -
+    // wrapFactorial() appends "!" postfix instead - but ExprParser accepts
+    // "fact(" too, so it's included for consistency.)
+    private const FUNCTION_NAMES = [
+        "sin", "cos", "tan", "sqrt", "log", "ln", "asin", "acos", "atan", "cbrt", "abs", "floor", "ceil", "fact"
+    ] as Array<String>;
+
     function initialize() {
         var stored = Storage.getValue("calcVariables");
         if (stored != null) {
@@ -101,9 +110,22 @@ class CalculatorEngine {
         insertAtCursor(name + "(");
     }
 
+    // Inserts a single-letter variable (or "e"/"π") at the cursor. If the
+    // character right before the cursor is also a bare letter, "AB" would
+    // otherwise concatenate into ExprParser's identifier reader as one
+    // 2+-letter run - which, if it happened to spell a real function name
+    // (e.g. tapping "S" then "I" then "N"), would silently parse as that
+    // function instead of three multiplied variables. An explicit "*"
+    // keeps every letter unambiguous, so all of them (not just a
+    // non-function-prefix subset) are safe to offer as variables.
     function appendConstant(sym as String) as Void {
         resetIfNeeded(true);
-        insertAtCursor(sym);
+        if (cursorPos > 0 && sym.length() == 1 && isAsciiLetter(sym) &&
+                isAsciiLetter(expr.substring(cursorPos - 1, cursorPos) as String)) {
+            insertAtCursor("*" + sym);
+        } else {
+            insertAtCursor(sym);
+        }
     }
 
     // Auto-nesting brackets: one button picks the glyph by how deep the
@@ -290,10 +312,43 @@ class CalculatorEngine {
             return;
         }
         if (cursorPos > 0) {
-            expr = (expr.substring(0, cursorPos - 1) as String) + (expr.substring(cursorPos, expr.length()) as String);
-            cursorPos -= 1;
+            var cut = functionCallLengthBeforeCursor();
+            var n = cut > 0 ? cut : 1;
+            expr = (expr.substring(0, cursorPos - n) as String) + (expr.substring(cursorPos, expr.length()) as String);
+            cursorPos -= n;
         }
         justEvaluated = false;
+    }
+
+    // If the cursor sits right after "name(" for a known function - i.e.
+    // the call was just opened and nothing's been typed inside it yet -
+    // one backspace should remove the whole "name(" instead of peeling it
+    // one character at a time (typing "log(" then changing your mind
+    // shouldn't take 4 presses). Returns the number of characters to
+    // delete, or 0 if the cursor isn't right after such an opening.
+    private function functionCallLengthBeforeCursor() as Number {
+        if (cursorPos < 2 || !(expr.substring(cursorPos - 1, cursorPos) as String).equals("(")) {
+            return 0;
+        }
+        for (var i = 0; i < FUNCTION_NAMES.size(); i++) {
+            var name = FUNCTION_NAMES[i] as String;
+            var nameLen = name.length();
+            var start = cursorPos - 1 - nameLen;
+            if (start < 0) {
+                continue;
+            }
+            if (!(expr.substring(start, cursorPos - 1) as String).equals(name)) {
+                continue;
+            }
+            // Don't swallow a longer identifier this name is just a
+            // suffix of - e.g. matching "sin" inside "asin(" - the actual
+            // "asin" entry handles that case on its own.
+            if (start > 0 && isAsciiLetter(expr.substring(start - 1, start) as String)) {
+                continue;
+            }
+            return nameLen + 1;
+        }
+        return 0;
     }
 
     function clear() as Void {
@@ -485,8 +540,10 @@ class CalculatorEngine {
     // Linear-equation solver: since f(letter) = LHS - RHS is a straight line
     // for any equation built only from +,-,*,/,^ with constant exponents,
     // two sample points fully determine it (f(v) = a*v + b), so v = -b/a. A
-    // third sample point catches non-linear formulas instead of silently
-    // returning a wrong answer.
+    // third sample point catches non-linear formulas so they can fall back
+    // to solveNumeric() (a reciprocal like "3/x", or the unknown appearing
+    // on both sides in a way that doesn't cancel to affine) instead of
+    // silently returning a wrong answer.
     private function solveEquation() as Void {
         var resultOrNull = solveEquationForDisplay(expr);
         if (resultOrNull == null) {
@@ -541,26 +598,155 @@ class CalculatorEngine {
         }
         var letter = letterOrNull as String;
 
-        var f0 = evalDiff(letter, lhs, rhs, 0.0d);
-        var f1 = evalDiff(letter, lhs, rhs, 1.0d);
-        var f2 = evalDiff(letter, lhs, rhs, 2.0d);
+        var solved = solveAffine(letter, lhs, rhs);
+        if (solved == null) {
+            solved = solveNumeric(letter, lhs, rhs);
+        }
+        if (solved == null) {
+            return null;
+        }
+        return letter + "=" + formatNumber(solved as Double);
+    }
+
+    // Fast, exact path: tries a few different trial triples (not just
+    // 0,1,2) so a singularity at one candidate point - e.g. "3/x" at x=0 -
+    // doesn't block the fit. Returns null if no triple samples cleanly or
+    // the relationship genuinely isn't affine in `letter`; the caller then
+    // falls back to solveNumeric().
+    private function solveAffine(letter as String, lhs as String, rhs as String) as Double? {
+        var solved = solveAffineTriple(letter, lhs, rhs, 0.0d, 1.0d, 2.0d);
+        if (solved != null) {
+            return solved;
+        }
+        solved = solveAffineTriple(letter, lhs, rhs, 1.0d, 2.0d, 3.0d);
+        if (solved != null) {
+            return solved;
+        }
+        solved = solveAffineTriple(letter, lhs, rhs, 2.0d, 3.0d, 5.0d);
+        if (solved != null) {
+            return solved;
+        }
+        return solveAffineTriple(letter, lhs, rhs, -1.0d, 1.0d, 3.0d);
+    }
+
+    private function solveAffineTriple(letter as String, lhs as String, rhs as String, t0 as Double, t1 as Double, t2 as Double) as Double? {
+        var f0 = evalDiff(letter, lhs, rhs, t0);
+        var f1 = evalDiff(letter, lhs, rhs, t1);
+        var f2 = evalDiff(letter, lhs, rhs, t2);
         if (f0 == null || f1 == null || f2 == null) {
             return null;
         }
         var b = f0 as Double;
-        var a = (f1 as Double) - b;
+        var a = ((f1 as Double) - b) / (t1 - t0);
         if (a == 0.0d) {
             return null;
         }
-        var residual = (f2 as Double) - (2.0d * a + b);
+        var predicted = a * (t2 - t0) + b;
+        var residual = (f2 as Double) - predicted;
         if (residual < 0.0d) {
             residual = -residual;
         }
         if (residual > 0.0001d) {
             return null;
         }
-        var solved = -b / a;
-        return letter + "=" + formatNumber(solved);
+        return t0 - b / a;
+    }
+
+    // General fallback for a relationship that isn't affine in `letter` -
+    // a reciprocal like "3/x", or the unknown on both sides in a way that
+    // doesn't cancel down to a line. Scans a wide, geometrically-spaced
+    // range of trial values (skipping any that error, e.g. a division by
+    // zero exactly at that value) for a sign change in
+    // f(letter) = LHS - RHS, then bisects down to the root. A sign change
+    // can also happen at a POLE instead of a root - e.g. "3/x" flips from
+    // +infinity to -infinity across x=0, which looks like a crossing but
+    // isn't one - so every bracket is verified (the true root drives
+    // f(letter) itself near zero; a pole doesn't) before being accepted,
+    // and rejected brackets just keep the scan going. Returns null if no
+    // genuine root turns up anywhere in the scanned range - same "can't
+    // solve this" outcome solveAffine would have given, just reached a
+    // different way.
+    private function solveNumeric(letter as String, lhs as String, rhs as String) as Double? {
+        var mags = [] as Array<Double>;
+        var mag = 0.0001d;
+        for (var i = 0; i < 130; i++) {
+            mags.add(mag);
+            mag = mag * 1.2d;
+        }
+        var points = [] as Array<Double>;
+        for (var i = mags.size() - 1; i >= 0; i--) {
+            points.add(-(mags[i] as Double));
+        }
+        for (var i = 0; i < mags.size(); i++) {
+            points.add(mags[i] as Double);
+        }
+
+        var prevV = points[0] as Double;
+        var prevF = evalDiff(letter, lhs, rhs, prevV);
+        for (var i = 1; i < points.size(); i++) {
+            var v = points[i] as Double;
+            var f = evalDiff(letter, lhs, rhs, v);
+            if (f != null && (f as Double) == 0.0d) {
+                return v;
+            }
+            if (prevF != null && f != null && ((prevF as Double) < 0.0d) != ((f as Double) < 0.0d)) {
+                var candidate = bisectRoot(letter, lhs, rhs, prevV, v);
+                if (candidate != null) {
+                    var check = evalDiff(letter, lhs, rhs, candidate as Double);
+                    if (check != null) {
+                        var mag2 = check as Double;
+                        if (mag2 < 0.0d) {
+                            mag2 = -mag2;
+                        }
+                        if (mag2 < 0.0001d) {
+                            return candidate;
+                        }
+                    }
+                }
+                // The bracket straddled a pole, not a root - keep scanning
+                // past it instead of reporting a bogus near-zero answer.
+            }
+            prevV = v;
+            prevF = f;
+        }
+        return null;
+    }
+
+    // Narrows a bracket known to contain a sign change of
+    // f(letter) = LHS - RHS down to the root. 60 halvings converge well
+    // past the precision formatNumber() displays even for the widest
+    // brackets solveNumeric() can hand it.
+    private function bisectRoot(letter as String, lhs as String, rhs as String, loIn as Double, hiIn as Double) as Double? {
+        var lo = loIn;
+        var hi = hiIn;
+        var flo = evalDiff(letter, lhs, rhs, lo);
+        if (flo == null) {
+            return null;
+        }
+        for (var i = 0; i < 60; i++) {
+            var mid = (lo + hi) / 2.0d;
+            var fmid = evalDiff(letter, lhs, rhs, mid);
+            if (fmid == null) {
+                // Straddled an undefined point (e.g. a denominator hitting
+                // zero exactly at the midpoint) - nudge and retry once
+                // rather than giving up the whole bracket.
+                mid = mid + (hi - lo) * 0.0001d;
+                fmid = evalDiff(letter, lhs, rhs, mid);
+                if (fmid == null) {
+                    return (lo + hi) / 2.0d;
+                }
+            }
+            if ((fmid as Double) == 0.0d) {
+                return mid;
+            }
+            if (((flo as Double) < 0.0d) != ((fmid as Double) < 0.0d)) {
+                hi = mid;
+            } else {
+                lo = mid;
+                flo = fmid;
+            }
+        }
+        return (lo + hi) / 2.0d;
     }
 
     // Substitutes `trial` for `letter` via a scratch copy of `variables`

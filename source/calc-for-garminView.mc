@@ -51,6 +51,11 @@ class calc_for_garminView extends WatchUi.View {
     const SCREEN_GRAPH = 18;       // plots the typed expression over X, off MORE
     const SCREEN_BASE = 19;        // dec/hex/oct/bin view + bitwise ops, off MORE
     const SCREEN_COLOR = 20;       // R/G/B entry -> swatch + #HEX, off the RGB corner button on UNITS
+    const SCREEN_COUNTER = 21;     // tally counter: +1/-1, plus a settable bulk step, off MORE
+    const SCREEN_FORMULAS = 22;          // formulas: category picker for the default-visible set
+    const SCREEN_FORMULA_LIST = 23;      // formulas in one category, from the default-visible set
+    const SCREEN_FORMULAS_MORE = 24;     // formulas: category picker for everything NOT default-visible
+    const SCREEN_FORMULA_MORE_LIST = 25; // formulas in one category, from the "more" set
 
     const SETUP_URL = "https://giamat13.github.io/calc-for-garmin/";
 
@@ -65,6 +70,8 @@ class calc_for_garminView extends WatchUi.View {
     var engine as CalculatorEngine = new CalculatorEngine();
     var screen as Number = SCREEN_BASIC;
     var selectedIndex as Number = 0;
+    // Which category is showing on SCREEN_FORMULA_LIST/SCREEN_FORMULA_MORE_LIST.
+    private var formulaCategory as String = "";
     private var buttons as Array<CalcButton> = [] as Array<CalcButton>;
 
     // Two-step unit conversion state: first tap picks the source unit
@@ -174,6 +181,14 @@ class calc_for_garminView extends WatchUi.View {
     private var colorR as Number = 0;
     private var colorG as Number = 0;
     private var colorB as Number = 0;
+
+    // Tally counter tool. counterStage: 1 = the normal +1/-1/RESET view,
+    // 0 = typing a new bulk step (1-100), a nested embedded flow like
+    // baseRdx (see "counterStep" in activate()). Long-pressing "-1"
+    // subtracts a whole counterStep instead of 1 (see onHold()).
+    private var counterValue as Number = 0;
+    private var counterStep as Number = 1;
+    private var counterStage as Number = 1;
 
     // Safe content area: on round watches a full-width row near the top/bottom
     // edge gets chopped off by the bezel, so content is confined to the
@@ -441,6 +456,12 @@ class calc_for_garminView extends WatchUi.View {
                 defs.add(new CalcButton("NAV", "nav"));
             }
         }
+        // Fixed - not part of SeedConfig.menuItems/VALID_MENU_ITEMS, so a
+        // pasted SEED can neither hide nor reorder it (per the request:
+        // "a fixed MENU button, not part of the customizable pool"). Which
+        // formulas show once you're on that screen is still customizable,
+        // via the separate "F="/"U=" fields (see formulaCategoryButtons()).
+        defs.add(new CalcButton("FORM", "formulas"));
         defs.add(new CalcButton("BACK", "basic"));
         return defs;
     }
@@ -471,15 +492,17 @@ class calc_for_garminView extends WatchUi.View {
     // Every letter usable as an algebraic unknown, e.g. tapping X then
     // building "2X+3=10" and hitting "=" on the basic screen solves for X
     // (CalculatorEngine.solveEquation). Fixed, not seed-customizable - a
-    // shuffled alphabet has no benefit, unlike the other 4 screens.
-    // S,C,T,L,A,F,M are omitted: each is the first letter of a real
-    // function name (sin/cos/tan/log|ln/asin|acos|atan|abs/floor|fact/mod),
-    // so two of those letters typed back-to-back with no operator between
-    // would parse as that function's name instead of two variables
-    // multiplied. E is omitted too - it's always Euler's constant to the
-    // parser (ExprParser.mc), never an unknown to solve for.
+    // shuffled alphabet has no benefit, unlike the other 4 screens. E is
+    // omitted - it's always Euler's constant to the parser
+    // (ExprParser.mc), never an unknown to solve for. The rest (including
+    // S/C/T/L/A/F/M, each the first letter of a real function name like
+    // sin/cos/tan/log/asin/floor/mod) are all safe to offer:
+    // CalculatorEngine.appendConstant() inserts an explicit "*" whenever a
+    // letter would otherwise land directly against another letter, so two
+    // variables typed back-to-back never concatenate into a function name.
     private const VAR_LETTERS = [
-        "B", "D", "G", "H", "I", "J", "K", "N", "O", "P", "Q", "R", "U", "V", "W", "X", "Y", "Z"
+        "A", "B", "C", "D", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
+        "T", "U", "V", "W", "X", "Y", "Z"
     ] as Array<String>;
 
     private function varButtons() as Array<CalcButton> {
@@ -490,6 +513,143 @@ class calc_for_garminView extends WatchUi.View {
         defs.add(new CalcButton("=", "eq"));
         defs.add(new CalcButton("CLR", "varClear"));
         defs.add(new CalcButton("BACK", "menu"));
+        return defs;
+    }
+
+    // Built-in formula catalog for the FORMULAS screen (SCREEN_FORMULAS/
+    // SCREEN_FORMULAS_MORE). Fixed, not seed-reorderable - SeedConfig's
+    // "F=" only picks a SUBSET of these ids to show by default (everything
+    // else lives behind each category's "MORE" button); it never changes
+    // this catalog itself. Each entry's "tpl" is spliced into the
+    // expression exactly as written (CalculatorEngine.appendRaw) and
+    // "back" is how many characters to move the cursor left afterward so
+    // it lands right after the template's first fill-in letter (e.g. "R"
+    // for radius) - a labeled placeholder rather than a blank "()", so it
+    // reads clearly on a small screen. Any additional placeholder letters
+    // in a template (e.g. Pythagorean's B, after its A) are reached with
+    // the cursor arrows like any other mid-expression edit.
+    private const FORMULA_CATALOG = {
+        "circleArea" => { "label" => "Circle Area (πR²)", "cat" => "geom", "tpl" => "π*R^2", "back" => 2 },
+        "circleCircumference" => { "label" => "Circle Circumference (2πR)", "cat" => "geom", "tpl" => "2*π*R", "back" => 0 },
+        "pythagorean" => { "label" => "Pythagorean Theorem", "cat" => "geom", "tpl" => "sqrt(A^2+B^2)", "back" => 7 },
+        "rectangleArea" => { "label" => "Rectangle Area (L×W)", "cat" => "geom", "tpl" => "L*W", "back" => 2 },
+        "triangleArea" => { "label" => "Triangle Area (½B×H)", "cat" => "geom", "tpl" => "0.5*B*H", "back" => 2 },
+        "trapezoidArea" => { "label" => "Trapezoid Area (½(A+B)×H)", "cat" => "geom", "tpl" => "0.5*(A+B)*H", "back" => 5 },
+        "parallelogramArea" => { "label" => "Parallelogram Area (B×H)", "cat" => "geom", "tpl" => "B*H", "back" => 2 },
+        "rectanglePerimeter" => { "label" => "Rectangle Perimeter (2(L+W))", "cat" => "geom", "tpl" => "2*(L+W)", "back" => 3 },
+        "sphereVolume" => { "label" => "Sphere Volume", "cat" => "geom", "tpl" => "(4/3)*π*R^3", "back" => 2 },
+        "sphereSurfaceArea" => { "label" => "Sphere Surface Area (4πR²)", "cat" => "geom", "tpl" => "4*π*R^2", "back" => 2 },
+        "cubeVolume" => { "label" => "Cube Volume (S³)", "cat" => "geom", "tpl" => "S^3", "back" => 2 },
+        "cylinderVolume" => { "label" => "Cylinder Volume", "cat" => "geom", "tpl" => "π*R^2*H", "back" => 4 },
+        "cylinderSurfaceArea" => { "label" => "Cylinder Surface Area", "cat" => "geom", "tpl" => "2*π*R*(R+H)", "back" => 6 },
+        "coneVolume" => { "label" => "Cone Volume", "cat" => "geom", "tpl" => "(1/3)*π*R^2*H", "back" => 4 },
+        "distanceBetweenPoints" => { "label" => "Distance (A,B)-(C,D)", "cat" => "geom", "tpl" => "sqrt((C-A)^2+(D-B)^2)", "back" => 14 },
+        "speedDistTime" => { "label" => "Speed (D÷T)", "cat" => "phys", "tpl" => "D/T", "back" => 2 },
+        "force" => { "label" => "Force (F=M×A)", "cat" => "phys", "tpl" => "M*A", "back" => 2 },
+        "kineticEnergy" => { "label" => "Kinetic Energy (½MV²)", "cat" => "phys", "tpl" => "0.5*M*V^2", "back" => 4 },
+        "unitConv" => { "label" => "Unit Conversion", "cat" => "tools", "tpl" => "", "back" => 0 }
+    } as Dictionary;
+
+    private const FORMULA_CATEGORY_ORDER = ["geom", "phys", "tools", "custom"] as Array<String>;
+    private const FORMULA_CATEGORY_LABELS = {
+        "geom" => "Geometry", "phys" => "Physics", "tools" => "Tools", "custom" => "Custom"
+    } as Dictionary<String, String>;
+
+    // Resolves a formula id to its {label,cat,tpl,back} entry. Built-in ids
+    // come straight from FORMULA_CATALOG; a "customN" id (N = index into
+    // SeedConfig.customFormulas) is resolved from the user's own SEED-
+    // defined formulas, always shown under the "custom" category with the
+    // cursor simply left at the end of the inserted text (there's no way
+    // to know which part of a free-typed template the user most wants to
+    // fill in first). Null if the id doesn't - or no longer, e.g. a stale
+    // "F=" entry after the custom list shrank - resolve to anything;
+    // callers just skip it, the same tolerance as the rest of the SEED
+    // format.
+    private function formulaEntry(id as String) as Dictionary? {
+        if (FORMULA_CATALOG.hasKey(id)) {
+            return FORMULA_CATALOG[id] as Dictionary;
+        }
+        if (id.length() > 6 && id.substring(0, 6).equals("custom")) {
+            var idx = (id.substring(6, id.length()) as String).toNumber();
+            var custom = SeedConfig.get().customFormulas;
+            if (idx != null && idx >= 0 && idx < custom.size()) {
+                var c = custom[idx] as Dictionary<String, String>;
+                return { "label" => c["label"], "cat" => "custom", "tpl" => c["tpl"], "back" => 0 } as Dictionary;
+            }
+        }
+        return null;
+    }
+
+    private function allFormulaIds() as Array<String> {
+        var out = [] as Array<String>;
+        var keys = FORMULA_CATALOG.keys();
+        for (var i = 0; i < keys.size(); i++) {
+            out.add(keys[i] as String);
+        }
+        var custom = SeedConfig.get().customFormulas;
+        for (var i = 0; i < custom.size(); i++) {
+            out.add("custom" + i);
+        }
+        return out;
+    }
+
+    private function formulaContainsStr(arr as Array<String>, s as String) as Boolean {
+        for (var i = 0; i < arr.size(); i++) {
+            if ((arr[i] as String).equals(s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function formulaIdsInCategory(cat as String, wanted as Array<String>) as Array<String> {
+        var out = [] as Array<String>;
+        for (var i = 0; i < wanted.size(); i++) {
+            var entry = formulaEntry(wanted[i]);
+            if (entry != null && (entry["cat"] as String).equals(cat)) {
+                out.add(wanted[i]);
+            }
+        }
+        return out;
+    }
+
+    private function formulasNotIn(wanted as Array<String>) as Array<String> {
+        var all = allFormulaIds();
+        var out = [] as Array<String>;
+        for (var i = 0; i < all.size(); i++) {
+            if (!formulaContainsStr(wanted, all[i])) {
+                out.add(all[i]);
+            }
+        }
+        return out;
+    }
+
+    private function formulaCategoryButtons() as Array<CalcButton> {
+        var subset = SeedConfig.get().formulaSubset;
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < FORMULA_CATEGORY_ORDER.size(); i++) {
+            var cat = FORMULA_CATEGORY_ORDER[i] as String;
+            if (formulaIdsInCategory(cat, subset).size() > 0) {
+                defs.add(new CalcButton(FORMULA_CATEGORY_LABELS[cat] as String, "formulaCat:" + cat));
+            }
+        }
+        if (formulasNotIn(subset).size() > 0) {
+            defs.add(new CalcButton("MORE", "formulasMore"));
+        }
+        defs.add(new CalcButton("BACK", "menu"));
+        return defs;
+    }
+
+    private function formulaMoreCategoryButtons() as Array<CalcButton> {
+        var notSubset = formulasNotIn(SeedConfig.get().formulaSubset);
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < FORMULA_CATEGORY_ORDER.size(); i++) {
+            var cat = FORMULA_CATEGORY_ORDER[i] as String;
+            if (formulaIdsInCategory(cat, notSubset).size() > 0) {
+                defs.add(new CalcButton(FORMULA_CATEGORY_LABELS[cat] as String, "formulaCatMore:" + cat));
+            }
+        }
+        defs.add(new CalcButton("BACK", "formulas"));
         return defs;
     }
 
@@ -745,7 +905,23 @@ class calc_for_garminView extends WatchUi.View {
         return [
             new CalcButton("PCT+", "apct"), new CalcButton("DATE", "date"),
             new CalcButton("VAR", "var"), new CalcButton("GRAPH", "graph"),
-            new CalcButton("BASE", "base"), new CalcButton("BACK", "moreBack"),
+            new CalcButton("BASE", "base"), new CalcButton("COUNT", "counter"),
+            new CalcButton("BACK", "moreBack"),
+        ] as Array<CalcButton>;
+    }
+
+    // Tally counter: +1/-1 tally. "+N" opens a keypad to type an amount
+    // (1-100) which is added once and remembered as counterStep, reused by
+    // long-pressing -1 to subtract a whole step at once (see onHold() in
+    // the delegate). RESET zeros the tally, BACK returns to MORE.
+    private function counterButtons() as Array<CalcButton> {
+        if (counterStage == 0) {
+            return keypadButtons("counterBack", "ADD", "counterMultiAdd");
+        }
+        return [
+            new CalcButton("+1", "counterInc"), new CalcButton("-1", "counterDec"),
+            new CalcButton("+N", "counterMulti"), new CalcButton("RESET", "counterReset"),
+            new CalcButton("BACK", "counterBack"),
         ] as Array<CalcButton>;
     }
 
@@ -852,7 +1028,7 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     private function layoutButtons() as Void {
-        if (screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL) {
+        if (isListScreen()) {
             layoutHistoryList();
             return;
         }
@@ -932,6 +1108,18 @@ class calc_for_garminView extends WatchUi.View {
             defs = colorButtons();
             cols = colorStage < 3 ? 4 : 1;
             rows = colorStage < 3 ? (defs.size() + cols - 1) / cols : 1;
+        } else if (screen == SCREEN_COUNTER) {
+            defs = counterButtons();
+            cols = counterStage == 0 ? 4 : 2;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_FORMULAS) {
+            defs = formulaCategoryButtons();
+            cols = 2;
+            rows = (defs.size() + cols - 1) / cols;
+        } else if (screen == SCREEN_FORMULAS_MORE) {
+            defs = formulaMoreCategoryButtons();
+            cols = 2;
+            rows = (defs.size() + cols - 1) / cols;
         }
 
         // BACK lands in the grid's bottom-right corner on every screen
@@ -1040,12 +1228,21 @@ class calc_for_garminView extends WatchUi.View {
     // height is ever shown at once and the rest scrolls (see scrollOffset).
     private const HISTORY_MIN_ROW_H = 44;
 
-    // Custom layout for SCREEN_HISTORY (past results) and
-    // SCREEN_HISTORY_DETAIL (one entry's step-by-step solution): a fixed
-    // footer row (CLR+BACK, or just BACK) under a scrollable single-column
-    // list, sized so each visible row keeps a comfortable minimum height no
-    // matter how long the list gets. Scrolls via swipe up/down or the
-    // hardware up/down keys (see calc-for-garminDelegate.mc).
+    // Screens laid out by layoutHistoryList() instead of a fixed grid - a
+    // scrollable single-column list, so they share swipe/hardware up-down
+    // scrolling (see calc-for-garminDelegate.mc's onSwipe/onKey).
+    function isListScreen() as Boolean {
+        return screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL ||
+            screen == SCREEN_FORMULA_LIST || screen == SCREEN_FORMULA_MORE_LIST;
+    }
+
+    // Custom layout for SCREEN_HISTORY (past results), SCREEN_HISTORY_DETAIL
+    // (one entry's step-by-step solution), and SCREEN_FORMULA_LIST/
+    // SCREEN_FORMULA_MORE_LIST (the formulas in one category): a fixed
+    // footer row under a scrollable single-column list, sized so each
+    // visible row keeps a comfortable minimum height no matter how long the
+    // list gets. Scrolls via swipe up/down or the hardware up/down keys
+    // (see calc-for-garminDelegate.mc).
     private function layoutHistoryList() as Void {
         var items = [] as Array<CalcButton>;
         var footer = [] as Array<CalcButton>;
@@ -1055,11 +1252,25 @@ class calc_for_garminView extends WatchUi.View {
             }
             footer.add(new CalcButton("CLR", "histClear"));
             footer.add(new CalcButton("BACK", "basic"));
-        } else {
+        } else if (screen == SCREEN_HISTORY_DETAIL) {
             for (var i = 0; i < historySteps.size(); i++) {
                 items.add(new CalcButton(historySteps[i], "histStep:" + i));
             }
             footer.add(new CalcButton("BACK", "history"));
+        } else if (screen == SCREEN_FORMULA_LIST) {
+            var ids = formulaIdsInCategory(formulaCategory, SeedConfig.get().formulaSubset);
+            for (var i = 0; i < ids.size(); i++) {
+                var entry = formulaEntry(ids[i]);
+                items.add(new CalcButton(entry != null ? entry["label"] as String : ids[i], "formula:" + ids[i]));
+            }
+            footer.add(new CalcButton("BACK", "formulaListBack"));
+        } else {
+            var moreIds = formulaIdsInCategory(formulaCategory, formulasNotIn(SeedConfig.get().formulaSubset));
+            for (var i = 0; i < moreIds.size(); i++) {
+                var entry2 = formulaEntry(moreIds[i]);
+                items.add(new CalcButton(entry2 != null ? entry2["label"] as String : moreIds[i], "formula:" + moreIds[i]));
+            }
+            footer.add(new CalcButton("BACK", "formulaMoreListBack"));
         }
 
         var headerH = (safeH * headerFraction()).toNumber();
@@ -1297,6 +1508,18 @@ class calc_for_garminView extends WatchUi.View {
             return;
         } else if (action.equals("var")) {
             switchScreen(SCREEN_VAR);
+            return;
+        } else if (action.equals("formulas")) {
+            switchScreen(SCREEN_FORMULAS);
+            return;
+        } else if (action.equals("formulasMore")) {
+            switchScreen(SCREEN_FORMULAS_MORE);
+            return;
+        } else if (action.equals("formulaListBack")) {
+            switchScreen(SCREEN_FORMULAS);
+            return;
+        } else if (action.equals("formulaMoreListBack")) {
+            switchScreen(SCREEN_FORMULAS_MORE);
             return;
         } else if (action.equals("nav")) {
             switchScreen(SCREEN_NAV);
@@ -1557,6 +1780,50 @@ class calc_for_garminView extends WatchUi.View {
                 switchScreen(SCREEN_MORE);
             }
             return;
+        } else if (action.equals("counter")) {
+            counterStage = 1;
+            switchScreen(SCREEN_COUNTER);
+            return;
+        } else if (action.equals("counterInc")) {
+            counterValue += 1;
+            return;
+        } else if (action.equals("counterDec")) {
+            counterValue -= 1;
+            return;
+        } else if (action.equals("counterDecMulti")) {
+            counterValue -= counterStep;
+            return;
+        } else if (action.equals("counterReset")) {
+            counterValue = 0;
+            return;
+        } else if (action.equals("counterMulti")) {
+            // Nested embedded flow, same as baseRdx: types the bulk amount
+            // on a blank keypad without touching the main expression.
+            enterEmbeddedFlow();
+            counterStage = 0;
+            selectedIndex = 0;
+            layoutButtons();
+            return;
+        } else if (action.equals("counterMultiAdd")) {
+            var nOrNull = readEntry();
+            var n = nOrNull != null ? (Math.round(nOrNull as Double) as Numeric).toNumber() : counterStep;
+            counterStep = clampRange(n, 1, 100);
+            counterValue += counterStep;
+            exitEmbeddedFlow(null);
+            counterStage = 1;
+            selectedIndex = 0;
+            layoutButtons();
+            return;
+        } else if (action.equals("counterBack")) {
+            if (counterStage == 0) {
+                exitEmbeddedFlow(null);
+                counterStage = 1;
+                selectedIndex = 0;
+                layoutButtons();
+            } else {
+                switchScreen(SCREEN_MORE);
+            }
+            return;
         } else if (action.equals("color")) {
             // No enterEmbeddedFlow() here - COLOR only ever opens from the
             // RGB corner button on SCREEN_UNITS, which already stashed the
@@ -1622,6 +1889,28 @@ class calc_for_garminView extends WatchUi.View {
             if (value.equals("cur")) {
                 refreshCurrencyRates();
                 refreshBitcoinRate();
+            }
+        } else if (prefix.equals("formulaCat")) {
+            formulaCategory = value;
+            switchScreen(SCREEN_FORMULA_LIST);
+        } else if (prefix.equals("formulaCatMore")) {
+            formulaCategory = value;
+            switchScreen(SCREEN_FORMULA_MORE_LIST);
+        } else if (prefix.equals("formula")) {
+            var formulaEntryOrNull = formulaEntry(value);
+            if (formulaEntryOrNull == null) {
+                switchScreen(SCREEN_BASIC);
+            } else if (value.equals("unitConv")) {
+                enterEmbeddedFlow();
+                switchScreen(SCREEN_UNITS);
+            } else {
+                var fEntry = formulaEntryOrNull as Dictionary;
+                engine.appendRaw(fEntry["tpl"] as String);
+                var back = fEntry["back"] as Number;
+                for (var bi = 0; bi < back; bi++) {
+                    engine.moveCursorLeft();
+                }
+                switchScreen(SCREEN_BASIC);
             }
         } else if (prefix.equals("unit")) {
             if (handleUnitTap(value)) {
@@ -2117,6 +2406,12 @@ class calc_for_garminView extends WatchUi.View {
         return "R" + baseRadix.toString() + " " + toBaseString(baseValue, baseRadix);
     }
 
+    // Test-only hook, same reasoning as baseCustomString(): the tally is
+    // only ever pixel-compared on a real Dc.
+    function counterValueString() as String {
+        return counterValue.toString();
+    }
+
     private function drawBaseView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
         var lines = [
             "DEC " + baseValue.toString(),
@@ -2144,6 +2439,14 @@ class calc_for_garminView extends WatchUi.View {
     // real Dc, so tests instead assert on this #HEX string directly.
     function colorHex() as String {
         return "#" + hexByte(colorR) + hexByte(colorG) + hexByte(colorB);
+    }
+
+    private function drawCounterView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(x0 + w / 2, y0 + h * 0.4, Graphics.FONT_LARGE, groupThousands(counterValue.toString()),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(x0 + w / 2, y0 + h * 0.8, Graphics.FONT_XTINY, "STEP " + counterStep.toString(),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function drawColorSwatch(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
@@ -2178,6 +2481,8 @@ class calc_for_garminView extends WatchUi.View {
             drawBaseView(dc, safeX, safeY, safeW, headerHBg);
         } else if (screen == SCREEN_COLOR && colorStage == 3) {
             drawColorSwatch(dc, safeX, safeY, safeW, headerHBg);
+        } else if (screen == SCREEN_COUNTER && counterStage == 1) {
+            drawCounterView(dc, safeX, safeY, safeW, headerHBg);
         } else {
             dc.setColor(Graphics.COLOR_WHITE, BG_TOP);
             var text = engine.displayText();
@@ -2237,6 +2542,8 @@ class calc_for_garminView extends WatchUi.View {
                 text = (colorStage == 0 ? "R (0-255)? " : colorStage == 1 ? "G (0-255)? " : "B (0-255)? ") + text;
             } else if (screen == SCREEN_BASE) {
                 text = "RADIX (2-36)? " + text;
+            } else if (screen == SCREEN_COUNTER) {
+                text = "ADD (1-100)? " + text;
             }
             // Regular text fonts, not FONT_NUMBER_*: the expression can
             // contain letters and symbols (X, =, sin, etc.), and the
@@ -2259,7 +2566,8 @@ class calc_for_garminView extends WatchUi.View {
         // cell and bleeds into neighboring buttons.
         var isSmallCellScreen = screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER ||
             screen == SCREEN_CUR_RESULTS || screen == SCREEN_VAR || screen == SCREEN_ADVANCED || screen == SCREEN_SCIENTIFIC ||
-            screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL;
+            screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL ||
+            screen == SCREEN_FORMULA_LIST || screen == SCREEN_FORMULA_MORE_LIST;
         var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (isSmallCellScreen ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];

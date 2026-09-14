@@ -25,13 +25,20 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     }
 
     // Some devices report a quick press as a hold rather than a tap; handle
-    // both the same way so a tap always registers. (A long-press gesture
-    // isn't used for anything here: physical buttons have no equivalent -
-    // onKey fires once per press with no hold/duration info - so inserting
-    // "=" is a plain button (EQ, on the scientific screen)
-    // instead, which works identically for touch and physical navigation.)
+    // both the same way by default so a tap always registers. The one
+    // exception is the counter's "-1" button: long-pressing it subtracts a
+    // whole bulk step instead of 1 (touch-only, like onSwipe below -
+    // physical buttons have no hold/duration info via onKey, so there's no
+    // equivalent gesture to wire up for them).
     function onHold(clickEvent as WatchUi.ClickEvent) as Boolean {
         var coords = clickEvent.getCoordinates();
+        var idx = view.buttonAt(coords[0], coords[1]);
+        if (idx != null && view.getButtons()[idx as Number].action.equals("counterDec")) {
+            view.selectedIndex = idx as Number;
+            view.activate(new CalcButton("-1", "counterDecMulti"));
+            WatchUi.requestUpdate();
+            return true;
+        }
         return handleTapAt(coords[0], coords[1]);
     }
 
@@ -41,7 +48,7 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     // simply never fires there.
     function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
         var dir = swipeEvent.getDirection();
-        var onListScreen = view.screen == view.SCREEN_HISTORY || view.screen == view.SCREEN_HISTORY_DETAIL;
+        var onListScreen = view.isListScreen();
         if (onListScreen && dir == WatchUi.SWIPE_UP) {
             view.scrollList(1);
         } else if (onListScreen && dir == WatchUi.SWIPE_DOWN) {
@@ -64,7 +71,7 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
         if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
             return pressSelected();
         } else if (key == WatchUi.KEY_DOWN) {
-            if (view.screen == view.SCREEN_HISTORY || view.screen == view.SCREEN_HISTORY_DETAIL) {
+            if (view.isListScreen()) {
                 view.scrollList(1);
             } else {
                 view.moveSelection(1);
@@ -72,7 +79,7 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
             WatchUi.requestUpdate();
             return true;
         } else if (key == WatchUi.KEY_UP) {
-            if (view.screen == view.SCREEN_HISTORY || view.screen == view.SCREEN_HISTORY_DETAIL) {
+            if (view.isListScreen()) {
                 view.scrollList(-1);
             } else {
                 view.moveSelection(-1);
@@ -104,6 +111,14 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
             view.switchScreen(view.SCREEN_MENU);
         } else if (view.screen == view.SCREEN_VAR) {
             view.switchScreen(view.SCREEN_MENU);
+        } else if (view.screen == view.SCREEN_FORMULA_LIST) {
+            view.switchScreen(view.SCREEN_FORMULAS);
+        } else if (view.screen == view.SCREEN_FORMULAS) {
+            view.switchScreen(view.SCREEN_MENU);
+        } else if (view.screen == view.SCREEN_FORMULA_MORE_LIST) {
+            view.switchScreen(view.SCREEN_FORMULAS_MORE);
+        } else if (view.screen == view.SCREEN_FORMULAS_MORE) {
+            view.switchScreen(view.SCREEN_FORMULAS);
         } else if (view.screen == view.SCREEN_NAV) {
             // Falls into the generic screen-1 fallback below otherwise,
             // landing on SCREEN_MORE (14) - but NAV is only ever entered
@@ -119,6 +134,10 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
             view.activate(new CalcButton("BACK", "baseBack"));
         } else if (view.screen == view.SCREEN_GRAPH) {
             view.switchScreen(view.SCREEN_MORE);
+        } else if (view.screen == view.SCREEN_COUNTER) {
+            // COUNTER's own BACK is stage-aware (cancels out of "+N" entry
+            // first, then exits to MORE) - reuse that instead of duplicating it.
+            view.activate(new CalcButton("BACK", "counterBack"));
         } else if (view.screen == view.SCREEN_COLOR) {
             view.switchScreen(view.SCREEN_UNITS);
         } else if (view.screen == view.SCREEN_SCIENTIFIC) {
