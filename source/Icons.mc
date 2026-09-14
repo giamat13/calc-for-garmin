@@ -5,46 +5,40 @@ import Toybox.Lang;
 // Only buttons without a conventional written form get an icon here -
 // digits, operators, math notation and unit/currency codes stay text.
 function iconFor(action as String, label as String) as ResourceId? {
-    if (label.equals("BACK")) {
-        return Rez.Drawables.ic_back;
+    var idx = label.equals("BACK") ? ["1"] as Array<String>? :
+        specLookup(",back~0,adv~2,units~3,formulaCat:tools~3,formulaCatMore:tools~3,random~4,randGen~4,tip~5,cat:dist~6,cat:weight~7,cat:temp~8,cat:speed~9,cat:pace~10,cat:vol~11,cat:area~12,cat:time~13,cat:pres~14,cat:energy~15,cat:cur~16,curOther~17,randAgain~18,randNewRange~19,tipNew~19,randNext~20,tipNext~20,tipGo~21,curLeft~22,curRight~23,const:π~24,formulas~25,formulaCat:geom~26,formulaCatMore:geom~26,formulaCat:phys~27,formulaCatMore:phys~27,formulaCat:custom~28,formulaCatMore:custom~28,", action);
+    if (idx == null) {
+        return null;
     }
-    var ids = {
-        "back" => Rez.Drawables.ic_del,
-        "adv" => Rez.Drawables.ic_adv,
-        "units" => Rez.Drawables.ic_units,
-        "formulaCat:tools" => Rez.Drawables.ic_units,
-        "formulaCatMore:tools" => Rez.Drawables.ic_units,
-        "random" => Rez.Drawables.ic_dice,
-        "randGen" => Rez.Drawables.ic_dice,
-        "tip" => Rez.Drawables.ic_tip,
-        "cat:dist" => Rez.Drawables.ic_cat_dist,
-        "cat:weight" => Rez.Drawables.ic_cat_weight,
-        "cat:temp" => Rez.Drawables.ic_cat_temp,
-        "cat:speed" => Rez.Drawables.ic_cat_speed,
-        "cat:pace" => Rez.Drawables.ic_cat_pace,
-        "cat:vol" => Rez.Drawables.ic_cat_vol,
-        "cat:area" => Rez.Drawables.ic_cat_area,
-        "cat:time" => Rez.Drawables.ic_cat_time,
-        "cat:pres" => Rez.Drawables.ic_cat_pres,
-        "cat:energy" => Rez.Drawables.ic_cat_energy,
-        "cat:cur" => Rez.Drawables.ic_cat_cur,
-        "curOther" => Rez.Drawables.ic_other,
-        "randAgain" => Rez.Drawables.ic_again,
-        "randNewRange" => Rez.Drawables.ic_plus,
-        "tipNew" => Rez.Drawables.ic_plus,
-        "randNext" => Rez.Drawables.ic_next,
-        "tipNext" => Rez.Drawables.ic_next,
-        "tipGo" => Rez.Drawables.ic_go,
-        "curLeft" => Rez.Drawables.ic_larr,
-        "curRight" => Rez.Drawables.ic_rarr,
-        "const:π" => Rez.Drawables.ic_pi,
-        "formulas" => Rez.Drawables.ic_formula,
-        "formulaCat:geom" => Rez.Drawables.ic_cat_geom,
-        "formulaCatMore:geom" => Rez.Drawables.ic_cat_geom,
-        "formulaCat:phys" => Rez.Drawables.ic_cat_phys,
-        "formulaCatMore:phys" => Rez.Drawables.ic_cat_phys,
-        "formulaCat:custom" => Rez.Drawables.ic_cat_custom,
-        "formulaCatMore:custom" => Rez.Drawables.ic_cat_custom,
-    };
-    return ids[action];
+    return [
+        Rez.Drawables.ic_del,
+        Rez.Drawables.ic_back,
+        Rez.Drawables.ic_adv,
+        Rez.Drawables.ic_units,
+        Rez.Drawables.ic_dice,
+        Rez.Drawables.ic_tip,
+        Rez.Drawables.ic_cat_dist,
+        Rez.Drawables.ic_cat_weight,
+        Rez.Drawables.ic_cat_temp,
+        Rez.Drawables.ic_cat_speed,
+        Rez.Drawables.ic_cat_pace,
+        Rez.Drawables.ic_cat_vol,
+        Rez.Drawables.ic_cat_area,
+        Rez.Drawables.ic_cat_time,
+        Rez.Drawables.ic_cat_pres,
+        Rez.Drawables.ic_cat_energy,
+        Rez.Drawables.ic_cat_cur,
+        Rez.Drawables.ic_other,
+        Rez.Drawables.ic_again,
+        Rez.Drawables.ic_plus,
+        Rez.Drawables.ic_next,
+        Rez.Drawables.ic_go,
+        Rez.Drawables.ic_larr,
+        Rez.Drawables.ic_rarr,
+        Rez.Drawables.ic_pi,
+        Rez.Drawables.ic_formula,
+        Rez.Drawables.ic_cat_geom,
+        Rez.Drawables.ic_cat_phys,
+        Rez.Drawables.ic_cat_custom
+    ][idx[0].toNumber() as Number] as ResourceId;
 }

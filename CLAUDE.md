@@ -28,3 +28,12 @@ It's fine to reshape the format itself (resize/reorder the pool, bump the versio
 - The watch's `SeedConfig.mc` parser still recognizes and correctly applies seeds in every previous format/version.
 
 In practice this usually means keeping the old parser path alongside the new one, branching on the version prefix (or the pool size/shape) rather than deleting old handling. What's not okay is a change that makes an old seed parse into something silently wrong or fall back to defaults - if you can't keep both sides truly reading it correctly, flag it to the user before doing anything that would break existing seeds.
+
+## "PRG generated exceeds the memory limit" build errors
+
+When an export/build fails with `ERROR: PRG generated exceeds the memory limit of app type 'widget' for device id '...'`, don't start removing devices or cutting code right away. First report to the user:
+- **Which watches failed** - every one, not just the first. The compiler stops at the first failure, so build each manifest device on its own (a temporary single-product manifest, restored afterwards) to get the full list.
+- **How many** failed, out of how many devices in the manifest.
+- **An estimate of how much the app must shrink to fix it**: bytes used vs. the limit (e.g. 74413 / 65536 → at least ~8.9KB, ~12%, plus some margin), and a rough guess at how much is realistically compressible and where. To find the big spenders, do a release build for an old-opcode device that still builds (e.g. `descentmk2`) and sum bytes per function/line from the `*.prg.debug.xml` `pcToLineNum` entries.
+
+Background: older watches without Garmin's v2 opcodes (fenix6, fr245, instinct2, venusq, enduro, ...) cap widgets at 65536 bytes, and the same code compiles ~36% bigger there. The preferred fix is to compress without changing any feature (string tables via `specLookup()`/`splitStr()` in `SeedConfig.mc` instead of long `if/equals` chains or array/dictionary literals, no duplicated code, test-only helpers marked `(:debug)`), then rebuild only the devices that failed, and only drop support for devices that still don't fit.

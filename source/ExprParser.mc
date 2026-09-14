@@ -6,16 +6,16 @@ import Toybox.Math;
 // pi (as the literal "π") and e.
 class ExprParser {
 
-    private var s as String;
-    private var len as Number;
-    private var pos as Number = 0;
-    private var xValue as Double;
+    hidden var s as String;
+    hidden var len as Number;
+    hidden var pos as Number = 0;
+    hidden var xValue as Double;
     // Named variables (A, B, C, D - see CalculatorEngine.variables), usable
     // directly in a formula like a constant, e.g. "A+B*2".
-    private var variables as Dictionary<String, Double>;
+    hidden var variables as Dictionary<String, Double>;
     var error as Boolean = false;
 
-    private const E = 2.718281828459045d;
+    hidden const E = 2.718281828459045d;
 
     function initialize(str as String, xVal as Double, vars as Dictionary<String, Double>) {
         s = str;
@@ -35,25 +35,16 @@ class ExprParser {
         return v;
     }
 
-    private function peek() as String {
+    hidden function peek() as String {
         if (pos >= len) {
             return "";
         }
         return s.substring(pos, pos + 1) as String;
     }
 
-    private function isAlphaCh(c as String) as Boolean {
-        if (c.length() != 1) {
-            return false;
-        }
-        var lower = c.toLower() as String;
-        return lower.equals("a") || lower.equals("b") || lower.equals("c") || lower.equals("d") ||
-               lower.equals("e") || lower.equals("f") || lower.equals("g") || lower.equals("h") ||
-               lower.equals("i") || lower.equals("j") || lower.equals("k") || lower.equals("l") ||
-               lower.equals("m") || lower.equals("n") || lower.equals("o") || lower.equals("p") ||
-               lower.equals("q") || lower.equals("r") || lower.equals("s") || lower.equals("t") ||
-               lower.equals("u") || lower.equals("v") || lower.equals("w") || lower.equals("x") ||
-               lower.equals("y") || lower.equals("z");
+    // ASCII letters only (so "π" is not an identifier char).
+    hidden function isAlphaCh(c as String) as Boolean {
+        return c.length() == 1 && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".find(c) != null;
     }
 
     private function parseExpr() as Double {
@@ -103,7 +94,7 @@ class ExprParser {
 
     // True if the keyword's letters sit at pos and aren't part of a longer
     // identifier (so "mod" matches but "mode" would not, if that ever came up).
-    private function matchKeyword(kw as String) as Boolean {
+    hidden function matchKeyword(kw as String) as Boolean {
         var kwLen = kw.length();
         if (pos + kwLen > len) {
             return false;
@@ -117,7 +108,7 @@ class ExprParser {
         return true;
     }
 
-    private function startsPrimary(c as String) as Boolean {
+    hidden function startsPrimary(c as String) as Boolean {
         if (c.equals("")) {
             return false;
         }
@@ -212,9 +203,8 @@ class ExprParser {
         return 0.0d;
     }
 
-    private function isDigitLiteral(c as String) as Boolean {
-        return c.equals("0") || c.equals("1") || c.equals("2") || c.equals("3") || c.equals("4") ||
-               c.equals("5") || c.equals("6") || c.equals("7") || c.equals("8") || c.equals("9");
+    hidden function isDigitLiteral(c as String) as Boolean {
+        return c.length() == 1 && "0123456789".find(c) != null;
     }
 
     private function readNumber() as Double {
@@ -239,7 +229,7 @@ class ExprParser {
         return v;
     }
 
-    private function readIdent() as String {
+    hidden function readIdent() as String {
         var start = pos;
         while (isAlphaCh(peek())) {
             pos += 1;
@@ -247,7 +237,7 @@ class ExprParser {
         return s.substring(start, pos) as String;
     }
 
-    private function applyFunc(name as String, arg as Double) as Double {
+    hidden function applyFunc(name as String, arg as Double) as Double {
         if (name.equals("sin")) {
             return Math.sin(arg * Math.PI / 180.0d) as Double;
         } else if (name.equals("cos")) {
@@ -303,7 +293,7 @@ class ExprParser {
 
     // n! for a non-negative integer n. Rejects negatives, non-integers, and
     // anything past 170 (170! is the last one that fits in a double).
-    private function factorial(arg as Double) as Double {
+    hidden function factorial(arg as Double) as Double {
         var rounded = Math.round(arg) as Double;
         var diff = arg - rounded;
         if (diff < 0.0d) {

@@ -344,69 +344,37 @@ class calc_for_garminView extends WatchUi.View {
     // is self-contained (a plain screen switch, or an engine op that
     // doesn't care what screen triggered it), so nothing breaks no matter
     // which screen a given token is drawn on.
+    // ",token~label~action," rows (see specLookup() in SeedConfig.mc) - a
+    // table instead of an if/else chain to stay under older watches' 64KB
+    // widget memory limit. Tokens not listed ("0".."9") are digits.
+    private const TOKEN_SPEC = ",blank~~,c~C~clear,del~DEL~back,pct~%~op:%,div~/~op:/,mul~*~op:*,sub~-~op:-,add~+~op:+," +
+        "dot~.~digit:.,eq~=~equals,menu~MENU~menu,sin~sin~func:sin,cos~cos~func:cos,tan~tan~func:tan," +
+        "sqrt~sqrt~func:sqrt,log~log~func:log,ln~ln~func:ln,sqr~x2~sqr,x~x~const:X,open~(~open,close~)~close," +
+        "pow~^~op:^,pi~pi~const:π,e~e~const:e,adv~ADV~adv,uc~UC~units,rnd~RND~random,tip~TIP~tip,eqIns~=~eq," +
+        "ans~Ans~ans,curl~<~curLeft,curr~>~curRight,backMenu~BACK~menu,asin~asin~func:asin,acos~acos~func:acos," +
+        "atan~atan~func:atan,fact~x!~fact,inv~1/x~inv,cbrt~cbrt~func:cbrt,absv~|x|~func:abs,mod~mod~op:mod," +
+        "ee~EE~ee,cube~x3~cube,floor~floor~func:floor,ceil~ceil~func:ceil,pow10~10x~pow10,frac~a/b~frac," +
+        "var~VAR~var,backSci~BACK~sci,clr~CLR~varClear,dist~DIST~cat:dist,wt~WT~cat:weight,temp~TEMP~cat:temp," +
+        "spd~SPD~cat:speed,pace~PACE~cat:pace,vol~VOL~cat:vol,area~AREA~cat:area,time~TIME~cat:time," +
+        "pres~PRES~cat:pres,enrg~ENRG~cat:energy,cur~CUR~cat:cur,";
+
     private function tokenToButton(token as String) as CalcButton {
-        if (token.equals("blank")) { return new CalcButton("", ""); }
-        else if (token.equals("c")) { return new CalcButton("C", "clear"); }
-        else if (token.equals("del")) { return new CalcButton("DEL", "back"); }
-        else if (token.equals("pct")) { return new CalcButton("%", "op:%"); }
-        else if (token.equals("div")) { return new CalcButton("/", "op:/"); }
-        else if (token.equals("mul")) { return new CalcButton("*", "op:*"); }
-        else if (token.equals("sub")) { return new CalcButton("-", "op:-"); }
-        else if (token.equals("add")) { return new CalcButton("+", "op:+"); }
-        else if (token.equals("dot")) { return new CalcButton(".", "digit:."); }
-        else if (token.equals("eq")) { return new CalcButton("=", "equals"); }
-        else if (token.equals("menu")) { return new CalcButton("MENU", "menu"); }
-        else if (token.equals("sin")) { return new CalcButton("sin", "func:sin"); }
-        else if (token.equals("cos")) { return new CalcButton("cos", "func:cos"); }
-        else if (token.equals("tan")) { return new CalcButton("tan", "func:tan"); }
-        else if (token.equals("sqrt")) { return new CalcButton("sqrt", "func:sqrt"); }
-        else if (token.equals("log")) { return new CalcButton("log", "func:log"); }
-        else if (token.equals("ln")) { return new CalcButton("ln", "func:ln"); }
-        else if (token.equals("sqr")) { return new CalcButton("x2", "sqr"); }
-        else if (token.equals("x")) { return new CalcButton("x", "const:X"); }
-        else if (token.equals("open")) { return new CalcButton("(", "open"); }
-        else if (token.equals("close")) { return new CalcButton(")", "close"); }
-        else if (token.equals("pow")) { return new CalcButton("^", "op:^"); }
-        else if (token.equals("pi")) { return new CalcButton("pi", "const:π"); }
-        else if (token.equals("e")) { return new CalcButton("e", "const:e"); }
-        else if (token.equals("adv")) { return new CalcButton("ADV", "adv"); }
-        else if (token.equals("uc")) { return new CalcButton("UC", "units"); }
-        else if (token.equals("rnd")) { return new CalcButton("RND", "random"); }
-        else if (token.equals("tip")) { return new CalcButton("TIP", "tip"); }
-        else if (token.equals("eqIns")) { return new CalcButton("=", "eq"); }
-        else if (token.equals("ans")) { return new CalcButton("Ans", "ans"); }
-        else if (token.equals("curl")) { return new CalcButton("<", "curLeft"); }
-        else if (token.equals("curr")) { return new CalcButton(">", "curRight"); }
-        else if (token.equals("backMenu")) { return new CalcButton("BACK", "menu"); }
-        else if (token.equals("asin")) { return new CalcButton("asin", "func:asin"); }
-        else if (token.equals("acos")) { return new CalcButton("acos", "func:acos"); }
-        else if (token.equals("atan")) { return new CalcButton("atan", "func:atan"); }
-        else if (token.equals("fact")) { return new CalcButton("x!", "fact"); }
-        else if (token.equals("inv")) { return new CalcButton("1/x", "inv"); }
-        else if (token.equals("cbrt")) { return new CalcButton("cbrt", "func:cbrt"); }
-        else if (token.equals("absv")) { return new CalcButton("|x|", "func:abs"); }
-        else if (token.equals("mod")) { return new CalcButton("mod", "op:mod"); }
-        else if (token.equals("ee")) { return new CalcButton("EE", "ee"); }
-        else if (token.equals("cube")) { return new CalcButton("x3", "cube"); }
-        else if (token.equals("floor")) { return new CalcButton("floor", "func:floor"); }
-        else if (token.equals("ceil")) { return new CalcButton("ceil", "func:ceil"); }
-        else if (token.equals("pow10")) { return new CalcButton("10x", "pow10"); }
-        else if (token.equals("frac")) { return new CalcButton("a/b", "frac"); }
-        else if (token.equals("var")) { return new CalcButton("VAR", "var"); }
-        else if (token.equals("backSci")) { return new CalcButton("BACK", "sci"); }
-        else if (token.equals("clr")) { return new CalcButton("CLR", "varClear"); }
-        else if (token.equals("dist")) { return new CalcButton("DIST", "cat:dist"); }
-        else if (token.equals("wt")) { return new CalcButton("WT", "cat:weight"); }
-        else if (token.equals("temp")) { return new CalcButton("TEMP", "cat:temp"); }
-        else if (token.equals("spd")) { return new CalcButton("SPD", "cat:speed"); }
-        else if (token.equals("pace")) { return new CalcButton("PACE", "cat:pace"); }
-        else if (token.equals("vol")) { return new CalcButton("VOL", "cat:vol"); }
-        else if (token.equals("area")) { return new CalcButton("AREA", "cat:area"); }
-        else if (token.equals("time")) { return new CalcButton("TIME", "cat:time"); }
-        else if (token.equals("pres")) { return new CalcButton("PRES", "cat:pres"); }
-        else if (token.equals("enrg")) { return new CalcButton("ENRG", "cat:energy"); }
-        else if (token.equals("cur")) { return new CalcButton("CUR", "cat:cur"); }
-        return new CalcButton(token, "digit:" + token);
+        var f = specLookup(TOKEN_SPEC, token);
+        if (f == null) {
+            return new CalcButton(token, "digit:" + token);
+        }
+        return new CalcButton(f[0], f[1]);
+    }
+
+    // "label~action,label~action" -> buttons, for fixed button sets.
+    private function btns(spec as String) as Array<CalcButton> {
+        var parts = splitStr(spec, ",");
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < parts.size(); i++) {
+            var f = splitStr(parts[i], "~");
+            defs.add(new CalcButton(f[0], f[1]));
+        }
+        return defs;
     }
 
     private function buttonsFromTokens(tokens as Array<String>) as Array<CalcButton> {
@@ -437,23 +405,9 @@ class calc_for_garminView extends WatchUi.View {
         var items = SeedConfig.get().menuItems;
         var defs = [] as Array<CalcButton>;
         for (var i = 0; i < items.size(); i++) {
-            var item = items[i];
-            if (item.equals("sci")) {
-                defs.add(new CalcButton("fx", "sci"));
-            } else if (item.equals("units")) {
-                defs.add(new CalcButton("Units", "units"));
-            } else if (item.equals("tip")) {
-                defs.add(new CalcButton("Tip", "tip"));
-            } else if (item.equals("rnd")) {
-                defs.add(new CalcButton("RND", "random"));
-            } else if (item.equals("var")) {
-                defs.add(new CalcButton("VAR", "var"));
-            } else if (item.equals("apct")) {
-                defs.add(new CalcButton("PCT+", "apct"));
-            } else if (item.equals("date")) {
-                defs.add(new CalcButton("DATE", "date"));
-            } else if (item.equals("nav")) {
-                defs.add(new CalcButton("NAV", "nav"));
+            var f = specLookup(",sci~fx~sci,units~Units~units,tip~Tip~tip,rnd~RND~random,var~VAR~var,apct~PCT+~apct,date~DATE~date,nav~NAV~nav,", items[i]);
+            if (f != null) {
+                defs.add(new CalcButton(f[0], f[1]));
             }
         }
         // Fixed - not part of SeedConfig.menuItems/VALID_MENU_ITEMS, so a
@@ -470,9 +424,7 @@ class calc_for_garminView extends WatchUi.View {
     // and the MENU item order are customized into a SEED code, pasted
     // back into this app's Connect IQ settings. 2 cols x 1 row.
     private function personalizeButtons() as Array<CalcButton> {
-        return [
-            new CalcButton("OPEN", "setupOpen"), new CalcButton("BACK", "menu"),
-        ] as Array<CalcButton>;
+        return btns("OPEN~setupOpen,BACK~menu");
     }
 
     // Scientific screen: functions, parentheses, general powers, cursor
@@ -500,19 +452,15 @@ class calc_for_garminView extends WatchUi.View {
     // CalculatorEngine.appendConstant() inserts an explicit "*" whenever a
     // letter would otherwise land directly against another letter, so two
     // variables typed back-to-back never concatenate into a function name.
-    private const VAR_LETTERS = [
-        "A", "B", "C", "D", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
-        "T", "U", "V", "W", "X", "Y", "Z"
-    ] as Array<String>;
+    private const VAR_LETTERS = "ABCDFGHIJKLMNOPQRSTUVWXYZ";
 
     private function varButtons() as Array<CalcButton> {
         var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < VAR_LETTERS.size(); i++) {
-            defs.add(new CalcButton(VAR_LETTERS[i], "const:" + VAR_LETTERS[i]));
+        for (var i = 0; i < VAR_LETTERS.length(); i++) {
+            var letter = VAR_LETTERS.substring(i, i + 1) as String;
+            defs.add(new CalcButton(letter, "const:" + letter));
         }
-        defs.add(new CalcButton("=", "eq"));
-        defs.add(new CalcButton("CLR", "varClear"));
-        defs.add(new CalcButton("BACK", "menu"));
+        defs.addAll(btns("=~eq,CLR~varClear,BACK~menu"));
         return defs;
     }
 
@@ -528,27 +476,28 @@ class calc_for_garminView extends WatchUi.View {
     // reads clearly on a small screen. Any additional placeholder letters
     // in a template (e.g. Pythagorean's B, after its A) are reached with
     // the cursor arrows like any other mid-expression edit.
-    private const FORMULA_CATALOG = {
-        "circleArea" => { "label" => "Circle Area (πR²)", "cat" => "geom", "tpl" => "π*R^2", "back" => 2 },
-        "circleCircumference" => { "label" => "Circle Circumference (2πR)", "cat" => "geom", "tpl" => "2*π*R", "back" => 0 },
-        "pythagorean" => { "label" => "Pythagorean Theorem", "cat" => "geom", "tpl" => "sqrt(A^2+B^2)", "back" => 7 },
-        "rectangleArea" => { "label" => "Rectangle Area (L×W)", "cat" => "geom", "tpl" => "L*W", "back" => 2 },
-        "triangleArea" => { "label" => "Triangle Area (½B×H)", "cat" => "geom", "tpl" => "0.5*B*H", "back" => 2 },
-        "trapezoidArea" => { "label" => "Trapezoid Area (½(A+B)×H)", "cat" => "geom", "tpl" => "0.5*(A+B)*H", "back" => 5 },
-        "parallelogramArea" => { "label" => "Parallelogram Area (B×H)", "cat" => "geom", "tpl" => "B*H", "back" => 2 },
-        "rectanglePerimeter" => { "label" => "Rectangle Perimeter (2(L+W))", "cat" => "geom", "tpl" => "2*(L+W)", "back" => 3 },
-        "sphereVolume" => { "label" => "Sphere Volume", "cat" => "geom", "tpl" => "(4/3)*π*R^3", "back" => 2 },
-        "sphereSurfaceArea" => { "label" => "Sphere Surface Area (4πR²)", "cat" => "geom", "tpl" => "4*π*R^2", "back" => 2 },
-        "cubeVolume" => { "label" => "Cube Volume (S³)", "cat" => "geom", "tpl" => "S^3", "back" => 2 },
-        "cylinderVolume" => { "label" => "Cylinder Volume", "cat" => "geom", "tpl" => "π*R^2*H", "back" => 4 },
-        "cylinderSurfaceArea" => { "label" => "Cylinder Surface Area", "cat" => "geom", "tpl" => "2*π*R*(R+H)", "back" => 6 },
-        "coneVolume" => { "label" => "Cone Volume", "cat" => "geom", "tpl" => "(1/3)*π*R^2*H", "back" => 4 },
-        "distanceBetweenPoints" => { "label" => "Distance (A,B)-(C,D)", "cat" => "geom", "tpl" => "sqrt((C-A)^2+(D-B)^2)", "back" => 14 },
-        "speedDistTime" => { "label" => "Speed (D÷T)", "cat" => "phys", "tpl" => "D/T", "back" => 2 },
-        "force" => { "label" => "Force (F=M×A)", "cat" => "phys", "tpl" => "M*A", "back" => 2 },
-        "kineticEnergy" => { "label" => "Kinetic Energy (½MV²)", "cat" => "phys", "tpl" => "0.5*M*V^2", "back" => 4 },
-        "unitConv" => { "label" => "Unit Conversion", "cat" => "tools", "tpl" => "", "back" => 0 }
-    } as Dictionary;
+    // "|id~label~cat~tpl~back|" rows (see specLookup() in SeedConfig.mc;
+    // "|"-separated because labels contain commas).
+    private const FORMULA_CATALOG = "|" +
+        "circleArea~Circle Area (πR²)~geom~π*R^2~2|" +
+        "circleCircumference~Circle Circumference (2πR)~geom~2*π*R~0|" +
+        "pythagorean~Pythagorean Theorem~geom~sqrt(A^2+B^2)~7|" +
+        "rectangleArea~Rectangle Area (L×W)~geom~L*W~2|" +
+        "triangleArea~Triangle Area (½B×H)~geom~0.5*B*H~2|" +
+        "trapezoidArea~Trapezoid Area (½(A+B)×H)~geom~0.5*(A+B)*H~5|" +
+        "parallelogramArea~Parallelogram Area (B×H)~geom~B*H~2|" +
+        "rectanglePerimeter~Rectangle Perimeter (2(L+W))~geom~2*(L+W)~3|" +
+        "sphereVolume~Sphere Volume~geom~(4/3)*π*R^3~2|" +
+        "sphereSurfaceArea~Sphere Surface Area (4πR²)~geom~4*π*R^2~2|" +
+        "cubeVolume~Cube Volume (S³)~geom~S^3~2|" +
+        "cylinderVolume~Cylinder Volume~geom~π*R^2*H~4|" +
+        "cylinderSurfaceArea~Cylinder Surface Area~geom~2*π*R*(R+H)~6|" +
+        "coneVolume~Cone Volume~geom~(1/3)*π*R^2*H~4|" +
+        "distanceBetweenPoints~Distance (A,B)-(C,D)~geom~sqrt((C-A)^2+(D-B)^2)~14|" +
+        "speedDistTime~Speed (D÷T)~phys~D/T~2|" +
+        "force~Force (F=M×A)~phys~M*A~2|" +
+        "kineticEnergy~Kinetic Energy (½MV²)~phys~0.5*M*V^2~4|" +
+        "unitConv~Unit Conversion~tools~~0|";
 
     private const FORMULA_CATEGORY_ORDER = ["geom", "phys", "tools", "custom"] as Array<String>;
     private const FORMULA_CATEGORY_LABELS = {
@@ -566,8 +515,9 @@ class calc_for_garminView extends WatchUi.View {
     // callers just skip it, the same tolerance as the rest of the SEED
     // format.
     private function formulaEntry(id as String) as Dictionary? {
-        if (FORMULA_CATALOG.hasKey(id)) {
-            return FORMULA_CATALOG[id] as Dictionary;
+        var f = specLookup(FORMULA_CATALOG, id);
+        if (f != null) {
+            return { "label" => f[0], "cat" => f[1], "tpl" => f[2], "back" => f[3].toNumber() } as Dictionary;
         }
         if (id.length() > 6 && id.substring(0, 6).equals("custom")) {
             var idx = (id.substring(6, id.length()) as String).toNumber();
@@ -582,9 +532,9 @@ class calc_for_garminView extends WatchUi.View {
 
     private function allFormulaIds() as Array<String> {
         var out = [] as Array<String>;
-        var keys = FORMULA_CATALOG.keys();
-        for (var i = 0; i < keys.size(); i++) {
-            out.add(keys[i] as String);
+        var rows = splitStr(FORMULA_CATALOG.substring(1, FORMULA_CATALOG.length() - 1) as String, "|");
+        for (var i = 0; i < rows.size(); i++) {
+            out.add(rows[i].substring(0, rows[i].find("~") as Number) as String);
         }
         var custom = SeedConfig.get().customFormulas;
         for (var i = 0; i < custom.size(); i++) {
@@ -660,30 +610,13 @@ class calc_for_garminView extends WatchUi.View {
 
     // The unit keys that belong to each measurement category, in display order.
     private function unitKeysFor(category as String) as Array<String> {
-        if (category.equals("dist")) {
-            return ["km", "mi", "m", "ft", "cm", "in", "yd", "NM"] as Array<String>;
-        } else if (category.equals("weight")) {
-            return ["kg", "g", "lb", "oz", "st"] as Array<String>;
-        } else if (category.equals("temp")) {
-            return ["c", "f", "K"] as Array<String>;
-        } else if (category.equals("speed")) {
-            return ["kph", "mph", "m/s", "kn"] as Array<String>;
-        } else if (category.equals("pace")) {
-            return ["/km", "/mi", "kph", "mph"] as Array<String>;
-        } else if (category.equals("vol")) {
-            return ["l", "mL", "gal", "cup", "floz"] as Array<String>;
-        } else if (category.equals("area")) {
-            return ["m2", "km2", "ha", "acre", "ft2", "mi2"] as Array<String>;
-        } else if (category.equals("time")) {
-            return ["sec", "min", "hr", "day", "wk"] as Array<String>;
-        } else if (category.equals("pres")) {
-            return ["bar", "kPa", "hPa", "psi", "atm", "mmHg"] as Array<String>;
-        } else if (category.equals("energy")) {
-            return ["kcal", "kJ", "kWh"] as Array<String>;
-        } else if (category.equals("cur")) {
+        if (category.equals("cur")) {
             return CURRENCY_KEYS;
         }
-        return [] as Array<String>;
+        var keys = specLookup(",dist~km~mi~m~ft~cm~in~yd~NM,weight~kg~g~lb~oz~st,temp~c~f~K,speed~kph~mph~m/s~kn," +
+            "pace~/km~/mi~kph~mph,vol~l~mL~gal~cup~floz,area~m2~km2~ha~acre~ft2~mi2,time~sec~min~hr~day~wk," +
+            "pres~bar~kPa~hPa~psi~atm~mmHg,energy~kcal~kJ~kWh,", category);
+        return keys != null ? keys : [] as Array<String>;
     }
 
     // Compact integer display for the random screen's MIN/MAX hints.
@@ -733,21 +666,8 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     private function unitLabel(key as String) as String {
-        if (key.equals("km")) { return "km"; }
-        else if (key.equals("mi")) { return "mi"; }
-        else if (key.equals("m")) { return "m"; }
-        else if (key.equals("ft")) { return "ft"; }
-        else if (key.equals("cm")) { return "cm"; }
-        else if (key.equals("in")) { return "in"; }
-        else if (key.equals("kg")) { return "kg"; }
-        else if (key.equals("lb")) { return "lb"; }
-        else if (key.equals("c")) { return "°C"; }
-        else if (key.equals("f")) { return "°F"; }
-        else if (key.equals("kph")) { return "kph"; }
-        else if (key.equals("mph")) { return "mph"; }
-        else if (key.equals("l")) { return "L"; }
-        else if (key.equals("gal")) { return "gal"; }
-        return key;
+        var f = specLookup(",c~°C,f~°F,l~L,", key);
+        return f != null ? f[0] : key;
     }
 
     // Step 2 of the unit converter: pick the source unit, then the target
@@ -873,12 +793,7 @@ class calc_for_garminView extends WatchUi.View {
     // the pending expression.
     private function pctButtons() as Array<CalcButton> {
         if (pctStage == 0) {
-            return [
-                new CalcButton("DISCOUNT", "pctMode:0"),
-                new CalcButton("MARKUP", "pctMode:1"),
-                new CalcButton("MARGIN", "pctMode:2"),
-                new CalcButton("BACK", "pctBack"),
-            ] as Array<CalcButton>;
+            return btns("DISCOUNT~pctMode:0,MARKUP~pctMode:1,MARGIN~pctMode:2,BACK~pctBack");
         }
         return keypadButtons("pctBack", pctStage == 2 ? "GO" : "NEXT", pctStage == 2 ? "pctGo" : "pctNext");
     }
@@ -888,12 +803,7 @@ class calc_for_garminView extends WatchUi.View {
     // then the same keypad for Y/M/D - twice, for DIFF's two dates.
     private function dateButtons() as Array<CalcButton> {
         if (dateStage == 0) {
-            return [
-                new CalcButton("UNTIL", "dateMode:0"),
-                new CalcButton("AGE", "dateMode:1"),
-                new CalcButton("DIFF", "dateMode:2"),
-                new CalcButton("BACK", "dateBack"),
-            ] as Array<CalcButton>;
+            return btns("UNTIL~dateMode:0,AGE~dateMode:1,DIFF~dateMode:2,BACK~dateBack");
         }
         var lastStage = dateMode == 2 ? 6 : 3;
         return keypadButtons("dateBack", dateStage == lastStage ? "GO" : "NEXT", dateStage == lastStage ? "dateGo" : "dateNext");
@@ -902,12 +812,7 @@ class calc_for_garminView extends WatchUi.View {
     // Overflow hub, one tap off the Scientific screen's "MORE" corner
     // button: the less-everyday tools that got moved off the default MENU.
     private function moreButtons() as Array<CalcButton> {
-        return [
-            new CalcButton("PCT+", "apct"), new CalcButton("DATE", "date"),
-            new CalcButton("VAR", "var"), new CalcButton("GRAPH", "graph"),
-            new CalcButton("BASE", "base"), new CalcButton("COUNT", "counter"),
-            new CalcButton("BACK", "moreBack"),
-        ] as Array<CalcButton>;
+        return btns("PCT+~apct,DATE~date,VAR~var,GRAPH~graph,BASE~base,COUNT~counter,BACK~moreBack");
     }
 
     // Tally counter: +1/-1 tally. "+N" opens a keypad to type an amount
@@ -918,11 +823,7 @@ class calc_for_garminView extends WatchUi.View {
         if (counterStage == 0) {
             return keypadButtons("counterBack", "ADD", "counterMultiAdd");
         }
-        return [
-            new CalcButton("+1", "counterInc"), new CalcButton("-1", "counterDec"),
-            new CalcButton("+N", "counterMulti"), new CalcButton("RESET", "counterReset"),
-            new CalcButton("BACK", "counterBack"),
-        ] as Array<CalcButton>;
+        return btns("+1~counterInc,-1~counterDec,+N~counterMulti,RESET~counterReset,BACK~counterBack");
     }
 
     // Graph screen's only real control - BACK returns to MORE, the same
@@ -941,11 +842,7 @@ class calc_for_garminView extends WatchUi.View {
         if (baseStage == 0) {
             return keypadButtons("baseBack", "SET", "baseRdxSet");
         }
-        return [
-            new CalcButton("NOT", "baseNot"), new CalcButton("<<", "baseShl"), new CalcButton(">>", "baseShr"),
-            new CalcButton("RDX", "baseRdx"), new CalcButton("USE", "baseUse"), new CalcButton("C", "baseClear"),
-            new CalcButton("BACK", "baseBack"),
-        ] as Array<CalcButton>;
+        return btns("NOT~baseNot,<<~baseShl,>>~baseShr,RDX~baseRdx,USE~baseUse,C~baseClear,BACK~baseBack");
     }
 
     // RGB tool: same 4x4 numeric keypad as random/tip/pct/date for the
@@ -961,11 +858,7 @@ class calc_for_garminView extends WatchUi.View {
     // brackets, split out on their own page instead of only living on the
     // Scientific screen. Fixed, not seed-customizable, same as VAR.
     private function navButtons() as Array<CalcButton> {
-        return [
-            new CalcButton("<", "curLeft"), new CalcButton(">", "curRight"), new CalcButton("Ans", "ans"),
-            new CalcButton("(", "open"), new CalcButton(")", "close"), new CalcButton("a/b", "frac"),
-            new CalcButton("HIST", "history"), new CalcButton("BACK", "menu"),
-        ] as Array<CalcButton>;
+        return btns("<~curLeft,>~curRight,Ans~ans,(~open,)~close,a/b~frac,HIST~history,BACK~menu");
     }
 
     // The compact preview label for history row `i` - just the exercise and
@@ -1007,21 +900,8 @@ class calc_for_garminView extends WatchUi.View {
 
     // Compact 4x4 numeric keypad shared by the random and tip screens.
     private function keypadButtons(backAction as String, nextLabel as String, nextAction as String) as Array<CalcButton> {
-        var defs = [] as Array<CalcButton>;
-        defs.add(new CalcButton("7", "digit:7"));
-        defs.add(new CalcButton("8", "digit:8"));
-        defs.add(new CalcButton("9", "digit:9"));
-        defs.add(new CalcButton("DEL", "back"));
-        defs.add(new CalcButton("4", "digit:4"));
-        defs.add(new CalcButton("5", "digit:5"));
-        defs.add(new CalcButton("6", "digit:6"));
-        defs.add(new CalcButton("C", "clear"));
-        defs.add(new CalcButton("1", "digit:1"));
-        defs.add(new CalcButton("2", "digit:2"));
-        defs.add(new CalcButton("3", "digit:3"));
-        defs.add(new CalcButton("-", "op:-"));
-        defs.add(new CalcButton("0", "digit:0"));
-        defs.add(new CalcButton(".", "digit:."));
+        var defs = btns("7~digit:7,8~digit:8,9~digit:9,DEL~back,4~digit:4,5~digit:5,6~digit:6,C~clear," +
+            "1~digit:1,2~digit:2,3~digit:3,-~op:-,0~digit:0,.~digit:.");
         defs.add(new CalcButton("BACK", backAction));
         defs.add(new CalcButton(nextLabel, nextAction));
         return defs;
@@ -1034,93 +914,74 @@ class calc_for_garminView extends WatchUi.View {
         }
         var defs = basicButtons();
         var cols = 4;
-        var rows = 5;
         if (screen == SCREEN_SCIENTIFIC) {
             defs = scientificButtons();
             cols = 4;
-            rows = 6;
         } else if (screen == SCREEN_ADVANCED) {
             defs = advancedButtons();
             cols = 4;
-            rows = 5;
         } else if (screen == SCREEN_UNITS) {
             defs = unitCategoryButtons();
             cols = 3;
-            rows = 4;
         } else if (screen == SCREEN_UNIT_PICK) {
             defs = unitPickButtons();
             // Big categories (distance, currency) would need 5+ rows of 2.
             cols = defs.size() > 8 ? 3 : 2;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_CUR_LETTER) {
             defs = curLetterButtons();
             cols = 5;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_CUR_RESULTS) {
             defs = curResultButtons();
             cols = 2;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_RANDOM) {
             defs = randomButtons();
             cols = 4;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_TIP) {
             defs = tipButtons();
             cols = 4;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_PCT) {
             defs = pctButtons();
             cols = pctStage == 0 ? 2 : 4;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_DATE) {
             defs = dateButtons();
             cols = dateStage == 0 ? 2 : 4;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_MORE) {
             defs = moreButtons();
             cols = 2;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_NAV) {
             defs = navButtons();
             cols = 3;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_VAR) {
             defs = varButtons();
             cols = 5;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_MENU) {
             defs = menuButtons();
             cols = 2;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_PERSONALIZE) {
             defs = personalizeButtons();
             cols = 2;
-            rows = 1;
         } else if (screen == SCREEN_GRAPH) {
             defs = graphButtons();
             cols = 1;
-            rows = 1;
         } else if (screen == SCREEN_BASE) {
             defs = baseButtons();
             cols = baseStage == 0 ? 4 : 3;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_COLOR) {
             defs = colorButtons();
             cols = colorStage < 3 ? 4 : 1;
-            rows = colorStage < 3 ? (defs.size() + cols - 1) / cols : 1;
         } else if (screen == SCREEN_COUNTER) {
             defs = counterButtons();
             cols = counterStage == 0 ? 4 : 2;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_FORMULAS) {
             defs = formulaCategoryButtons();
             cols = 2;
-            rows = (defs.size() + cols - 1) / cols;
         } else if (screen == SCREEN_FORMULAS_MORE) {
             defs = formulaMoreCategoryButtons();
             cols = 2;
-            rows = (defs.size() + cols - 1) / cols;
         }
+        // Fixed-size screens (basic 20, sci 24, adv 18, units 12 tokens, ...)
+        // come out to the same row counts this way as the dynamic ones.
+        var rows = (defs.size() + cols - 1) / cols;
 
         // BACK lands in the grid's bottom-right corner on every screen
         // EXCEPT the fully customizable ones (basic/sci/adv/units), where
@@ -1453,8 +1314,18 @@ class calc_for_garminView extends WatchUi.View {
         selectedIndex = (selectedIndex + delta + buttons.size()) % buttons.size();
     }
 
+    // Actions that only switch screens, as ",action~SCREEN_* id," rows -
+    // a table instead of if/else branches to stay under older watches'
+    // 64KB widget limit.
+    private const SWITCH_SPEC = ",sci~1,basic~0,menu~10,setup~11,adv~2,unitCatBack~3,var~9,formulas~22,formulasMore~24,formulaListBack~22,formulaMoreListBack~24,nav~15,history~16,randBack~10,tipBack~10,pctBack~14,dateBack~14,more~14,moreBack~1,graphBack~14,colorBack~3,";
+
     function activate(b as CalcButton) as Void {
         var action = b.action;
+        var target = specLookup(SWITCH_SPEC, action);
+        if (target != null) {
+            switchScreen(target[0].toNumber() as Number);
+            return;
+        }
         if (action.equals("clear")) {
             engine.clear();
             fromUnitKey = null;
@@ -1469,29 +1340,11 @@ class calc_for_garminView extends WatchUi.View {
                 recordHistory(exprBefore, engine.expr);
             }
             return;
-        } else if (action.equals("sci")) {
-            switchScreen(SCREEN_SCIENTIFIC);
-            return;
-        } else if (action.equals("basic")) {
-            switchScreen(SCREEN_BASIC);
-            return;
-        } else if (action.equals("menu")) {
-            switchScreen(SCREEN_MENU);
-            return;
-        } else if (action.equals("setup")) {
-            switchScreen(SCREEN_PERSONALIZE);
-            return;
         } else if (action.equals("setupOpen")) {
             Communications.openWebPage(SETUP_URL, null, null);
             return;
-        } else if (action.equals("adv")) {
-            switchScreen(SCREEN_ADVANCED);
-            return;
         } else if (action.equals("units")) {
             enterEmbeddedFlow();
-            switchScreen(SCREEN_UNITS);
-            return;
-        } else if (action.equals("unitCatBack")) {
             switchScreen(SCREEN_UNITS);
             return;
         } else if (action.equals("curLeft")) {
@@ -1505,27 +1358,6 @@ class calc_for_garminView extends WatchUi.View {
             return;
         } else if (action.equals("eq")) {
             engine.insertEquals();
-            return;
-        } else if (action.equals("var")) {
-            switchScreen(SCREEN_VAR);
-            return;
-        } else if (action.equals("formulas")) {
-            switchScreen(SCREEN_FORMULAS);
-            return;
-        } else if (action.equals("formulasMore")) {
-            switchScreen(SCREEN_FORMULAS_MORE);
-            return;
-        } else if (action.equals("formulaListBack")) {
-            switchScreen(SCREEN_FORMULAS);
-            return;
-        } else if (action.equals("formulaMoreListBack")) {
-            switchScreen(SCREEN_FORMULAS_MORE);
-            return;
-        } else if (action.equals("nav")) {
-            switchScreen(SCREEN_NAV);
-            return;
-        } else if (action.equals("history")) {
-            switchScreen(SCREEN_HISTORY);
             return;
         } else if (action.equals("histClear")) {
             historyBefore = [] as Array<String>;
@@ -1599,9 +1431,6 @@ class calc_for_garminView extends WatchUi.View {
             exitEmbeddedFlow(engine.expr);
             switchScreen(SCREEN_BASIC);
             return;
-        } else if (action.equals("randBack")) {
-            switchScreen(SCREEN_MENU);
-            return;
         } else if (action.equals("tip")) {
             enterEmbeddedFlow();
             tipStage = 0;
@@ -1634,9 +1463,6 @@ class calc_for_garminView extends WatchUi.View {
             exitEmbeddedFlow(engine.expr);
             switchScreen(SCREEN_BASIC);
             return;
-        } else if (action.equals("tipBack")) {
-            switchScreen(SCREEN_MENU);
-            return;
         } else if (action.equals("apct")) {
             enterEmbeddedFlow();
             pctStage = 0;
@@ -1659,9 +1485,6 @@ class calc_for_garminView extends WatchUi.View {
             engine.setResult(computePct(pctMode, pctBase, pctOrNull as Double));
             exitEmbeddedFlow(engine.expr);
             switchScreen(SCREEN_BASIC);
-            return;
-        } else if (action.equals("pctBack")) {
-            switchScreen(SCREEN_MORE);
             return;
         } else if (action.equals("date")) {
             enterEmbeddedFlow();
@@ -1707,15 +1530,6 @@ class calc_for_garminView extends WatchUi.View {
             exitEmbeddedFlow(engine.expr);
             switchScreen(SCREEN_BASIC);
             return;
-        } else if (action.equals("dateBack")) {
-            switchScreen(SCREEN_MORE);
-            return;
-        } else if (action.equals("more")) {
-            switchScreen(SCREEN_MORE);
-            return;
-        } else if (action.equals("moreBack")) {
-            switchScreen(SCREEN_SCIENTIFIC);
-            return;
         } else if (action.equals("graph")) {
             // Whatever's currently typed (e.g. "X^2-3") becomes the plotted
             // formula; an empty/errored expression has nothing to plot, so
@@ -1725,9 +1539,6 @@ class calc_for_garminView extends WatchUi.View {
                 computeGraphSamples();
                 switchScreen(SCREEN_GRAPH);
             }
-            return;
-        } else if (action.equals("graphBack")) {
-            switchScreen(SCREEN_MORE);
             return;
         } else if (action.equals("base")) {
             var vOrNull = readEntry();
@@ -1862,9 +1673,6 @@ class calc_for_garminView extends WatchUi.View {
             colorStage = 3;
             selectedIndex = 0;
             layoutButtons();
-            return;
-        } else if (action.equals("colorBack")) {
-            switchScreen(SCREEN_UNITS);
             return;
         }
 
@@ -2181,59 +1989,18 @@ class calc_for_garminView extends WatchUi.View {
         return kph;
     }
 
+    // Factor to each category's base unit (meters / kg / kph / liters /
+    // m2 / seconds / pascals / joules), as ",category.unit~factor," rows.
     private function unitFactor(category as String, key as String) as Double? {
-        if (category.equals("dist")) {
-            if (key.equals("km")) { return 1000.0d; }
-            else if (key.equals("mi")) { return 1609.34d; }
-            else if (key.equals("m")) { return 1.0d; }
-            else if (key.equals("ft")) { return 0.3048d; }
-            else if (key.equals("cm")) { return 0.01d; }
-            else if (key.equals("in")) { return 0.0254d; }
-            else if (key.equals("yd")) { return 0.9144d; }
-            else if (key.equals("NM")) { return 1852.0d; }
-        } else if (category.equals("weight")) {
-            if (key.equals("kg")) { return 1.0d; }
-            else if (key.equals("g")) { return 0.001d; }
-            else if (key.equals("lb")) { return 0.453592d; }
-            else if (key.equals("oz")) { return 0.0283495d; }
-            else if (key.equals("st")) { return 6.35029d; }
-        } else if (category.equals("speed")) {
-            if (key.equals("kph")) { return 1.0d; }
-            else if (key.equals("mph")) { return 1.60934d; }
-            else if (key.equals("m/s")) { return 3.6d; }
-            else if (key.equals("kn")) { return 1.852d; }
-        } else if (category.equals("vol")) {
-            if (key.equals("l")) { return 1.0d; }
-            else if (key.equals("mL")) { return 0.001d; }
-            else if (key.equals("gal")) { return 3.78541d; }
-            else if (key.equals("cup")) { return 0.236588d; }
-            else if (key.equals("floz")) { return 0.0295735d; }
-        } else if (category.equals("area")) {
-            if (key.equals("m2")) { return 1.0d; }
-            else if (key.equals("km2")) { return 1000000.0d; }
-            else if (key.equals("ha")) { return 10000.0d; }
-            else if (key.equals("acre")) { return 4046.86d; }
-            else if (key.equals("ft2")) { return 0.092903d; }
-            else if (key.equals("mi2")) { return 2589988.0d; }
-        } else if (category.equals("time")) {
-            if (key.equals("sec")) { return 1.0d; }
-            else if (key.equals("min")) { return 60.0d; }
-            else if (key.equals("hr")) { return 3600.0d; }
-            else if (key.equals("day")) { return 86400.0d; }
-            else if (key.equals("wk")) { return 604800.0d; }
-        } else if (category.equals("pres")) {
-            if (key.equals("bar")) { return 100000.0d; }
-            else if (key.equals("kPa")) { return 1000.0d; }
-            else if (key.equals("hPa")) { return 100.0d; }
-            else if (key.equals("psi")) { return 6894.76d; }
-            else if (key.equals("atm")) { return 101325.0d; }
-            else if (key.equals("mmHg")) { return 133.322d; }
-        } else if (category.equals("energy")) {
-            if (key.equals("kcal")) { return 4184.0d; }
-            else if (key.equals("kJ")) { return 1000.0d; }
-            else if (key.equals("kWh")) { return 3600000.0d; }
-        }
-        return null;
+        var f = specLookup(",dist.km~1000,dist.mi~1609.34,dist.m~1,dist.ft~0.3048,dist.cm~0.01,dist.in~0.0254,dist.yd~0.9144,dist.NM~1852," +
+            "weight.kg~1,weight.g~0.001,weight.lb~0.453592,weight.oz~0.0283495,weight.st~6.35029," +
+            "speed.kph~1,speed.mph~1.60934,speed.m/s~3.6,speed.kn~1.852," +
+            "vol.l~1,vol.mL~0.001,vol.gal~3.78541,vol.cup~0.236588,vol.floz~0.0295735," +
+            "area.m2~1,area.km2~1000000,area.ha~10000,area.acre~4046.86,area.ft2~0.092903,area.mi2~2589988," +
+            "time.sec~1,time.min~60,time.hr~3600,time.day~86400,time.wk~604800," +
+            "pres.bar~100000,pres.kPa~1000,pres.hPa~100,pres.psi~6894.76,pres.atm~101325,pres.mmHg~133.322," +
+            "energy.kcal~4184,energy.kJ~1000,energy.kWh~3600000,", category + "." + key);
+        return f != null ? f[0].toDouble() : null;
     }
 
     // Modern flat-color-by-category palette (custom hex, not the stock

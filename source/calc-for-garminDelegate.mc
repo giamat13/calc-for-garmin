@@ -92,62 +92,33 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
+    // Where BACK goes from each screen, indexed by view.SCREEN_* id (see
+    // the list at the top of calc-for-garminView.mc). A table rather than
+    // an if/else chain to stay under older watches' 64KB widget limit.
+    // BASE/COUNTER (19/21) and the currency autocomplete screens (5/6) are
+    // handled separately below; their slots here are unused.
+    private const BACK_TARGET = [0, 10, 1, 10, 3, 4, 5, 10, 10, 10, 0, 10, 14, 14, 1, 10, 0, 16, 14, 14, 3, 14, 10, 22, 22, 24] as Array<Number>;
+
     // Steps `view.screen` back one logical screen. Returns false only from
     // SCREEN_BASIC, letting the platform's default Back (pop/exit) proceed.
     private function goBack() as Boolean {
-        if (view.screen == view.SCREEN_CUR_RESULTS) {
+        var s = view.screen;
+        if (s == view.SCREEN_BASIC) {
+            return false;
+        } else if (s == view.SCREEN_CUR_RESULTS) {
             view.goToScreen(view.SCREEN_CUR_LETTER);
-        } else if (view.screen == view.SCREEN_CUR_LETTER) {
+        } else if (s == view.SCREEN_CUR_LETTER) {
             view.goToScreen(view.SCREEN_UNIT_PICK);
-        } else if (view.screen == view.SCREEN_UNIT_PICK) {
-            view.switchScreen(view.SCREEN_UNITS);
-        } else if (view.screen == view.SCREEN_RANDOM || view.screen == view.SCREEN_TIP) {
-            view.switchScreen(view.SCREEN_MENU);
-        } else if (view.screen == view.SCREEN_PCT || view.screen == view.SCREEN_DATE) {
-            view.switchScreen(view.SCREEN_MORE);
-        } else if (view.screen == view.SCREEN_MORE) {
-            view.switchScreen(view.SCREEN_SCIENTIFIC);
-        } else if (view.screen == view.SCREEN_UNITS) {
-            view.switchScreen(view.SCREEN_MENU);
-        } else if (view.screen == view.SCREEN_VAR) {
-            view.switchScreen(view.SCREEN_MENU);
-        } else if (view.screen == view.SCREEN_FORMULA_LIST) {
-            view.switchScreen(view.SCREEN_FORMULAS);
-        } else if (view.screen == view.SCREEN_FORMULAS) {
-            view.switchScreen(view.SCREEN_MENU);
-        } else if (view.screen == view.SCREEN_FORMULA_MORE_LIST) {
-            view.switchScreen(view.SCREEN_FORMULAS_MORE);
-        } else if (view.screen == view.SCREEN_FORMULAS_MORE) {
-            view.switchScreen(view.SCREEN_FORMULAS);
-        } else if (view.screen == view.SCREEN_NAV) {
-            // Falls into the generic screen-1 fallback below otherwise,
-            // landing on SCREEN_MORE (14) - but NAV is only ever entered
-            // from MENU (see the "nav" action in activate()).
-            view.switchScreen(view.SCREEN_MENU);
-        } else if (view.screen == view.SCREEN_HISTORY) {
-            view.switchScreen(view.SCREEN_BASIC);
-        } else if (view.screen == view.SCREEN_HISTORY_DETAIL) {
-            view.switchScreen(view.SCREEN_HISTORY);
-        } else if (view.screen == view.SCREEN_BASE) {
+        } else if (s == view.SCREEN_BASE) {
             // BASE's own BACK is stage-aware (cancels out of radix entry
             // first, then exits to MORE) - reuse that instead of duplicating it.
             view.activate(new CalcButton("BACK", "baseBack"));
-        } else if (view.screen == view.SCREEN_GRAPH) {
-            view.switchScreen(view.SCREEN_MORE);
-        } else if (view.screen == view.SCREEN_COUNTER) {
+        } else if (s == view.SCREEN_COUNTER) {
             // COUNTER's own BACK is stage-aware (cancels out of "+N" entry
             // first, then exits to MORE) - reuse that instead of duplicating it.
             view.activate(new CalcButton("BACK", "counterBack"));
-        } else if (view.screen == view.SCREEN_COLOR) {
-            view.switchScreen(view.SCREEN_UNITS);
-        } else if (view.screen == view.SCREEN_SCIENTIFIC) {
-            view.switchScreen(view.SCREEN_MENU);
-        } else if (view.screen == view.SCREEN_MENU) {
-            view.switchScreen(view.SCREEN_BASIC);
-        } else if (view.screen != view.SCREEN_BASIC) {
-            view.switchScreen(view.screen - 1);
         } else {
-            return false;
+            view.switchScreen(s < BACK_TARGET.size() ? BACK_TARGET[s] : s - 1);
         }
         WatchUi.requestUpdate();
         return true;

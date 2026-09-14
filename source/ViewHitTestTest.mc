@@ -75,6 +75,7 @@ function testFormulaListScreensAreTappable(logger as Test.Logger) as Boolean {
         checkFormulaListTappable(logger, true, "formulaCatMore:geom");
 }
 
+(:debug)
 function checkFormulaListTappable(logger as Test.Logger, round as Boolean, categoryAction as String) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, round);
@@ -413,6 +414,7 @@ function testMenuHubNavigation(logger as Test.Logger) as Boolean {
 }
 
 // Presses a sequence of actions, then checks what the display shows.
+(:debug)
 function pressAndExpect(logger as Test.Logger, v as calc_for_garminView, actions as Array<String>, expected as String) as Boolean {
     for (var i = 0; i < actions.size(); i++) {
         v.activate(new CalcButton("", actions[i]));
@@ -636,6 +638,7 @@ function testCurrencyAutocompletePreservesFromPick(logger as Test.Logger) as Boo
     return true;
 }
 
+(:debug)
 function checkAllButtonsTappable(logger as Test.Logger, round as Boolean, screen as Number) as Boolean {
     var v = new calc_for_garminView();
     if (screen != 0) {

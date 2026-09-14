@@ -49,22 +49,10 @@ function findFirstStepNode(n as StepNode) as StepNode? {
 // Same grammar/semantics as ExprParser, but building a span-tagged tree
 // instead of folding straight to a Double, so the engine can splice just
 // one sub-expression's result back into the displayed formula at a time.
-class StepSolver {
-
-    private var s as String;
-    private var len as Number;
-    private var pos as Number = 0;
-    private var xValue as Double;
-    private var variables as Dictionary<String, Double>;
-    var error as Boolean = false;
-
-    private const E = 2.718281828459045d;
+class StepSolver extends ExprParser {
 
     function initialize(str as String, xVal as Double, vars as Dictionary<String, Double>) {
-        s = str;
-        len = s.length();
-        xValue = xVal;
-        variables = vars;
+        ExprParser.initialize(str, xVal, vars);
     }
 
     // Returns the root node, or null on a parse error.
@@ -77,54 +65,6 @@ class StepSolver {
             return null;
         }
         return node;
-    }
-
-    private function peek() as String {
-        if (pos >= len) {
-            return "";
-        }
-        return s.substring(pos, pos + 1) as String;
-    }
-
-    private function isAlphaCh(c as String) as Boolean {
-        if (c.length() != 1) {
-            return false;
-        }
-        var lower = c.toLower() as String;
-        return lower.equals("a") || lower.equals("b") || lower.equals("c") || lower.equals("d") ||
-               lower.equals("e") || lower.equals("f") || lower.equals("g") || lower.equals("h") ||
-               lower.equals("i") || lower.equals("j") || lower.equals("k") || lower.equals("l") ||
-               lower.equals("m") || lower.equals("n") || lower.equals("o") || lower.equals("p") ||
-               lower.equals("q") || lower.equals("r") || lower.equals("s") || lower.equals("t") ||
-               lower.equals("u") || lower.equals("v") || lower.equals("w") || lower.equals("x") ||
-               lower.equals("y") || lower.equals("z");
-    }
-
-    private function isDigitLiteral(c as String) as Boolean {
-        return c.equals("0") || c.equals("1") || c.equals("2") || c.equals("3") || c.equals("4") ||
-               c.equals("5") || c.equals("6") || c.equals("7") || c.equals("8") || c.equals("9");
-    }
-
-    private function startsPrimary(c as String) as Boolean {
-        if (c.equals("")) {
-            return false;
-        }
-        return isDigitLiteral(c) || c.equals(".") || c.equals("(") || c.equals("[") || c.equals("{") ||
-            c.equals("π") || isAlphaCh(c);
-    }
-
-    private function matchKeyword(kw as String) as Boolean {
-        var kwLen = kw.length();
-        if (pos + kwLen > len) {
-            return false;
-        }
-        if (!(s.substring(pos, pos + kwLen) as String).equals(kw)) {
-            return false;
-        }
-        if (pos + kwLen < len && isAlphaCh(s.substring(pos + kwLen, pos + kwLen + 1) as String)) {
-            return false;
-        }
-        return true;
     }
 
     private function leaf(st as Number, en as Number, v as Double) as StepNode {
@@ -310,85 +250,5 @@ class StepSolver {
             v = v + ((s.substring(secStart, pos) as String).toDouble() as Double) / 60.0d;
         }
         return leaf(start, pos, v);
-    }
-
-    private function readIdent() as String {
-        var start = pos;
-        while (isAlphaCh(peek())) {
-            pos += 1;
-        }
-        return s.substring(start, pos) as String;
-    }
-
-    private function applyFunc(name as String, arg as Double) as Double {
-        if (name.equals("sin")) {
-            return Math.sin(arg * Math.PI / 180.0d) as Double;
-        } else if (name.equals("cos")) {
-            return Math.cos(arg * Math.PI / 180.0d) as Double;
-        } else if (name.equals("tan")) {
-            return Math.tan(arg * Math.PI / 180.0d) as Double;
-        } else if (name.equals("sqrt")) {
-            if (arg < 0.0d) {
-                error = true;
-                return 0.0d;
-            }
-            return Math.sqrt(arg) as Double;
-        } else if (name.equals("log")) {
-            if (arg <= 0.0d) {
-                error = true;
-                return 0.0d;
-            }
-            return Math.log(arg, 10.0d) as Double;
-        } else if (name.equals("ln")) {
-            if (arg <= 0.0d) {
-                error = true;
-                return 0.0d;
-            }
-            return Math.log(arg, E) as Double;
-        } else if (name.equals("asin")) {
-            if (arg < -1.0d || arg > 1.0d) {
-                error = true;
-                return 0.0d;
-            }
-            return (Math.asin(arg) as Double) * 180.0d / Math.PI;
-        } else if (name.equals("acos")) {
-            if (arg < -1.0d || arg > 1.0d) {
-                error = true;
-                return 0.0d;
-            }
-            return (Math.acos(arg) as Double) * 180.0d / Math.PI;
-        } else if (name.equals("atan")) {
-            return (Math.atan(arg) as Double) * 180.0d / Math.PI;
-        } else if (name.equals("cbrt")) {
-            return arg < 0.0d ? -(Math.pow(-arg, 1.0d / 3.0d) as Double) : (Math.pow(arg, 1.0d / 3.0d) as Double);
-        } else if (name.equals("abs")) {
-            return arg < 0.0d ? -arg : arg;
-        } else if (name.equals("floor")) {
-            return Math.floor(arg) as Double;
-        } else if (name.equals("ceil")) {
-            return Math.ceil(arg) as Double;
-        } else if (name.equals("fact")) {
-            return factorial(arg);
-        }
-        error = true;
-        return 0.0d;
-    }
-
-    private function factorial(arg as Double) as Double {
-        var rounded = Math.round(arg) as Double;
-        var diff = arg - rounded;
-        if (diff < 0.0d) {
-            diff = -diff;
-        }
-        if (diff > 0.0000001d || rounded < 0.0d || rounded > 170.0d) {
-            error = true;
-            return 0.0d;
-        }
-        var n = rounded.toNumber();
-        var result = 1.0d;
-        for (var i = 2; i <= n; i++) {
-            result = result * i;
-        }
-        return result;
     }
 }

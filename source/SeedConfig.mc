@@ -60,46 +60,34 @@ class SeedConfig {
     // default MENU to the tools used every day. "nav" (cursor/Ans/brackets)
     // is a default MENU item, not tucked away - it's an everyday editing
     // helper, not an occasional tool.
-    static const DEFAULT_MENU = ["sci", "units", "tip", "rnd", "nav"] as Array<String>;
-    static const VALID_MENU_ITEMS = ["sci", "units", "tip", "rnd", "var", "apct", "date", "nav"] as Array<String>;
+    // Token lists below are comma-joined strings split at load time rather
+    // than array literals: every array element costs bytecode, which pushed
+    // the app past the 64KB widget limit on older (pre-v2-opcode) watches.
+    static const DEFAULT_MENU = "sci,units,tip,rnd,nav";
+    // Wrapped in commas so a whole-item match is a single find(",item,").
+    static const VALID_MENU_ITEMS = ",sci,units,tip,rnd,var,apct,date,nav,";
 
     // Kept small on purpose - the rest of calc-for-garminView.FORMULA_CATALOG
     // lives one tap away behind each category's "MORE" button.
-    static const DEFAULT_FORMULA_SUBSET = [
-        "circleArea", "circleCircumference", "pythagorean", "rectangleArea", "speedDistTime"
-    ] as Array<String>;
+    static const DEFAULT_FORMULA_SUBSET = "circleArea,circleCircumference,pythagorean,rectangleArea,speedDistTime";
 
     static const BASIC_LEN = 20;
     static const SCI_LEN = 24;
     static const ADV_LEN = 18;
     static const UNITS_LEN = 12;
 
-    static const DEFAULT_BASIC_LAYOUT = [
-        "c", "del", "pct", "div",
-        "1", "2", "3", "mul",
-        "4", "5", "6", "sub",
-        "7", "8", "9", "add",
-        "menu", "0", "dot", "eq"
-    ] as Array<String>;
+    // 4 cols x 5 rows.
+    static const DEFAULT_BASIC_LAYOUT = "c,del,pct,div,1,2,3,mul,4,5,6,sub,7,8,9,add,menu,0,dot,eq";
 
     // "eqIns" = sci's EQ (inserts "=" to build an equation, distinct from
     // basic's "eq" which evaluates); "backMenu"/"backSci" are BACK buttons
     // - named by destination, not by screen, since the identical action
-    // works the same wherever it's placed.
-    static const DEFAULT_SCI_LAYOUT = [
-        "sin", "cos", "tan", "sqrt", "log", "ln", "sqr", "x",
-        "open", "close", "pow", "pi", "e", "c", "del", "adv",
-        "uc", "rnd", "tip", "eqIns", "ans", "curl", "curr", "backMenu"
-    ] as Array<String>;
+    // works the same wherever it's placed. 4 cols x 6 rows.
+    static const DEFAULT_SCI_LAYOUT = "sin,cos,tan,sqrt,log,ln,sqr,x,open,close,pow,pi,e,c,del,adv,uc,rnd,tip,eqIns,ans,curl,curr,backMenu";
 
-    static const DEFAULT_ADV_LAYOUT = [
-        "asin", "acos", "atan", "fact", "inv", "cbrt", "absv", "mod",
-        "ee", "cube", "floor", "ceil", "c", "del", "pow10", "frac", "var", "backSci"
-    ] as Array<String>;
+    static const DEFAULT_ADV_LAYOUT = "asin,acos,atan,fact,inv,cbrt,absv,mod,ee,cube,floor,ceil,c,del,pow10,frac,var,backSci";
 
-    static const DEFAULT_UNITS_LAYOUT = [
-        "dist", "wt", "temp", "spd", "pace", "vol", "area", "time", "pres", "enrg", "cur", "backMenu"
-    ] as Array<String>;
+    static const DEFAULT_UNITS_LAYOUT = "dist,wt,temp,spd,pace,vol,area,time,pres,enrg,cur,backMenu";
 
     static function get() as SeedConfig {
         if (instance == null) {
@@ -116,12 +104,12 @@ class SeedConfig {
 
     function initialize(seed as String?) {
         colors = DEFAULT_COLORS;
-        menuItems = DEFAULT_MENU;
-        basicLayout = DEFAULT_BASIC_LAYOUT;
-        sciLayout = DEFAULT_SCI_LAYOUT;
-        advLayout = DEFAULT_ADV_LAYOUT;
-        unitsLayout = DEFAULT_UNITS_LAYOUT;
-        formulaSubset = DEFAULT_FORMULA_SUBSET;
+        menuItems = splitStr(DEFAULT_MENU, ",");
+        basicLayout = splitStr(DEFAULT_BASIC_LAYOUT, ",");
+        sciLayout = splitStr(DEFAULT_SCI_LAYOUT, ",");
+        advLayout = splitStr(DEFAULT_ADV_LAYOUT, ",");
+        unitsLayout = splitStr(DEFAULT_UNITS_LAYOUT, ",");
+        formulaSubset = splitStr(DEFAULT_FORMULA_SUBSET, ",");
         customFormulas = [] as Array<Dictionary<String, String> >;
         if (seed == null || seed.length() < 2 || !seed.substring(0, 2).equals("1|")) {
             return;
@@ -158,18 +146,7 @@ class SeedConfig {
     }
 
     private function requiredPool() as Array<String> {
-        var out = [] as Array<String>;
-        appendAll(out, DEFAULT_BASIC_LAYOUT);
-        appendAll(out, DEFAULT_SCI_LAYOUT);
-        appendAll(out, DEFAULT_ADV_LAYOUT);
-        appendAll(out, DEFAULT_UNITS_LAYOUT);
-        return out;
-    }
-
-    private function appendAll(dst as Array<String>, src as Array<String>) as Void {
-        for (var i = 0; i < src.size(); i++) {
-            dst.add(src[i]);
-        }
+        return splitStr(DEFAULT_BASIC_LAYOUT + "," + DEFAULT_SCI_LAYOUT + "," + DEFAULT_ADV_LAYOUT + "," + DEFAULT_UNITS_LAYOUT, ",");
     }
 
     private function sliceArr(src as Array<String>, start as Number, len as Number) as Array<String> {
@@ -216,7 +193,7 @@ class SeedConfig {
         var parts = splitStr(s, ",");
         var out = [] as Array<String>;
         for (var i = 0; i < parts.size(); i++) {
-            if (containsStr(VALID_MENU_ITEMS, parts[i]) && !containsStr(out, parts[i])) {
+            if (VALID_MENU_ITEMS.find("," + parts[i] + ",") != null && !containsStr(out, parts[i])) {
                 out.add(parts[i]);
             }
         }
@@ -318,19 +295,35 @@ class SeedConfig {
         return indexOfStr(arr, s) != -1;
     }
 
-    // Monkey C's String has no built-in split().
-    private function splitStr(s as String, delim as String) as Array<String> {
-        var out = [] as Array<String>;
-        var rest = s;
-        while (true) {
-            var idx = rest.find(delim);
-            if (idx == null) {
-                out.add(rest);
-                return out;
-            }
-            out.add(rest.substring(0, idx as Number));
-            rest = rest.substring((idx as Number) + delim.length(), rest.length());
+}
+
+// Monkey C's String has no built-in split().
+function splitStr(s as String, delim as String) as Array<String> {
+    var out = [] as Array<String>;
+    var rest = s;
+    while (true) {
+        var idx = rest.find(delim);
+        if (idx == null) {
+            out.add(rest);
+            return out;
         }
-        return out;
+        out.add(rest.substring(0, idx as Number) as String);
+        rest = rest.substring((idx as Number) + delim.length(), rest.length()) as String;
     }
+    return out;
+}
+
+// Looks up `key` in a ",key~a~b,key2~c," table and returns its fields
+// (["a","b"]), or null if absent. The table's first character is its row
+// separator and it must also end with one ("," here; "|" for a table whose
+// values contain commas). Used instead of long if/else-equals chains or
+// dictionary literals, which compile to far more bytecode on older watches.
+function specLookup(spec as String, key as String) as Array<String>? {
+    var sep = spec.substring(0, 1) as String;
+    var i = spec.find(sep + key + "~");
+    if (i == null) {
+        return null;
+    }
+    var rest = spec.substring((i as Number) + key.length() + 2, spec.length()) as String;
+    return splitStr(rest.substring(0, rest.find(sep) as Number) as String, "~");
 }

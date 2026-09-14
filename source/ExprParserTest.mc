@@ -642,6 +642,7 @@ function testComputeSolutionStepsFallsBackToKnownAnswer(logger as Test.Logger) a
     return true;
 }
 
+(:debug)
 function joinSteps(steps as Array<String>) as String {
     var out = "";
     for (var i = 0; i < steps.size(); i++) {
@@ -650,6 +651,7 @@ function joinSteps(steps as Array<String>) as String {
     return out;
 }
 
+(:debug)
 function near(a as Double, b as Double, logger as Test.Logger) as Boolean {
     var d = a - b;
     if (d < 0.0d) {
