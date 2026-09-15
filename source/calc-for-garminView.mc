@@ -39,6 +39,12 @@ const MODULE_SWITCH_SPEC = ",sci~1,basic~0,menu~10,setup~11,adv~2,unitCatBack~3,
 (:oldwidget_only)
 const MODULE_SWITCH_SPEC = ",sci~1,basic~0,menu~10,setup~11,adv~2,unitCatBack~3,var~9,nav~15,history~16,randBack~10,tipBack~10,pctBack~14,dateBack~14,more~14,moreBack~1,";
 
+// The full-featured view - every device except the ones too memory-
+// constrained to run it at all gets this one (see CalcLiteView.mc for the
+// lean alternative those devices get instead - everything here except
+// GRAPH/BASE/COLOR/COUNTER/FORMULAS/HISTORY/the QR setup page - and the
+// pool comment at the top of SeedConfig.mc for the device list).
+(:exclude_oldwidget)
 class calc_for_garminView extends WatchUi.View {
 
     const SCREEN_BASIC = 0;

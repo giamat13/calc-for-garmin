@@ -1,11 +1,24 @@
 project.manifest = manifest.xml
 
-# Devices too memory-constrained to run this app at all were dropped from
-# manifest.xml (see the pool comment at the top of SeedConfig.mc for the
-# background) rather than shipping a crippled build - every remaining
-# device gets the full app. Some source files still carry a leftover
-# "(:oldwidget_only)"/"(:exclude_oldwidget)" annotation pair from when a
-# lighter build was attempted for those devices; this line keeps every
-# device on the "exclude_oldwidget" (full-featured) side. Safe to remove
-# once those leftover annotations are cleaned up.
+# Every device gets the full calc_for_garminView by default; the devices
+# below (the ones capped at a 64KB widget - see the pool comment at the
+# top of SeedConfig.mc) get the "exclude_oldwidget" pieces stripped and
+# fall back to the lean calc_for_garminView in CalcLiteView.mc instead
+# (same class name, so nothing else in the app needs to know which one
+# it's talking to) - everything except GRAPH/BASE/COLOR/COUNTER/FORMULAS/
+# HISTORY/the QR setup page. Both versions of every annotated declaration
+# always exist in source; only which one gets compiled in differs per
+# device.
 base.excludeAnnotations = oldwidget_only
+
+descentg1.excludeAnnotations = exclude_oldwidget
+enduro.excludeAnnotations = exclude_oldwidget
+fenix6.excludeAnnotations = exclude_oldwidget
+fenix6s.excludeAnnotations = exclude_oldwidget
+fr245.excludeAnnotations = exclude_oldwidget
+fr55.excludeAnnotations = exclude_oldwidget
+instinct2.excludeAnnotations = exclude_oldwidget
+instinct2s.excludeAnnotations = exclude_oldwidget
+instinct2x.excludeAnnotations = exclude_oldwidget
+instinctcrossover.excludeAnnotations = exclude_oldwidget
+venusq.excludeAnnotations = exclude_oldwidget
