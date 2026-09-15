@@ -286,6 +286,23 @@ class ExprParser {
             return Math.ceil(arg) as Double;
         } else if (name.equals("fact")) {
             return factorial(arg);
+        } else if (name.equals("rand")) {
+            // rand(N) -> a random whole number in [0, N] (N rounded,
+            // sign ignored). Re-rolls fresh every time the expression is
+            // evaluated, since it's parsed straight from the text - so
+            // "min+rand(range)" left sitting in the calculator gives a new
+            // result each time "=" is pressed on it, unlike a value that
+            // was pre-computed and inserted as a plain number.
+            var n = Math.round(arg) as Double;
+            if (n < 0.0d) {
+                n = -n;
+            }
+            var span = n.toNumber() + 1;
+            var r = Math.rand() % span;
+            if (r < 0) {
+                r = r + span;
+            }
+            return r.toDouble();
         }
         error = true;
         return 0.0d;

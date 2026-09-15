@@ -497,7 +497,12 @@ class calc_for_garminView extends WatchUi.View {
         "speedDistTime~Speed (D÷T)~phys~D/T~2|" +
         "force~Force (F=M×A)~phys~M*A~2|" +
         "kineticEnergy~Kinetic Energy (½MV²)~phys~0.5*M*V^2~4|" +
-        "unitConv~Unit Conversion~tools~~0|";
+        "unitConv~Unit Conversion~tools~~0|" +
+        "tipSplit~Tip Split ((B×(1+P/100))/N)~tools~(B*(1+P/100))/N~13|" +
+        "pctDecrease~Percent Decrease (B×(1-P/100))~tools~B*(1-P/100)~10|" +
+        "pctIncrease~Percent Increase (B×(1+P/100))~tools~B*(1+P/100)~10|" +
+        "pctReverse~Reverse Percent (B÷(1-P/100))~tools~B/(1-P/100)~10|" +
+        "randomRange~Random (A+rand(B))~tools~A+rand(B)~8|";
 
     private const FORMULA_CATEGORY_ORDER = ["geom", "phys", "tools", "custom"] as Array<String>;
     private const FORMULA_CATEGORY_LABELS = {
@@ -1427,8 +1432,7 @@ class calc_for_garminView extends WatchUi.View {
                 return;
             }
             randMax = maxOrNull as Double;
-            rollRandom();
-            exitEmbeddedFlow(engine.expr);
+            exitEmbeddedFlow(randomExpr());
             switchScreen(SCREEN_BASIC);
             return;
         } else if (action.equals("tip")) {
@@ -1458,9 +1462,8 @@ class calc_for_garminView extends WatchUi.View {
             if (ppl < 1) {
                 ppl = 1;
             }
-            var total = tipBill * (1.0d + tipPct / 100.0d);
-            engine.setResult(total / ppl);
-            exitEmbeddedFlow(engine.expr);
+            var tipExpr = "(" + engine.formatNumber(tipBill) + "*(1+" + engine.formatNumber(tipPct) + "/100))/" + ppl.toString();
+            exitEmbeddedFlow(tipExpr);
             switchScreen(SCREEN_BASIC);
             return;
         } else if (action.equals("apct")) {
@@ -1482,8 +1485,7 @@ class calc_for_garminView extends WatchUi.View {
             if (pctOrNull == null) {
                 return;
             }
-            engine.setResult(computePct(pctMode, pctBase, pctOrNull as Double));
-            exitEmbeddedFlow(engine.expr);
+            exitEmbeddedFlow(pctExpr(pctMode, pctBase, pctOrNull as Double));
             switchScreen(SCREEN_BASIC);
             return;
         } else if (action.equals("date")) {
@@ -1847,9 +1849,12 @@ class calc_for_garminView extends WatchUi.View {
         layoutButtons();
     }
 
-    // Rolls a random whole number in [min, max] (bounds are rounded and
-    // swapped if entered backwards) and shows it via the engine's display.
-    private function rollRandom() as Void {
+    // Builds "lo+rand(hi-lo)" (bounds rounded and swapped if entered
+    // backwards) instead of rolling the number here - this leaves the
+    // RANDOM function itself sitting in the main expression, same as a
+    // formula, so pressing "=" re-rolls it fresh (and pressing "=" again
+    // later re-rolls again), rather than pasting in one fixed result.
+    private function randomExpr() as String {
         var lo = (Math.round(randMin) as Numeric).toNumber();
         var hi = (Math.round(randMax) as Numeric).toNumber();
         if (hi < lo) {
@@ -1857,12 +1862,7 @@ class calc_for_garminView extends WatchUi.View {
             lo = hi;
             hi = tmp;
         }
-        var range = hi - lo + 1;
-        var r = Math.rand() % range;
-        if (r < 0) {
-            r = r + range;
-        }
-        engine.setResult((lo + r).toDouble());
+        return lo.toString() + "+rand(" + (hi - lo).toString() + ")";
     }
 
     // mode: 0 = discount (price after taking pct off base), 1 = markup
@@ -1879,6 +1879,24 @@ class calc_for_garminView extends WatchUi.View {
             denom = 0.01d;
         }
         return base / denom;
+    }
+
+    // Same three modes as computePct(), but as an expression string to
+    // leave in the main calculator (like a formula) instead of a
+    // pre-computed number. Mode 2 (base/(1-pct/100)) skips computePct()'s
+    // divide-by-zero guard on purpose - the guard exists to protect a
+    // Double computed once here, but as a live expression the calculator's
+    // own evaluator already reports a divide-by-zero as an error state,
+    // which is the more honest outcome for a 100%-discount base.
+    private function pctExpr(mode as Number, base as Double, pct as Double) as String {
+        var baseStr = engine.formatNumber(base);
+        var pctStr = engine.formatNumber(pct);
+        if (mode == 0) {
+            return baseStr + "*(1-" + pctStr + "/100)";
+        } else if (mode == 1) {
+            return baseStr + "*(1+" + pctStr + "/100)";
+        }
+        return baseStr + "/(1-" + pctStr + "/100)";
     }
 
     // Whole days from today until the given date (negative if it's past).
