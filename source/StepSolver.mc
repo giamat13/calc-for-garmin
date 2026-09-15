@@ -6,6 +6,7 @@ import Toybox.Math;
 // variable, or a value already fully resolved by sign/percent/brackets
 // wrapping a leaf) - anything else (a binary op or function call) is a
 // pending operation that computeSolutionSteps() can collapse one at a time.
+(:exclude_oldwidget)
 class StepNode {
     var kind as String; // "leaf", "bin", or "func"
     var start as Number;
@@ -27,6 +28,7 @@ class StepNode {
 // Returns the first (deepest, then highest-precedence, then left-most) node
 // still awaiting an operation - i.e. the next step of the solution - or
 // null if the whole tree is already a single leaf.
+(:exclude_oldwidget)
 function findFirstStepNode(n as StepNode) as StepNode? {
     if (n.kind.equals("leaf")) {
         return null;
@@ -49,6 +51,7 @@ function findFirstStepNode(n as StepNode) as StepNode? {
 // Same grammar/semantics as ExprParser, but building a span-tagged tree
 // instead of folding straight to a Double, so the engine can splice just
 // one sub-expression's result back into the displayed formula at a time.
+(:exclude_oldwidget)
 class StepSolver extends ExprParser {
 
     function initialize(str as String, xVal as Double, vars as Dictionary<String, Double>) {

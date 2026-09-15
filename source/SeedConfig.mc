@@ -25,13 +25,17 @@ class SeedConfig {
     // nav (MENU/BACK), top display background.
     var colors as Array<Number>;
     // Which tools appear in the MENU screen, and in what order. "Setup"
-    // and "BACK" are always appended by the view itself.
-    var menuItems as Array<String>;
-    // Per-screen slices of the pool - see class comment.
-    var basicLayout as Array<String>;   // 20 tokens, 4 cols x 5 rows
-    var sciLayout as Array<String>;     // 24 tokens, 4 cols x 6 rows
-    var advLayout as Array<String>;     // 18 tokens, 4 cols x 5 rows (last row uneven)
-    var unitsLayout as Array<String>;   // 12 tokens, 3 cols x 4 rows
+    // and "BACK" are always appended by the view itself. Lazy, same
+    // reasoning as the layout fields below.
+    private var _menuItems as Array<String>?;
+    // Per-screen slices of the pool - see class comment. Backing fields are
+    // lazy (null until first touched) so a fresh launch only pays for
+    // splitting the ONE screen actually shown first, not all 4 - real
+    // pressure on the smallest watches (see the pool comment above).
+    private var _basicLayout as Array<String>?;   // 20 tokens, 4 cols x 5 rows
+    private var _sciLayout as Array<String>?;     // 24 tokens, 4 cols x 6 rows
+    private var _advLayout as Array<String>?;     // 18 tokens, 4 cols x 5 rows (last row uneven)
+    private var _unitsLayout as Array<String>?;   // 12 tokens, 3 cols x 4 rows
     // The VAR screen (algebraic letters) isn't here - it's a fixed
     // alphabet, not a customizable slice of the pool (see
     // calc-for-garminView.VAR_LETTERS).
@@ -42,8 +46,9 @@ class SeedConfig {
     // "customN" id (N = index into customFormulas) can appear here too.
     // Independent of the P= pool - it's a variable-length subset pick, not
     // a fixed-grid permutation - so it's its own field ("F=") and adding it
-    // needed no SEED version bump (see parseFormulas()).
-    var formulaSubset as Array<String>;
+    // needed no SEED version bump (see parseFormulas()). Lazy, same
+    // reasoning as the layout fields above.
+    private var _formulaSubset as Array<String>?;
     // User-authored formulas from the setup page's custom-formula editor
     // ("U="), each a {label, tpl} pair - tpl is inserted into the
     // expression exactly like a built-in formula's template (see
@@ -104,12 +109,6 @@ class SeedConfig {
 
     function initialize(seed as String?) {
         colors = DEFAULT_COLORS;
-        menuItems = splitStr(DEFAULT_MENU, ",");
-        basicLayout = splitStr(DEFAULT_BASIC_LAYOUT, ",");
-        sciLayout = splitStr(DEFAULT_SCI_LAYOUT, ",");
-        advLayout = splitStr(DEFAULT_ADV_LAYOUT, ",");
-        unitsLayout = splitStr(DEFAULT_UNITS_LAYOUT, ",");
-        formulaSubset = splitStr(DEFAULT_FORMULA_SUBSET, ",");
         customFormulas = [] as Array<Dictionary<String, String> >;
         if (seed == null || seed.length() < 2 || !seed.substring(0, 2).equals("1|")) {
             return;
@@ -125,24 +124,70 @@ class SeedConfig {
             } else if (f.length() > 2 && f.substring(0, 2).equals("M=")) {
                 var parsedMenu = parseMenu(f.substring(2, f.length()));
                 if (parsedMenu != null && (parsedMenu as Array<String>).size() > 0) {
-                    menuItems = parsedMenu as Array<String>;
+                    _menuItems = parsedMenu as Array<String>;
                 }
             } else if (f.length() > 2 && f.substring(0, 2).equals("P=")) {
                 var pool = parsePermutation(f.substring(2, f.length()), requiredPool());
                 if (pool != null) {
                     var p = pool as Array<String>;
                     var offset = 0;
-                    basicLayout = sliceArr(p, offset, BASIC_LEN); offset += BASIC_LEN;
-                    sciLayout = sliceArr(p, offset, SCI_LEN); offset += SCI_LEN;
-                    advLayout = sliceArr(p, offset, ADV_LEN); offset += ADV_LEN;
-                    unitsLayout = sliceArr(p, offset, UNITS_LEN);
+                    _basicLayout = sliceArr(p, offset, BASIC_LEN); offset += BASIC_LEN;
+                    _sciLayout = sliceArr(p, offset, SCI_LEN); offset += SCI_LEN;
+                    _advLayout = sliceArr(p, offset, ADV_LEN); offset += ADV_LEN;
+                    _unitsLayout = sliceArr(p, offset, UNITS_LEN);
                 }
             } else if (f.length() >= 2 && f.substring(0, 2).equals("F=")) {
-                formulaSubset = parseFormulas(f.substring(2, f.length()));
+                _formulaSubset = parseFormulas(f.substring(2, f.length()));
             } else if (f.length() >= 2 && f.substring(0, 2).equals("U=")) {
                 customFormulas = parseCustomFormulas(f.substring(2, f.length()));
             }
         }
+    }
+
+    function menuItems() as Array<String> {
+        if (_menuItems == null) {
+            _menuItems = splitStr(DEFAULT_MENU, ",");
+        }
+        return _menuItems as Array<String>;
+    }
+
+    function formulaSubset() as Array<String> {
+        if (_formulaSubset == null) {
+            _formulaSubset = splitStr(DEFAULT_FORMULA_SUBSET, ",");
+        }
+        return _formulaSubset as Array<String>;
+    }
+
+    // Each screen's layout is only split from its default the first time
+    // it's actually shown (see the lazy backing fields above) - a P= seed
+    // already filled the backing field eagerly in initialize() above, so
+    // these just return it unchanged in that case.
+    function basicLayout() as Array<String> {
+        if (_basicLayout == null) {
+            _basicLayout = splitStr(DEFAULT_BASIC_LAYOUT, ",");
+        }
+        return _basicLayout as Array<String>;
+    }
+
+    function sciLayout() as Array<String> {
+        if (_sciLayout == null) {
+            _sciLayout = splitStr(DEFAULT_SCI_LAYOUT, ",");
+        }
+        return _sciLayout as Array<String>;
+    }
+
+    function advLayout() as Array<String> {
+        if (_advLayout == null) {
+            _advLayout = splitStr(DEFAULT_ADV_LAYOUT, ",");
+        }
+        return _advLayout as Array<String>;
+    }
+
+    function unitsLayout() as Array<String> {
+        if (_unitsLayout == null) {
+            _unitsLayout = splitStr(DEFAULT_UNITS_LAYOUT, ",");
+        }
+        return _unitsLayout as Array<String>;
     }
 
     private function requiredPool() as Array<String> {
@@ -299,17 +344,24 @@ class SeedConfig {
 
 // Monkey C's String has no built-in split().
 function splitStr(s as String, delim as String) as Array<String> {
+    // Scans by index instead of re-copying an ever-shrinking "rest" tail on
+    // every delimiter (that was O(n^2) transient garbage for a string with
+    // many fields - real pressure on the smallest watches).
     var out = [] as Array<String>;
-    var rest = s;
-    while (true) {
-        var idx = rest.find(delim);
-        if (idx == null) {
-            out.add(rest);
-            return out;
+    var len = s.length();
+    var dlen = delim.length();
+    var start = 0;
+    var i = 0;
+    while (i <= len - dlen) {
+        if ((s.substring(i, i + dlen) as String).equals(delim)) {
+            out.add(s.substring(start, i) as String);
+            i += dlen;
+            start = i;
+        } else {
+            i++;
         }
-        out.add(rest.substring(0, idx as Number) as String);
-        rest = rest.substring((idx as Number) + delim.length(), rest.length()) as String;
     }
+    out.add(s.substring(start, len) as String);
     return out;
 }
 
@@ -324,6 +376,16 @@ function specLookup(spec as String, key as String) as Array<String>? {
     if (i == null) {
         return null;
     }
-    var rest = spec.substring((i as Number) + key.length() + 2, spec.length()) as String;
-    return splitStr(rest.substring(0, rest.find(sep) as Number) as String, "~");
+    // Scans forward from the match for the row's closing separator instead
+    // of substring-ing everything from the match to the END of `spec` (the
+    // old `rest = spec.substring(i, spec.length())` copied up to the whole
+    // table on every lookup - real pressure on the smallest watches when
+    // the match is near the front of a long spec).
+    var start = (i as Number) + key.length() + 2;
+    var len = spec.length();
+    var j = start;
+    while (j < len && !(spec.substring(j, j + 1) as String).equals(sep)) {
+        j++;
+    }
+    return splitStr(spec.substring(start, j) as String, "~");
 }

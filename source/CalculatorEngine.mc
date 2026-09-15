@@ -400,6 +400,7 @@ class CalculatorEngine {
     // raw expression with no answer at all. Since the real answer is
     // already known, always make sure it ends up as the last step even if
     // the walk itself couldn't get there.
+    (:exclude_oldwidget)
     function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
         var steps = [] as Array<String>;
         if (startExpr.length() == 0) {
@@ -431,6 +432,28 @@ class CalculatorEngine {
             current = (current.substring(0, node.start) as String) + formatNumber(node.value) +
                 (current.substring(node.end, current.length()) as String);
             steps.add(current);
+        }
+        return ensureFinalAnswer(steps, knownAnswer);
+    }
+
+    // Low-memory fallback for watches too small to fit StepSolver (see the
+    // pool comment at the top of SeedConfig.mc for that device list) - no
+    // order-of-operations walk, just the typed expression (and, for an
+    // equation, its solved form) plus the already-known final answer. The
+    // history detail screen still works, it just skips the intermediate
+    // stages.
+    (:oldwidget_only)
+    function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
+        var steps = [] as Array<String>;
+        if (startExpr.length() == 0) {
+            return steps;
+        }
+        steps.add(startExpr);
+        if (startExpr.find("=") != null) {
+            var solved = solveEquationForDisplay(startExpr);
+            if (solved != null) {
+                steps.add(solved as String);
+            }
         }
         return ensureFinalAnswer(steps, knownAnswer);
     }

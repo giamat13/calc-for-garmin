@@ -28,6 +28,17 @@ class CalcButton {
     }
 }
 
+const MODULE_TOKEN_SPEC = ",blank~~,c~C~clear,del~DEL~back,pct~%~op:%,div~/~op:/,mul~*~op:*,sub~-~op:-,add~+~op:+,dot~.~digit:.,eq~=~equals,menu~MENU~menu,sin~sin~func:sin,cos~cos~func:cos,tan~tan~func:tan,sqrt~sqrt~func:sqrt,log~log~func:log,ln~ln~func:ln,sqr~x2~sqr,x~x~const:X,open~(~open,close~)~close,pow~^~op:^,pi~pi~const:π,e~e~const:e,adv~ADV~adv,uc~UC~units,rnd~RND~random,tip~TIP~tip,eqIns~=~eq,ans~Ans~ans,curl~<~curLeft,curr~>~curRight,backMenu~BACK~menu,asin~asin~func:asin,acos~acos~func:acos,atan~atan~func:atan,fact~x!~fact,inv~1/x~inv,cbrt~cbrt~func:cbrt,absv~|x|~func:abs,mod~mod~op:mod,ee~EE~ee,cube~x3~cube,floor~floor~func:floor,ceil~ceil~func:ceil,pow10~10x~pow10,frac~a/b~frac,var~VAR~var,backSci~BACK~sci,clr~CLR~varClear,dist~DIST~cat:dist,wt~WT~cat:weight,temp~TEMP~cat:temp,spd~SPD~cat:speed,pace~PACE~cat:pace,vol~VOL~cat:vol,area~AREA~cat:area,time~TIME~cat:time,pres~PRES~cat:pres,enrg~ENRG~cat:energy,cur~CUR~cat:cur,";
+
+(:exclude_oldwidget)
+const MODULE_SWITCH_SPEC = ",sci~1,basic~0,menu~10,setup~11,adv~2,unitCatBack~3,var~9,formulas~22,formulasMore~24,formulaListBack~22,formulaMoreListBack~24,nav~15,history~16,randBack~10,tipBack~10,pctBack~14,dateBack~14,more~14,moreBack~1,graphBack~14,colorBack~3,";
+
+// No graph/formulas/color entries here - none of those screens are
+// reachable on these watches (see moreButtons()/drawGraph() etc.), so
+// their back-target rows would never be looked up.
+(:oldwidget_only)
+const MODULE_SWITCH_SPEC = ",sci~1,basic~0,menu~10,setup~11,adv~2,unitCatBack~3,var~9,nav~15,history~16,randBack~10,tipBack~10,pctBack~14,dateBack~14,more~14,moreBack~1,";
+
 class calc_for_garminView extends WatchUi.View {
 
     const SCREEN_BASIC = 0;
@@ -83,7 +94,9 @@ class calc_for_garminView extends WatchUi.View {
     // that currency). Falls back to the last successfully fetched rates
     // (persisted in Storage), or to this hardcoded table on first-ever use
     // with no internet and no stored rates.
+    (:exclude_oldwidget)
     const CURRENCY_KEYS = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "BTC"] as Array<String>;
+    (:exclude_oldwidget)
     const DEFAULT_CURRENCY_RATES = {
         "USD" => 1.0d,
         "EUR" => 0.92d,
@@ -95,6 +108,20 @@ class calc_for_garminView extends WatchUi.View {
         // (see refreshBitcoinRate()); this is just a stale-but-sane seed.
         "BTC" => 0.000009d,
     } as Dictionary<String, Double>;
+
+    // Fewer currencies on these watches - still the majors, just without
+    // CAD/AUD/BTC's extra table weight (see the pool comment at the top of
+    // SeedConfig.mc for the device list this applies to).
+    (:oldwidget_only)
+    const CURRENCY_KEYS = ["USD", "EUR", "GBP", "JPY"] as Array<String>;
+    (:oldwidget_only)
+    const DEFAULT_CURRENCY_RATES = {
+        "USD" => 1.0d,
+        "EUR" => 0.92d,
+        "GBP" => 0.79d,
+        "JPY" => 149.5d,
+    } as Dictionary<String, Double>;
+
     private var currencyRates as Dictionary<String, Double> = DEFAULT_CURRENCY_RATES;
 
     // Currency autocomplete: after picking a first letter, the matching
@@ -347,19 +374,9 @@ class calc_for_garminView extends WatchUi.View {
     // ",token~label~action," rows (see specLookup() in SeedConfig.mc) - a
     // table instead of an if/else chain to stay under older watches' 64KB
     // widget memory limit. Tokens not listed ("0".."9") are digits.
-    private const TOKEN_SPEC = ",blank~~,c~C~clear,del~DEL~back,pct~%~op:%,div~/~op:/,mul~*~op:*,sub~-~op:-,add~+~op:+," +
-        "dot~.~digit:.,eq~=~equals,menu~MENU~menu,sin~sin~func:sin,cos~cos~func:cos,tan~tan~func:tan," +
-        "sqrt~sqrt~func:sqrt,log~log~func:log,ln~ln~func:ln,sqr~x2~sqr,x~x~const:X,open~(~open,close~)~close," +
-        "pow~^~op:^,pi~pi~const:π,e~e~const:e,adv~ADV~adv,uc~UC~units,rnd~RND~random,tip~TIP~tip,eqIns~=~eq," +
-        "ans~Ans~ans,curl~<~curLeft,curr~>~curRight,backMenu~BACK~menu,asin~asin~func:asin,acos~acos~func:acos," +
-        "atan~atan~func:atan,fact~x!~fact,inv~1/x~inv,cbrt~cbrt~func:cbrt,absv~|x|~func:abs,mod~mod~op:mod," +
-        "ee~EE~ee,cube~x3~cube,floor~floor~func:floor,ceil~ceil~func:ceil,pow10~10x~pow10,frac~a/b~frac," +
-        "var~VAR~var,backSci~BACK~sci,clr~CLR~varClear,dist~DIST~cat:dist,wt~WT~cat:weight,temp~TEMP~cat:temp," +
-        "spd~SPD~cat:speed,pace~PACE~cat:pace,vol~VOL~cat:vol,area~AREA~cat:area,time~TIME~cat:time," +
-        "pres~PRES~cat:pres,enrg~ENRG~cat:energy,cur~CUR~cat:cur,";
 
     private function tokenToButton(token as String) as CalcButton {
-        var f = specLookup(TOKEN_SPEC, token);
+        var f = specLookup(MODULE_TOKEN_SPEC, token);
         if (f == null) {
             return new CalcButton(token, "digit:" + token);
         }
@@ -392,7 +409,7 @@ class calc_for_garminView extends WatchUi.View {
     // Which button sits in which of the 20 cells comes from SeedConfig
     // (set via the setup web page's SEED code). 4 cols x 5 rows.
     private function basicButtons() as Array<CalcButton> {
-        return buttonsFromTokens(SeedConfig.get().basicLayout);
+        return buttonsFromTokens(SeedConfig.get().basicLayout());
     }
 
     // Tool hub: every advanced tool is one tap away from here instead of
@@ -401,8 +418,9 @@ class calc_for_garminView extends WatchUi.View {
     // "BACK" is always appended. Setup is NOT one of these - it's a small
     // corner button laid out separately (see layoutButtons()) so it never
     // competes for attention with the actual tools. 2 cols x 4 rows.
+    (:exclude_oldwidget)
     private function menuButtons() as Array<CalcButton> {
-        var items = SeedConfig.get().menuItems;
+        var items = SeedConfig.get().menuItems();
         var defs = [] as Array<CalcButton>;
         for (var i = 0; i < items.size(); i++) {
             var f = specLookup(",sci~fx~sci,units~Units~units,tip~Tip~tip,rnd~RND~random,var~VAR~var,apct~PCT+~apct,date~DATE~date,nav~NAV~nav,", items[i]);
@@ -420,6 +438,23 @@ class calc_for_garminView extends WatchUi.View {
         return defs;
     }
 
+    // FORM is dropped on these watches (see FORMULA_CATALOG below - it's
+    // empty there, so there'd be nothing to show) - no dead button leading
+    // to an empty formulas screen.
+    (:oldwidget_only)
+    private function menuButtons() as Array<CalcButton> {
+        var items = SeedConfig.get().menuItems();
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < items.size(); i++) {
+            var f = specLookup(",sci~fx~sci,units~Units~units,tip~Tip~tip,rnd~RND~random,var~VAR~var,apct~PCT+~apct,date~DATE~date,nav~NAV~nav,", items[i]);
+            if (f != null) {
+                defs.add(new CalcButton(f[0], f[1]));
+            }
+        }
+        defs.add(new CalcButton("BACK", "basic"));
+        return defs;
+    }
+
     // QR code + "open on phone" link to the setup web page where colors
     // and the MENU item order are customized into a SEED code, pasted
     // back into this app's Connect IQ settings. 2 cols x 1 row.
@@ -432,13 +467,13 @@ class calc_for_garminView extends WatchUi.View {
     // for building equations. BACK is just another token in the pool now
     // (not pinned), so it can be moved like anything else. 4 cols x 6 rows.
     private function scientificButtons() as Array<CalcButton> {
-        return buttonsFromTokens(SeedConfig.get().sciLayout);
+        return buttonsFromTokens(SeedConfig.get().sciLayout());
     }
 
     // Advanced screen: inverse trig, roots, integer/rounding ops and the
     // ×10^x shortcut for entering numbers in scientific notation. 4 cols x 5 rows.
     private function advancedButtons() as Array<CalcButton> {
-        return buttonsFromTokens(SeedConfig.get().advLayout);
+        return buttonsFromTokens(SeedConfig.get().advLayout());
     }
 
     // Every letter usable as an algebraic unknown, e.g. tapping X then
@@ -478,36 +513,28 @@ class calc_for_garminView extends WatchUi.View {
     // the cursor arrows like any other mid-expression edit.
     // "|id~label~cat~tpl~back|" rows (see specLookup() in SeedConfig.mc;
     // "|"-separated because labels contain commas).
-    private const FORMULA_CATALOG = "|" +
-        "circleArea~Circle Area (πR²)~geom~π*R^2~2|" +
-        "circleCircumference~Circle Circumference (2πR)~geom~2*π*R~0|" +
-        "pythagorean~Pythagorean Theorem~geom~sqrt(A^2+B^2)~7|" +
-        "rectangleArea~Rectangle Area (L×W)~geom~L*W~2|" +
-        "triangleArea~Triangle Area (½B×H)~geom~0.5*B*H~2|" +
-        "trapezoidArea~Trapezoid Area (½(A+B)×H)~geom~0.5*(A+B)*H~5|" +
-        "parallelogramArea~Parallelogram Area (B×H)~geom~B*H~2|" +
-        "rectanglePerimeter~Rectangle Perimeter (2(L+W))~geom~2*(L+W)~3|" +
-        "sphereVolume~Sphere Volume~geom~(4/3)*π*R^3~2|" +
-        "sphereSurfaceArea~Sphere Surface Area (4πR²)~geom~4*π*R^2~2|" +
-        "cubeVolume~Cube Volume (S³)~geom~S^3~2|" +
-        "cylinderVolume~Cylinder Volume~geom~π*R^2*H~4|" +
-        "cylinderSurfaceArea~Cylinder Surface Area~geom~2*π*R*(R+H)~6|" +
-        "coneVolume~Cone Volume~geom~(1/3)*π*R^2*H~4|" +
-        "distanceBetweenPoints~Distance (A,B)-(C,D)~geom~sqrt((C-A)^2+(D-B)^2)~14|" +
-        "speedDistTime~Speed (D÷T)~phys~D/T~2|" +
-        "force~Force (F=M×A)~phys~M*A~2|" +
-        "kineticEnergy~Kinetic Energy (½MV²)~phys~0.5*M*V^2~4|" +
-        "unitConv~Unit Conversion~tools~~0|" +
-        "tipSplit~Tip Split ((B×(1+P/100))/N)~tools~(B*(1+P/100))/N~13|" +
-        "pctDecrease~Percent Decrease (B×(1-P/100))~tools~B*(1-P/100)~10|" +
-        "pctIncrease~Percent Increase (B×(1+P/100))~tools~B*(1+P/100)~10|" +
-        "pctReverse~Reverse Percent (B÷(1-P/100))~tools~B/(1-P/100)~10|" +
-        "randomRange~Random (A+rand(B))~tools~A+rand(B)~8|";
+    (:exclude_oldwidget)
+    private const FORMULA_CATALOG = "|circleArea~Circle Area (πR²)~geom~π*R^2~2|circleCircumference~Circle Circumference (2πR)~geom~2*π*R~0|pythagorean~Pythagorean Theorem~geom~sqrt(A^2+B^2)~7|rectangleArea~Rectangle Area (L×W)~geom~L*W~2|triangleArea~Triangle Area (½B×H)~geom~0.5*B*H~2|trapezoidArea~Trapezoid Area (½(A+B)×H)~geom~0.5*(A+B)*H~5|parallelogramArea~Parallelogram Area (B×H)~geom~B*H~2|rectanglePerimeter~Rectangle Perimeter (2(L+W))~geom~2*(L+W)~3|sphereVolume~Sphere Volume~geom~(4/3)*π*R^3~2|sphereSurfaceArea~Sphere Surface Area (4πR²)~geom~4*π*R^2~2|cubeVolume~Cube Volume (S³)~geom~S^3~2|cylinderVolume~Cylinder Volume~geom~π*R^2*H~4|cylinderSurfaceArea~Cylinder Surface Area~geom~2*π*R*(R+H)~6|coneVolume~Cone Volume~geom~(1/3)*π*R^2*H~4|distanceBetweenPoints~Distance (A,B)-(C,D)~geom~sqrt((C-A)^2+(D-B)^2)~14|speedDistTime~Speed (D÷T)~phys~D/T~2|force~Force (F=M×A)~phys~M*A~2|kineticEnergy~Kinetic Energy (½MV²)~phys~0.5*M*V^2~4|unitConv~Unit Conversion~tools~~0|tipSplit~Tip Split ((B×(1+P/100))/N)~tools~(B*(1+P/100))/N~13|pctDecrease~Percent Decrease (B×(1-P/100))~tools~B*(1-P/100)~10|pctIncrease~Percent Increase (B×(1+P/100))~tools~B*(1+P/100)~10|pctReverse~Reverse Percent (B÷(1-P/100))~tools~B/(1-P/100)~10|randomRange~Random (A+rand(B))~tools~A+rand(B)~8|";
 
+    // FORMULAS isn't reachable on these watches at all (see menuButtons()
+    // above - no FORM button there), so an empty catalog/category set is
+    // never actually shown to anyone - it just has to exist so the
+    // (still-compiled, unreachable) formula* functions below have
+    // something to look up.
+    (:oldwidget_only)
+    private const FORMULA_CATALOG = "|";
+
+    (:exclude_oldwidget)
     private const FORMULA_CATEGORY_ORDER = ["geom", "phys", "tools", "custom"] as Array<String>;
+    (:oldwidget_only)
+    private const FORMULA_CATEGORY_ORDER = [] as Array<String>;
+
+    (:exclude_oldwidget)
     private const FORMULA_CATEGORY_LABELS = {
         "geom" => "Geometry", "phys" => "Physics", "tools" => "Tools", "custom" => "Custom"
     } as Dictionary<String, String>;
+    (:oldwidget_only)
+    private const FORMULA_CATEGORY_LABELS = {} as Dictionary<String, String>;
 
     // Resolves a formula id to its {label,cat,tpl,back} entry. Built-in ids
     // come straight from FORMULA_CATALOG; a "customN" id (N = index into
@@ -580,7 +607,7 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     private function formulaCategoryButtons() as Array<CalcButton> {
-        var subset = SeedConfig.get().formulaSubset;
+        var subset = SeedConfig.get().formulaSubset();
         var defs = [] as Array<CalcButton>;
         for (var i = 0; i < FORMULA_CATEGORY_ORDER.size(); i++) {
             var cat = FORMULA_CATEGORY_ORDER[i] as String;
@@ -596,7 +623,7 @@ class calc_for_garminView extends WatchUi.View {
     }
 
     private function formulaMoreCategoryButtons() as Array<CalcButton> {
-        var notSubset = formulasNotIn(SeedConfig.get().formulaSubset);
+        var notSubset = formulasNotIn(SeedConfig.get().formulaSubset());
         var defs = [] as Array<CalcButton>;
         for (var i = 0; i < FORMULA_CATEGORY_ORDER.size(); i++) {
             var cat = FORMULA_CATEGORY_ORDER[i] as String;
@@ -610,7 +637,7 @@ class calc_for_garminView extends WatchUi.View {
 
     // Step 1 of the unit converter: pick WHAT to measure. 3 cols x 4 rows.
     private function unitCategoryButtons() as Array<CalcButton> {
-        return buttonsFromTokens(SeedConfig.get().unitsLayout);
+        return buttonsFromTokens(SeedConfig.get().unitsLayout());
     }
 
     // The unit keys that belong to each measurement category, in display order.
@@ -816,8 +843,17 @@ class calc_for_garminView extends WatchUi.View {
 
     // Overflow hub, one tap off the Scientific screen's "MORE" corner
     // button: the less-everyday tools that got moved off the default MENU.
+    (:exclude_oldwidget)
     private function moreButtons() as Array<CalcButton> {
         return btns("PCT+~apct,DATE~date,VAR~var,GRAPH~graph,BASE~base,COUNT~counter,BACK~moreBack");
+    }
+
+    // GRAPH/BASE/COUNT are dropped on these watches (see drawGraph(),
+    // drawBaseView(), drawCounterView() above) - no dead buttons pointing
+    // at screens with nothing to show.
+    (:oldwidget_only)
+    private function moreButtons() as Array<CalcButton> {
+        return btns("PCT+~apct,DATE~date,VAR~var,BACK~moreBack");
     }
 
     // Tally counter: +1/-1 tally. "+N" opens a keypad to type an amount
@@ -1124,14 +1160,14 @@ class calc_for_garminView extends WatchUi.View {
             }
             footer.add(new CalcButton("BACK", "history"));
         } else if (screen == SCREEN_FORMULA_LIST) {
-            var ids = formulaIdsInCategory(formulaCategory, SeedConfig.get().formulaSubset);
+            var ids = formulaIdsInCategory(formulaCategory, SeedConfig.get().formulaSubset());
             for (var i = 0; i < ids.size(); i++) {
                 var entry = formulaEntry(ids[i]);
                 items.add(new CalcButton(entry != null ? entry["label"] as String : ids[i], "formula:" + ids[i]));
             }
             footer.add(new CalcButton("BACK", "formulaListBack"));
         } else {
-            var moreIds = formulaIdsInCategory(formulaCategory, formulasNotIn(SeedConfig.get().formulaSubset));
+            var moreIds = formulaIdsInCategory(formulaCategory, formulasNotIn(SeedConfig.get().formulaSubset()));
             for (var i = 0; i < moreIds.size(); i++) {
                 var entry2 = formulaEntry(moreIds[i]);
                 items.add(new CalcButton(entry2 != null ? entry2["label"] as String : moreIds[i], "formula:" + moreIds[i]));
@@ -1322,11 +1358,10 @@ class calc_for_garminView extends WatchUi.View {
     // Actions that only switch screens, as ",action~SCREEN_* id," rows -
     // a table instead of if/else branches to stay under older watches'
     // 64KB widget limit.
-    private const SWITCH_SPEC = ",sci~1,basic~0,menu~10,setup~11,adv~2,unitCatBack~3,var~9,formulas~22,formulasMore~24,formulaListBack~22,formulaMoreListBack~24,nav~15,history~16,randBack~10,tipBack~10,pctBack~14,dateBack~14,more~14,moreBack~1,graphBack~14,colorBack~3,";
 
     function activate(b as CalcButton) as Void {
         var action = b.action;
-        var target = specLookup(SWITCH_SPEC, action);
+        var target = specLookup(MODULE_SWITCH_SPEC, action);
         if (target != null) {
             switchScreen(target[0].toNumber() as Number);
             return;
@@ -2098,12 +2133,14 @@ class calc_for_garminView extends WatchUi.View {
 
     // Evaluates graphExpr at one X, or null if the parser errored there
     // (e.g. "1/X" at X=0).
+    (:exclude_oldwidget)
     private function sampleGraph(x as Double) as Double? {
         var parser = new ExprParser(graphExpr, x, engine.variables);
         var v = parser.parse();
         return parser.error ? null : v;
     }
 
+    (:exclude_oldwidget)
     private function computeGraphSamples() as Void {
         var ys = new [GRAPH_SAMPLES] as Array<Double?>;
         var minY = null as Double?;
@@ -2129,6 +2166,15 @@ class calc_for_garminView extends WatchUi.View {
         graphHi = hi;
     }
 
+    // GRAPH isn't reachable at all on these watches (see moreButtons() -
+    // the low-memory variant drops the GRAPH button), but activate()'s
+    // "graph" branch is one shared if-chain compiled for every device, so
+    // the symbol still has to exist here - it just never runs.
+    (:oldwidget_only)
+    private function computeGraphSamples() as Void {
+    }
+
+    (:exclude_oldwidget)
     private function drawGraph(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
         if (w < 2) {
             return;
@@ -2164,10 +2210,18 @@ class calc_for_garminView extends WatchUi.View {
         }
     }
 
+    // See computeGraphSamples() above - GRAPH is unreachable on these
+    // watches, this stub only exists so onUpdate()'s shared SCREEN_GRAPH
+    // branch still compiles.
+    (:oldwidget_only)
+    private function drawGraph(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
+    }
+
     // Digit-by-digit conversion of a signed Number into any base 2-36 via
     // repeated division - the sign is peeled off first and reattached at
     // the end, since Monkey C's %/ on a negative Number would otherwise
     // produce a negative remainder mid-conversion.
+    (:exclude_oldwidget)
     private function toBaseString(v as Number, radix as Number) as String {
         if (v == 0) {
             return "0";
@@ -2187,6 +2241,7 @@ class calc_for_garminView extends WatchUi.View {
     // Test-only hook, same reasoning as colorHex(): the custom-radix line
     // only ever gets pixel-compared on a real Dc, so tests assert on this
     // string directly instead.
+    (:exclude_oldwidget)
     function baseCustomString() as String {
         return "R" + baseRadix.toString() + " " + toBaseString(baseValue, baseRadix);
     }
@@ -2197,6 +2252,7 @@ class calc_for_garminView extends WatchUi.View {
         return counterValue.toString();
     }
 
+    (:exclude_oldwidget)
     private function drawBaseView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
         var lines = [
             "DEC " + baseValue.toString(),
@@ -2213,8 +2269,20 @@ class calc_for_garminView extends WatchUi.View {
         }
     }
 
+    // BASE isn't reachable on these watches (see moreButtons() below) -
+    // these stubs only exist so the shared activate()/onUpdate() branches
+    // that call them still compile; they're never actually invoked.
+    (:oldwidget_only)
+    function baseCustomString() as String {
+        return "";
+    }
+    (:oldwidget_only)
+    private function drawBaseView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
+    }
+
     // Two hex digits for one 0-255 channel, zero-padded (unlike
     // toBaseString(), a color hex code needs the leading zero - "00" not "").
+    (:exclude_oldwidget)
     private function hexByte(v as Number) as String {
         var digits = "0123456789ABCDEF";
         return digits.substring((v / 16) % 16, (v / 16) % 16 + 1) + digits.substring(v % 16, v % 16 + 1);
@@ -2222,8 +2290,15 @@ class calc_for_garminView extends WatchUi.View {
 
     // Test-only hook: the swatch itself only ever gets pixel-compared on a
     // real Dc, so tests instead assert on this #HEX string directly.
+    (:exclude_oldwidget)
     function colorHex() as String {
         return "#" + hexByte(colorR) + hexByte(colorG) + hexByte(colorB);
+    }
+    // COLOR isn't reachable on these watches (see the RGB corner button in
+    // layoutButtons() below) - stub only so colorHex()'s callers compile.
+    (:oldwidget_only)
+    function colorHex() as String {
+        return "#000000";
     }
 
     private function drawCounterView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
@@ -2234,6 +2309,7 @@ class calc_for_garminView extends WatchUi.View {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
+    (:exclude_oldwidget)
     private function drawColorSwatch(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
         var packed = (colorR << 16) | (colorG << 8) | colorB;
         var swatchH = (h * 0.7).toNumber();
@@ -2242,6 +2318,9 @@ class calc_for_garminView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x0 + w / 2, y0 + swatchH + (h - swatchH) / 2, Graphics.FONT_SMALL,
             colorHex(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+    (:oldwidget_only)
+    private function drawColorSwatch(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
     }
 
     function onUpdate(dc as Dc) as Void {

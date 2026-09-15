@@ -1,1 +1,11 @@
 project.manifest = manifest.xml
+
+# Devices too memory-constrained to run this app at all were dropped from
+# manifest.xml (see the pool comment at the top of SeedConfig.mc for the
+# background) rather than shipping a crippled build - every remaining
+# device gets the full app. Some source files still carry a leftover
+# "(:oldwidget_only)"/"(:exclude_oldwidget)" annotation pair from when a
+# lighter build was attempted for those devices; this line keeps every
+# device on the "exclude_oldwidget" (full-featured) side. Safe to remove
+# once those leftover annotations are cleaned up.
+base.excludeAnnotations = oldwidget_only

@@ -22,7 +22,6 @@
             <iq:product id="d2mach1"/>
             <iq:product id="d2mach2"/>
             <iq:product id="d2mach2pro"/>
-            <iq:product id="descentg1"/>
             <iq:product id="descentg2"/>
             <iq:product id="descentmk2"/>
             <iq:product id="descentmk2s"/>
@@ -41,7 +40,6 @@
             <iq:product id="edge850"/>
             <iq:product id="edgeexplore2"/>
             <iq:product id="edgemtb"/>
-            <iq:product id="enduro"/>
             <iq:product id="enduro3"/>
             <iq:product id="epix2"/>
             <iq:product id="epix2pro42mm"/>
@@ -51,9 +49,7 @@
             <iq:product id="fenix5plus"/>
             <iq:product id="fenix5splus"/>
             <iq:product id="fenix5xplus"/>
-            <iq:product id="fenix6"/>
             <iq:product id="fenix6pro"/>
-            <iq:product id="fenix6s"/>
             <iq:product id="fenix6spro"/>
             <iq:product id="fenix6xpro"/>
             <iq:product id="fenix7"/>
@@ -81,7 +77,6 @@
             <iq:product id="fr165m"/>
             <iq:product id="fr170"/>
             <iq:product id="fr170m"/>
-            <iq:product id="fr245"/>
             <iq:product id="fr245m"/>
             <iq:product id="fr255"/>
             <iq:product id="fr255m"/>
@@ -89,7 +84,6 @@
             <iq:product id="fr255sm"/>
             <iq:product id="fr265"/>
             <iq:product id="fr265s"/>
-            <iq:product id="fr55"/>
             <iq:product id="fr57042mm"/>
             <iq:product id="fr57047mm"/>
             <iq:product id="fr645m"/>
@@ -102,13 +96,9 @@
             <iq:product id="fr970"/>
             <iq:product id="gpsmap67"/>
             <iq:product id="gpsmaph1"/>
-            <iq:product id="instinct2"/>
-            <iq:product id="instinct2s"/>
-            <iq:product id="instinct2x"/>
             <iq:product id="instinct3amoled45mm"/>
             <iq:product id="instinct3amoled50mm"/>
             <iq:product id="instinct3solar45mm"/>
-            <iq:product id="instinctcrossover"/>
             <iq:product id="instinctcrossoveramoled"/>
             <iq:product id="instincte40mm"/>
             <iq:product id="instincte45mm"/>
@@ -136,7 +126,6 @@
             <iq:product id="venu441mm"/>
             <iq:product id="venu445mm"/>
             <iq:product id="venud"/>
-            <iq:product id="venusq"/>
             <iq:product id="venusq2"/>
             <iq:product id="venusq2m"/>
             <iq:product id="venusqm"/>
