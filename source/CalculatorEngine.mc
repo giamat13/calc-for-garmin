@@ -407,12 +407,25 @@ class CalculatorEngine {
             return steps;
         }
         steps.add(startExpr);
-        if (startExpr.find("=") != null) {
-            // Equation-solving isn't an order-of-operations walk - show the
-            // equation, an optional "collect terms" step (aX=C) when it
-            // adds real information, then the solved form.
+        var eqIdxOrNull = startExpr.find("=");
+        if (eqIdxOrNull != null) {
+            // Equation-solving on top of an order-of-operations walk: first
+            // collapse whichever side is pure arithmetic (no unknown) one
+            // step at a time - e.g. "5+5*3=X" -> "5+15=X" -> "20=X" - then
+            // show the optional "collect terms" step (aX=C) when it adds
+            // real information, then the solved form.
+            var eqIdx = eqIdxOrNull as Number;
+            var lhsPart = closeUnmatchedParens(startExpr.substring(0, eqIdx) as String);
+            var rhsPart = closeUnmatchedParens(startExpr.substring(eqIdx + 1, startExpr.length()) as String);
+            var letterLhs = findVariableLetter(lhsPart);
+            var letterRhs = findVariableLetter(rhsPart);
+            if (letterLhs == null && letterRhs != null && lhsPart.length() > 0) {
+                walkEquationSide(steps, lhsPart, rhsPart, true);
+            } else if (letterRhs == null && letterLhs != null && rhsPart.length() > 0) {
+                walkEquationSide(steps, lhsPart, rhsPart, false);
+            }
             var collect = equationCollectStep(startExpr);
-            if (collect != null && !(collect as String).equals(startExpr)) {
+            if (collect != null && !(collect as String).equals(startExpr) && !(collect as String).equals(steps[steps.size() - 1])) {
                 steps.add(collect as String);
             }
             var solved = solveEquationForDisplay(startExpr);
@@ -439,6 +452,32 @@ class CalculatorEngine {
             steps.add(current);
         }
         return ensureFinalAnswer(steps, knownAnswer);
+    }
+
+    // Order-of-operations walk for one side of an equation whose other side
+    // is just the bare unknown - reuses the same collapse loop as the
+    // non-equation branch of computeSolutionSteps(), but re-glues each
+    // intermediate result back onto the untouched side with "=" so every
+    // step still reads as a full equation (e.g. walkLhs: "5+15=X",
+    // "20=X"). Appends steps in place; does nothing if the walked side
+    // fails to parse (the caller's collect/solved steps still run).
+    (:exclude_oldwidget)
+    private function walkEquationSide(steps as Array<String>, lhs as String, rhs as String, walkLhs as Boolean) as Void {
+        var current = walkLhs ? lhs : rhs;
+        for (var guard = 0; guard < 64; guard++) {
+            var solver = new StepSolver(closeUnmatchedParens(current), 0.0d, variables);
+            var root = solver.buildTree();
+            if (solver.error || root == null) {
+                return;
+            }
+            var node = findFirstStepNode(root as StepNode);
+            if (node == null) {
+                break;
+            }
+            current = (current.substring(0, node.start) as String) + formatNumber(node.value) +
+                (current.substring(node.end, current.length()) as String);
+            steps.add(walkLhs ? (current + "=" + rhs) : (lhs + "=" + current));
+        }
     }
 
     // Low-memory fallback for watches too small to fit StepSolver (see the
