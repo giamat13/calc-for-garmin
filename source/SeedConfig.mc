@@ -55,6 +55,7 @@ class SeedConfig {
     // calc-for-garminView.activate()'s "formula:" handling). No device-side
     // limit; the SEED string is the only practical ceiling.
     var customFormulas as Array<Dictionary<String, String> >;
+    var easterEggs as Boolean = false;
 
     private static var instance as SeedConfig?;
 
@@ -110,6 +111,14 @@ class SeedConfig {
     function initialize(seed as String?) {
         colors = DEFAULT_COLORS;
         customFormulas = [] as Array<Dictionary<String, String> >;
+        try {
+            var ee = Application.Properties.getValue("easterEggs");
+            if (ee != null && ee instanceof Lang.Boolean) {
+                easterEggs = ee as Boolean;
+            }
+        } catch (e) {
+            easterEggs = false;
+        }
         if (seed == null || seed.length() < 2 || !seed.substring(0, 2).equals("1|")) {
             return;
         }

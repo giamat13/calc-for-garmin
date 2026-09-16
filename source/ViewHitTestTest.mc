@@ -699,3 +699,57 @@ function testCurrencyLetterScreenIsSortedWithoutArraySort(logger as Test.Logger)
     }
     return true;
 }
+
+(:test)
+function testEasterEggsWhenEnabledAndDisabled(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+
+    // When disabled, +6%+ does not trigger easter egg
+    SeedConfig.get().easterEggs = false;
+    v.engine.clear();
+    v.activate(new CalcButton("+", "op:+"));
+    v.activate(new CalcButton("6", "digit:6"));
+    v.activate(new CalcButton("%", "op:%"));
+    v.activate(new CalcButton("+", "op:+"));
+    v.activate(new CalcButton("=", "equals"));
+    if (v.popupKind != null) {
+        logger.debug("Easter eggs should not trigger when disabled");
+        return false;
+    }
+
+    // When enabled, +6%+ -> popupKind = "hebrew_profit"
+    SeedConfig.get().easterEggs = true;
+    v.engine.clear();
+    v.activate(new CalcButton("+", "op:+"));
+    v.activate(new CalcButton("6", "digit:6"));
+    v.activate(new CalcButton("%", "op:%"));
+    v.activate(new CalcButton("+", "op:+"));
+    v.activate(new CalcButton("=", "equals"));
+    if (v.popupKind == null || !(v.popupKind as String).equals("hebrew_profit")) {
+        logger.debug("Expected popupKind 'hebrew_profit', got: " + v.popupKind);
+        return false;
+    }
+    // Test dismiss
+    v.dismissPopup();
+    if (v.popupKind != null) {
+        logger.debug("Expected popup to be dismissed");
+        return false;
+    }
+
+    // When enabled, 42 -> popupKind = "answer_to_life"
+    v.engine.clear();
+    v.activate(new CalcButton("4", "digit:4"));
+    v.activate(new CalcButton("2", "digit:2"));
+    v.activate(new CalcButton("=", "equals"));
+    if (v.popupKind == null || !(v.popupKind as String).equals("answer_to_life")) {
+        logger.debug("Expected popupKind 'answer_to_life', got: " + v.popupKind);
+        return false;
+    }
+    v.dismissPopup();
+
+    // Reset back to default
+    SeedConfig.get().easterEggs = false;
+    return true;
+}
+
