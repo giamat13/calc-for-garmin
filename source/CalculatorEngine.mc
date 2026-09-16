@@ -417,12 +417,12 @@ class CalculatorEngine {
             var eqIdx = eqIdxOrNull as Number;
             var lhsPart = closeUnmatchedParens(startExpr.substring(0, eqIdx) as String);
             var rhsPart = closeUnmatchedParens(startExpr.substring(eqIdx + 1, startExpr.length()) as String);
-            var letterLhs = findVariableLetter(lhsPart);
-            var letterRhs = findVariableLetter(rhsPart);
-            if (letterLhs == null && letterRhs != null && lhsPart.length() > 0) {
-                walkEquationSide(steps, lhsPart, rhsPart, true);
-            } else if (letterRhs == null && letterLhs != null && rhsPart.length() > 0) {
-                walkEquationSide(steps, lhsPart, rhsPart, false);
+            var letter = findVariableLetter(lhsPart);
+            if (letter == null) {
+                letter = findVariableLetter(rhsPart);
+            }
+            if (letter != null) {
+                walkEquationConstants(steps, letter as String, lhsPart, rhsPart);
             }
             var collect = equationCollectStep(startExpr);
             if (collect != null && !(collect as String).equals(startExpr) && !(collect as String).equals(steps[steps.size() - 1])) {
@@ -454,30 +454,109 @@ class CalculatorEngine {
         return ensureFinalAnswer(steps, knownAnswer);
     }
 
-    // Order-of-operations walk for one side of an equation whose other side
-    // is just the bare unknown - reuses the same collapse loop as the
-    // non-equation branch of computeSolutionSteps(), but re-glues each
-    // intermediate result back onto the untouched side with "=" so every
-    // step still reads as a full equation (e.g. walkLhs: "5+15=X",
-    // "20=X"). Appends steps in place; does nothing if the walked side
-    // fails to parse (the caller's collect/solved steps still run).
+    // Order-of-operations walk for both sides of an equation, but constants
+    // only - any subtree that has the unknown letter inside it is left
+    // untouched, so a mixed side like "5-4+X" collapses to "1+X" instead of
+    // jumping straight past it. Each iteration collapses one pure-constant
+    // node (lhs first, then rhs) and re-glues both sides with "=" so every
+    // step still reads as a full equation (e.g. "5-4+X=30" -> "1+X=30").
+    // Appends steps in place; stops once neither side has a collapsible
+    // constant part left.
     (:exclude_oldwidget)
-    private function walkEquationSide(steps as Array<String>, lhs as String, rhs as String, walkLhs as Boolean) as Void {
-        var current = walkLhs ? lhs : rhs;
+    private function walkEquationConstants(steps as Array<String>, letter as String, lhsIn as String, rhsIn as String) as Void {
+        var lhs = lhsIn;
+        var rhs = rhsIn;
         for (var guard = 0; guard < 64; guard++) {
-            var solver = new StepSolver(closeUnmatchedParens(current), 0.0d, variables);
-            var root = solver.buildTree();
-            if (solver.error || root == null) {
-                return;
+            var collapsedLhs = collapseOnePureNode(lhs, letter);
+            if (collapsedLhs != null) {
+                lhs = collapsedLhs as String;
+                steps.add(lhs + "=" + rhs);
+                continue;
             }
-            var node = findFirstStepNode(root as StepNode);
-            if (node == null) {
-                break;
+            var collapsedRhs = collapseOnePureNode(rhs, letter);
+            if (collapsedRhs != null) {
+                rhs = collapsedRhs as String;
+                steps.add(lhs + "=" + rhs);
+                continue;
             }
-            current = (current.substring(0, node.start) as String) + formatNumber(node.value) +
-                (current.substring(node.end, current.length()) as String);
-            steps.add(walkLhs ? (current + "=" + rhs) : (lhs + "=" + current));
+            break;
         }
+    }
+
+    // Collapses the first (deepest, leftmost) constants-only node in
+    // `sideExpr`, skipping any subtree that contains the unknown letter -
+    // those get resolved later by equationCollectStep()/
+    // solveEquationForDisplay() instead. Returns null when the side fails
+    // to parse or has nothing left to collapse.
+    (:exclude_oldwidget)
+    private function collapseOnePureNode(sideExpr as String, letter as String) as String? {
+        if (sideExpr.length() == 0) {
+            return null;
+        }
+        var solver = new StepSolver(closeUnmatchedParens(sideExpr), 0.0d, variables);
+        var root = solver.buildTree();
+        if (solver.error || root == null) {
+            return null;
+        }
+        var node = findFirstPureStepNode(root as StepNode, letter, sideExpr);
+        if (node == null) {
+            return null;
+        }
+        return (sideExpr.substring(0, node.start) as String) + formatNumber(node.value) +
+            (sideExpr.substring(node.end, sideExpr.length()) as String);
+    }
+
+    // Like findFirstStepNode(), but won't return a node whose span contains
+    // the unknown letter - it recurses past such nodes into their children
+    // instead, looking for a pure-constant pocket to collapse first (e.g.
+    // in "5-4+X", it steps past the root and into "5-4").
+    (:exclude_oldwidget)
+    private function findFirstPureStepNode(n as StepNode, letter as String, text as String) as StepNode? {
+        var span = text.substring(n.start, n.end) as String;
+        if (!containsUnknownToken(span, letter)) {
+            if (n.kind.equals("leaf")) {
+                return null;
+            }
+            return findFirstStepNode(n);
+        }
+        if (n.left != null) {
+            var fromLeft = findFirstPureStepNode(n.left as StepNode, letter, text);
+            if (fromLeft != null) {
+                return fromLeft;
+            }
+        }
+        if (n.right != null) {
+            var fromRight = findFirstPureStepNode(n.right as StepNode, letter, text);
+            if (fromRight != null) {
+                return fromRight;
+            }
+        }
+        return null;
+    }
+
+    // True if `letter` occurs in `text` as its own single-character
+    // identifier (not as part of a longer word) - used to tell a
+    // constants-only subexpression apart from one that still has the
+    // unknown mixed into it.
+    (:exclude_oldwidget)
+    private function containsUnknownToken(text as String, letter as String) as Boolean {
+        var i = 0;
+        while (i < text.length()) {
+            var c = text.substring(i, i + 1) as String;
+            if (isAsciiLetter(c)) {
+                var start = i;
+                while (i < text.length() && isAsciiLetter(text.substring(i, i + 1) as String)) {
+                    i += 1;
+                }
+                var ident = text.substring(start, i) as String;
+                if (ident.length() == 1 && ident.equals(letter)) {
+                    return true;
+                }
+            } else {
+                i += 1;
+            }
+        }
+        return false;
     }
 
     // Low-memory fallback for watches too small to fit StepSolver (see the
