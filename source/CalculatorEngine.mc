@@ -408,10 +408,15 @@ class CalculatorEngine {
         }
         steps.add(startExpr);
         if (startExpr.find("=") != null) {
-            // Equation-solving isn't an order-of-operations walk - just show
-            // the equation and its solved form.
+            // Equation-solving isn't an order-of-operations walk - show the
+            // equation, an optional "collect terms" step (aX=C) when it
+            // adds real information, then the solved form.
+            var collect = equationCollectStep(startExpr);
+            if (collect != null && !(collect as String).equals(startExpr)) {
+                steps.add(collect as String);
+            }
             var solved = solveEquationForDisplay(startExpr);
-            if (solved != null) {
+            if (solved != null && !(solved as String).equals(steps[steps.size() - 1])) {
                 steps.add(solved as String);
             }
             return ensureFinalAnswer(steps, knownAnswer);
@@ -621,22 +626,62 @@ class CalculatorEngine {
         }
         var letter = letterOrNull as String;
 
-        var solved = solveAffine(letter, lhs, rhs);
-        if (solved == null) {
-            solved = solveNumeric(letter, lhs, rhs);
+        var affine = solveAffine(letter, lhs, rhs);
+        if (affine != null) {
+            return letter + "=" + formatNumber((affine as Array<Double>)[0]);
         }
-        if (solved == null) {
+        var numeric = solveNumeric(letter, lhs, rhs);
+        if (numeric == null) {
             return null;
         }
-        return letter + "=" + formatNumber(solved as Double);
+        return letter + "=" + formatNumber(numeric as Double);
+    }
+
+    // "aX=C" collect-terms form shown as a step before the final "X=value"
+    // - only when the equation is affine in the unknown and there's
+    // actually a coefficient/constant to isolate; a==1 with C already equal
+    // to the solved value would just duplicate the final step, so that case
+    // returns null and computeSolutionSteps() shows the plain 2-step form.
+    private function equationCollectStep(equationExpr as String) as String? {
+        var eqIdxOrNull = equationExpr.find("=");
+        if (eqIdxOrNull == null) {
+            return null;
+        }
+        var eqIdx = eqIdxOrNull as Number;
+        var lhs = closeUnmatchedParens(equationExpr.substring(0, eqIdx) as String);
+        var rhs = closeUnmatchedParens(equationExpr.substring(eqIdx + 1, equationExpr.length()) as String);
+        if (lhs.length() == 0 || rhs.length() == 0) {
+            return null;
+        }
+        var letterOrNull = findVariableLetter(lhs);
+        if (letterOrNull == null) {
+            letterOrNull = findVariableLetter(rhs);
+        }
+        if (letterOrNull == null) {
+            return null;
+        }
+        var letter = letterOrNull as String;
+        var affine = solveAffine(letter, lhs, rhs);
+        if (affine == null) {
+            return null;
+        }
+        var a = (affine as Array<Double>)[1];
+        var b = (affine as Array<Double>)[2];
+        if (a == 1.0d) {
+            return null;
+        }
+        var coeff = a == -1.0d ? "-" + letter : formatNumber(a) + letter;
+        return coeff + "=" + formatNumber(-b);
     }
 
     // Fast, exact path: tries a few different trial triples (not just
     // 0,1,2) so a singularity at one candidate point - e.g. "3/x" at x=0 -
-    // doesn't block the fit. Returns null if no triple samples cleanly or
-    // the relationship genuinely isn't affine in `letter`; the caller then
-    // falls back to solveNumeric().
-    private function solveAffine(letter as String, lhs as String, rhs as String) as Double? {
+    // doesn't block the fit. Returns [root, a, b] where f(letter) = a*letter
+    // + b, or null if no triple samples cleanly or the relationship
+    // genuinely isn't affine in `letter`; the caller then falls back to
+    // solveNumeric(). The a/b coefficients let computeSolutionSteps() show
+    // a "collect terms" step (aX=C) before the final solved value.
+    private function solveAffine(letter as String, lhs as String, rhs as String) as Array<Double>? {
         var solved = solveAffineTriple(letter, lhs, rhs, 0.0d, 1.0d, 2.0d);
         if (solved != null) {
             return solved;
@@ -652,7 +697,7 @@ class CalculatorEngine {
         return solveAffineTriple(letter, lhs, rhs, -1.0d, 1.0d, 3.0d);
     }
 
-    private function solveAffineTriple(letter as String, lhs as String, rhs as String, t0 as Double, t1 as Double, t2 as Double) as Double? {
+    private function solveAffineTriple(letter as String, lhs as String, rhs as String, t0 as Double, t1 as Double, t2 as Double) as Array<Double>? {
         var f0 = evalDiff(letter, lhs, rhs, t0);
         var f1 = evalDiff(letter, lhs, rhs, t1);
         var f2 = evalDiff(letter, lhs, rhs, t2);
@@ -672,7 +717,10 @@ class CalculatorEngine {
         if (residual > 0.0001d) {
             return null;
         }
-        return t0 - b / a;
+        // f(letter) = a*(letter - t0) + b = a*letter + (b - a*t0)
+        var bAtZero = b - a * t0;
+        var root = -bAtZero / a;
+        return [root, a, bAtZero] as Array<Double>;
     }
 
     // General fallback for a relationship that isn't affine in `letter` -

@@ -609,15 +609,31 @@ function testComputeSolutionStepsFunctionCall(logger as Test.Logger) as Boolean 
     return true;
 }
 
-// An equation isn't an order-of-operations walk - just the equation and its
-// solved form, two steps total.
+// An equation isn't an order-of-operations walk - the equation, a "collect
+// terms" step (aX=C) when there's a coefficient to isolate, then the solved
+// form.
 (:test)
 function testComputeSolutionStepsEquation(logger as Test.Logger) as Boolean {
     var e = new CalculatorEngine();
     e.clearVariables();
     var steps = e.computeSolutionSteps("2X+3=7", null);
-    if (steps.size() != 2 || !steps[0].equals("2X+3=7") || !steps[1].equals("X=2")) {
-        logger.debug("expected ['2X+3=7','X=2'] got " + joinSteps(steps));
+    if (steps.size() != 3 || !steps[0].equals("2X+3=7") || !steps[1].equals("2X=4") || !steps[2].equals("X=2")) {
+        logger.debug("expected ['2X+3=7','2X=4','X=2'] got " + joinSteps(steps));
+        return false;
+    }
+    return true;
+}
+
+// When the coefficient on the unknown is already 1, the "collect terms"
+// step would just duplicate the final solved form, so it's skipped - two
+// steps total.
+(:test)
+function testComputeSolutionStepsEquationNoCollectStep(logger as Test.Logger) as Boolean {
+    var e = new CalculatorEngine();
+    e.clearVariables();
+    var steps = e.computeSolutionSteps("X+3=7", null);
+    if (steps.size() != 2 || !steps[0].equals("X+3=7") || !steps[1].equals("X=4")) {
+        logger.debug("expected ['X+3=7','X=4'] got " + joinSteps(steps));
         return false;
     }
     return true;
