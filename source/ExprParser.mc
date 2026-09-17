@@ -1,6 +1,12 @@
 import Toybox.Lang;
 import Toybox.Math;
 
+// Converts a value between two unit keys ("km", "mi", "USD", ...), or
+// returns null if no unit category holds both. Set by calc_for_garminView
+// (unit math and currency rates live there); null means "(5km>mi)"
+// groups are a parse error.
+var unitConverter as Method? = null;
+
 // Recursive-descent parser/evaluator for calculator formulas: +,-,*,/,^,
 // parentheses, unary minus, sin/cos/tan/sqrt/log/ln, and the constants
 // pi (as the literal "π") and e.
@@ -153,6 +159,10 @@ class ExprParser {
         // by nesting level, so the parser only needs to require the CLOSING
         // glyph match whichever one was opened.
         if (c.equals("(") || c.equals("[") || c.equals("{")) {
+            var conv = convSplit();
+            if (conv != null) {
+                return parseConversion(conv);
+            }
             var closeCh = c.equals("[") ? "]" : (c.equals("{") ? "}" : ")");
             pos += 1;
             var v = parseExpr();
@@ -201,6 +211,61 @@ class ExprParser {
         }
         error = true;
         return 0.0d;
+    }
+
+    // With pos on an opening bracket: if its group is a unit conversion
+    // "(<value><from>><to>)", returns [valueEnd, closePos, from, to] (the
+    // longest "from" unit that converts to "to"), else null.
+    hidden function convSplit() as Array? {
+        if (unitConverter == null) {
+            return null;
+        }
+        var depth = 0;
+        var gt = -1;
+        for (var i = pos + 1; i < len; i++) {
+            var ch = s.substring(i, i + 1) as String;
+            if ("([{".find(ch) != null) {
+                depth += 1;
+            } else if (")]}".find(ch) != null) {
+                if (depth > 0) {
+                    depth -= 1;
+                    continue;
+                }
+                if (gt < 0) {
+                    return null;
+                }
+                var to = s.substring(gt + 1, i) as String;
+                for (var j = pos + 2; j < gt; j++) {
+                    var from = s.substring(j, gt) as String;
+                    if ((unitConverter as Method).invoke(from, to, 1.0d) != null) {
+                        return [j, i, from, to];
+                    }
+                }
+                return null;
+            } else if (depth == 0 && ch.equals(">")) {
+                gt = i;
+            }
+        }
+        return null;
+    }
+
+    // "(5km>mi)": parses just the value part, then converts it. Kept out
+    // of parsePrimary() so its recursive frame stays small (deep nesting
+    // otherwise overflows the VM stack).
+    private function parseConversion(conv as Array) as Double {
+        pos += 1;
+        var savedLen = len;
+        len = conv[0] as Number;
+        var v = parseExpr();
+        var ok = !error && pos == len;
+        len = savedLen;
+        pos = (conv[1] as Number) + 1;
+        var r = ok ? (unitConverter as Method).invoke(conv[2], conv[3], v) : null;
+        if (r == null) {
+            error = true;
+            return 0.0d;
+        }
+        return r as Double;
     }
 
     hidden function isDigitLiteral(c as String) as Boolean {

@@ -109,7 +109,7 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     // an if/else chain to stay under older watches' 64KB widget limit.
     // BASE/COUNTER (19/21) and the currency autocomplete screens (5/6) are
     // handled separately below; their slots here are unused.
-    private const BACK_TARGET = [0, 10, 1, 10, 3, 4, 5, 10, 10, 10, 0, 10, 14, 14, 1, 10, 0, 16, 14, 14, 3, 14, 10, 22, 22, 24] as Array<Number>;
+    private const BACK_TARGET = [0, 10, 1, 10, 3, 4, 5, 10, 10, 10, 0, 10, 14, 14, 1, 10, 0, 16, 14, 14, 3, 14, 10, 22, 22, 24, 22] as Array<Number>;
 
     // Steps `view.screen` back one logical screen. Returns false only from
     // SCREEN_BASIC, letting the platform's default Back (pop/exit) proceed.

@@ -6,47 +6,47 @@ import Toybox.Math;
 // on-screen center, for both round and rectangular layouts, and for both
 // the basic and scientific screens. This is the exact logic behind onTap,
 // so a failure here means taps really would miss buttons on-device.
-(:exclude_oldwidget)
+(:test)
 function testBasicScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 0) && checkAllButtonsTappable(logger, true, 0);
 }
 
-(:exclude_oldwidget)
+(:test)
 function testScientificScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 1) && checkAllButtonsTappable(logger, true, 1);
 }
 
-(:exclude_oldwidget)
+(:test)
 function testAdvancedScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 2) && checkAllButtonsTappable(logger, true, 2);
 }
 
-(:exclude_oldwidget)
+(:test)
 function testUnitCategoryAndTipScreensAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 3) && checkAllButtonsTappable(logger, true, 3) &&
         checkAllButtonsTappable(logger, false, 8) && checkAllButtonsTappable(logger, true, 8) &&
         checkAllButtonsTappable(logger, false, 9) && checkAllButtonsTappable(logger, true, 9);
 }
 
-(:exclude_oldwidget)
+(:test)
 function testMenuScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 10) && checkAllButtonsTappable(logger, true, 10);
 }
 
-(:exclude_oldwidget)
+(:test)
 function testPctAndDateScreensAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 12) && checkAllButtonsTappable(logger, true, 12) &&
         checkAllButtonsTappable(logger, false, 13) && checkAllButtonsTappable(logger, true, 13);
 }
 
-(:exclude_oldwidget)
+(:test)
 function testMoreScreenButtonsAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 14) && checkAllButtonsTappable(logger, true, 14);
 }
 
 // GRAPH/BASE/COLOR/COUNTER (18/19/20/21) are non-customizable tool screens
 // off MORE, same as VAR/NAV - pin that their buttons are actually tappable too.
-(:exclude_oldwidget)
+(:test)
 function testGraphBaseColorScreensAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 18) && checkAllButtonsTappable(logger, true, 18) &&
         checkAllButtonsTappable(logger, false, 19) && checkAllButtonsTappable(logger, true, 19) &&
@@ -56,7 +56,7 @@ function testGraphBaseColorScreensAreTappable(logger as Test.Logger) as Boolean 
 
 // The FORMULAS (22) and "MORE formulas" (24) category pickers are plain
 // grids reachable directly, same as any other fixed tool screen.
-(:exclude_oldwidget)
+(:test)
 function testFormulasCategoryScreensAreTappable(logger as Test.Logger) as Boolean {
     return checkAllButtonsTappable(logger, false, 22) && checkAllButtonsTappable(logger, true, 22) &&
         checkAllButtonsTappable(logger, false, 24) && checkAllButtonsTappable(logger, true, 24);
@@ -67,7 +67,7 @@ function testFormulasCategoryScreensAreTappable(logger as Test.Logger) as Boolea
 // bare BACK row to lay out - checkAllButtonsTappable() always constructs
 // its own fresh view, so it can't be reused here; this inlines the same
 // center-hit assertion after picking "Geometry" on each screen.
-(:exclude_oldwidget)
+(:test)
 function testFormulaListScreensAreTappable(logger as Test.Logger) as Boolean {
     return checkFormulaListTappable(logger, false, "formulaCat:geom") &&
         checkFormulaListTappable(logger, true, "formulaCat:geom") &&
@@ -75,7 +75,6 @@ function testFormulaListScreensAreTappable(logger as Test.Logger) as Boolean {
         checkFormulaListTappable(logger, true, "formulaCatMore:geom");
 }
 
-(:exclude_oldwidget)
 function checkFormulaListTappable(logger as Test.Logger, round as Boolean, categoryAction as String) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, round);
@@ -104,7 +103,7 @@ function checkFormulaListTappable(logger as Test.Logger, round as Boolean, categ
 
 // MENU -> FORMULAS -> a category -> its list -> BACK, and the "MORE"
 // branch alongside it, following testMenuHubNavigation's pin-the-chain shape.
-(:exclude_oldwidget)
+(:test)
 function testFormulasNavigation(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -143,43 +142,37 @@ function testFormulasNavigation(logger as Test.Logger) as Boolean {
     return v.screen == v.SCREEN_FORMULAS;
 }
 
-// Tapping a formula injects its template with the cursor left right after
-// the first fill-in letter (see calc-for-garminView's "formula:" action) -
-// the letter itself is still there, a stand-in the user backspaces before
-// typing over it (same as clearing any other character), not something
-// digits silently replace. Pin one single-blank formula (circle area) end
-// to end, and one multi-blank one (Pythagorean) below.
-(:exclude_oldwidget)
-function testCircleAreaFormulaInjectsTemplateAndSolves(logger as Test.Logger) as Boolean {
-    var v = new calc_for_garminView();
-    v.layoutForSize(260, 260, false);
-    return pressAndExpect(logger, v,
-        ["clear", "formula:circleArea", "back", "digit:3", "equals"],
-        v.engine.formatNumber((Math.PI.toDouble() as Double) * 9.0d));
-}
-
-(:exclude_oldwidget)
-function testPythagoreanFormulaLeavesCursorAfterFirstBlank(logger as Test.Logger) as Boolean {
+// Tapping a formula asks each fill-in letter first (like RANDOM's MIN/MAX),
+// then inserts the filled-in exercise rather than the bare template.
+(:test)
+function testCircleAreaFormulaAsksRadiusThenInsertsExercise(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
     v.activate(new CalcButton("", "clear"));
-    v.activate(new CalcButton("", "formula:pythagorean"));
-    if (!v.engine.expr.equals("sqrt(A^2+B^2)")) {
-        logger.debug("expected template 'sqrt(A^2+B^2)' got '" + v.engine.expr + "'");
+    v.activate(new CalcButton("", "formula:circleArea"));
+    if (v.screen != v.SCREEN_FORMULA_INPUT) {
+        logger.debug("expected SCREEN_FORMULA_INPUT, got " + v.screen);
         return false;
     }
-    // The cursor should sit right after "A" (index 6), ready to backspace
-    // it and type a value - not at the end of the whole template.
-    if (v.engine.cursorPos != 6) {
-        logger.debug("expected cursor at 6 (right after 'A') got " + v.engine.cursorPos);
-        return false;
-    }
-    return true;
+    return pressAndExpect(logger, v, ["digit:3", "formulaNext"], "π*3^2") &&
+        pressAndExpect(logger, v, ["equals"], v.engine.formatNumber((Math.PI.toDouble() as Double) * 9.0d));
+}
+
+// Multi-letter formula: each letter asked once, in order; a negative value
+// is parenthesized, and an unfinished prefix gets the formula in parens.
+(:test)
+function testPythagoreanFormulaAsksEachLetterInOrder(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v,
+        ["clear", "digit:1", "op:+", "formula:pythagorean", "digit:3", "formulaNext", "op:-", "digit:4", "formulaNext"],
+        "1+(sqrt(3^2+(-4)^2))") &&
+        pressAndExpect(logger, v, ["equals"], "6");
 }
 
 // A formula id that no longer resolves (e.g. a stale seed-picked custom
 // formula after the custom list shrank) must fail safe, not crash.
-(:exclude_oldwidget)
+(:test)
 function testUnknownFormulaIdFallsBackToBasicScreen(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -188,7 +181,7 @@ function testUnknownFormulaIdFallsBackToBasicScreen(logger as Test.Logger) as Bo
 }
 
 // +1/-1 tally the running count; RESET zeros it; BACK returns to MORE.
-(:exclude_oldwidget)
+(:test)
 function testCounterIncDecAndReset(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -212,7 +205,7 @@ function testCounterIncDecAndReset(logger as Test.Logger) as Boolean {
 // "+N" opens a nested keypad (like baseRdx) to type a bulk amount (clamped
 // 1-100); ADD applies it once and remembers it as the step that a
 // long-press on -1 (see the delegate's onHold) later subtracts in one go.
-(:exclude_oldwidget)
+(:test)
 function testCounterMultiAddClampsAndFeedsLongPressDecrement(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -242,7 +235,7 @@ function testCounterMultiAddClampsAndFeedsLongPressDecrement(logger as Test.Logg
 
 // Typing "X^2" then GRAPH captures that formula, doesn't touch the main
 // expression, and BACK returns to MORE (the hub GRAPH is opened from).
-(:exclude_oldwidget)
+(:test)
 function testGraphCapturesExpressionAndBackReturnsToMore(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -263,7 +256,7 @@ function testGraphCapturesExpressionAndBackReturnsToMore(logger as Test.Logger) 
 // Typing 12, tapping BASE reads it as the seed integer; NOT flips every
 // bit (12 -> -13 for a two's-complement Number), and USE splices the
 // result back onto the keypad as a plain decimal.
-(:exclude_oldwidget)
+(:test)
 function testBaseNotAndUseRoundTrip(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -271,7 +264,7 @@ function testBaseNotAndUseRoundTrip(logger as Test.Logger) as Boolean {
 }
 
 // Shifting 1 left three times is 8, decimal.
-(:exclude_oldwidget)
+(:test)
 function testBaseShiftLeft(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -281,7 +274,7 @@ function testBaseShiftLeft(logger as Test.Logger) as Boolean {
 
 // RDX opens a nested numeric entry for an arbitrary radix (2-36) without
 // disturbing baseValue or the main expression; 12 in base 3 is "110".
-(:exclude_oldwidget)
+(:test)
 function testBaseCustomRadixConversion(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -313,7 +306,7 @@ function testBaseCustomRadixConversion(logger as Test.Logger) as Boolean {
 // category - so it's reached via "units" then "color", and BACK from it
 // returns to UNITS, same as any other converter sub-flow.
 // R=255 G=0 B=0 is pure red -> #FF0000, shown once colorStage hits 3.
-(:exclude_oldwidget)
+(:test)
 function testColorRgbEntryProducesHexAndBackReturnsToUnits(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -336,7 +329,7 @@ function testColorRgbEntryProducesHexAndBackReturnsToUnits(logger as Test.Logger
 // Opening COLOR from mid-expression ("1+") must not lose that expression -
 // a real bug risk here, since "units" already stashed it via its own
 // embedded flow before COLOR's keypad ever touches engine.expr.
-(:exclude_oldwidget)
+(:test)
 function testColorDoesNotLoseInProgressExpression(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -356,7 +349,7 @@ function testColorDoesNotLoseInProgressExpression(logger as Test.Logger) as Bool
 
 // PCT+/DATE/VAR moved off the default MENU behind a "MORE" corner button on
 // the Scientific screen; this pins that door and its own BACK still works.
-(:exclude_oldwidget)
+(:test)
 function testSciMoreNavigatesToOverflowTools(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -377,7 +370,7 @@ function testSciMoreNavigatesToOverflowTools(logger as Test.Logger) as Boolean {
 // The home screen is a plain 4-function calculator with a single "MENU"
 // door into every advanced tool; each tool's BACK returns to that menu
 // (not to each other), and the menu's own BACK returns home.
-(:exclude_oldwidget)
+(:test)
 function testMenuHubNavigation(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -414,7 +407,6 @@ function testMenuHubNavigation(logger as Test.Logger) as Boolean {
 }
 
 // Presses a sequence of actions, then checks what the display shows.
-(:exclude_oldwidget)
 function pressAndExpect(logger as Test.Logger, v as calc_for_garminView, actions as Array<String>, expected as String) as Boolean {
     for (var i = 0; i < actions.size(); i++) {
         v.activate(new CalcButton("", actions[i]));
@@ -430,7 +422,7 @@ function pressAndExpect(logger as Test.Logger, v as calc_for_garminView, actions
 // STO stores the typed value under a name (and shows it back, like "=");
 // RCL splices it in at the cursor, so A/B become normal formula building
 // blocks - e.g. "A+B".
-(:exclude_oldwidget)
+(:test)
 function testVariableStoreRecallAndUseInExpression(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -445,7 +437,7 @@ function testVariableStoreRecallAndUseInExpression(logger as Test.Logger) as Boo
 // spliced back in exactly where the flow was entered - so a tip split can
 // be part of a bigger formula instead of a dead end. 100 + 10% tip split 2
 // ways = 55 each -> "1+55".
-(:exclude_oldwidget)
+(:test)
 function testTipSplitEmbedsResultAtCursor(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -455,7 +447,7 @@ function testTipSplitEmbedsResultAtCursor(logger as Test.Logger) as Boolean {
 }
 
 // Advanced %: 100 with a 10% discount is 90, spliced into "1+" -> "1+90".
-(:exclude_oldwidget)
+(:test)
 function testAdvancedPercentDiscountEmbedsResultAtCursor(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -467,7 +459,7 @@ function testAdvancedPercentDiscountEmbedsResultAtCursor(logger as Test.Logger) 
 // "=" records a history entry; opening it shows its solution steps, and
 // pasting the final step splices that result back in at the cursor, same
 // as Ans.
-(:exclude_oldwidget)
+(:test)
 function testHistoryRecordsAndRecallsLastResult(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -478,7 +470,7 @@ function testHistoryRecordsAndRecallsLastResult(logger as Test.Logger) as Boolea
 
 // A target date almost 75 years out should always be thousands of days
 // away, regardless of what "today" actually is when the test runs.
-(:exclude_oldwidget)
+(:test)
 function testDateDaysUntilIsPositiveForAFutureYear(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -505,7 +497,7 @@ function testDateDaysUntilIsPositiveForAFutureYear(logger as Test.Logger) as Boo
 // expected day count is deterministic regardless of when the test runs.
 // 2024-01-01 -> 2024-01-11 is exactly 10 days (2024 being a leap year
 // doesn't matter here, both dates are in January).
-(:exclude_oldwidget)
+(:test)
 function testDateDiffBetweenTwoFixedDates(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -521,24 +513,49 @@ function testDateDiffBetweenTwoFixedDates(logger as Test.Logger) as Boolean {
 }
 
 // 12 kph is a 5:00/km pace, and the "m:ss" result converts back.
-(:exclude_oldwidget)
+(:test)
 function testPaceConvertsBothWays(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
-    return pressAndExpect(logger, v, ["cat:pace", "digit:1", "digit:2", "unit:kph", "unit:/km"], "5:00") &&
-        pressAndExpect(logger, v, ["unit:/km", "unit:kph"], "12");
+    return pressAndExpect(logger, v, ["cat:pace", "digit:1", "digit:2", "unit:kph", "unit:/km"], "(12kph>/km)") &&
+        pressAndExpect(logger, v, ["equals"], "5:00") &&
+        pressAndExpect(logger, v, ["unit:/km", "unit:kph", "equals"], "12");
 }
 
-(:exclude_oldwidget)
+// A conversion keeps the exercise in the expression, so it can be part of
+// a bigger calculation and a compound value gets its own parens.
+(:test)
+function testConversionIsAnExerciseInsideTheExpression(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    return pressAndExpect(logger, v, ["clear", "digit:2", "op:*", "units", "cat:dist", "digit:5", "unit:km", "unit:m"], "2*(5km>m)") &&
+        pressAndExpect(logger, v, ["equals"], "10000") &&
+        pressAndExpect(logger, v, ["clear", "digit:2", "op:+", "digit:3", "units", "cat:weight", "unit:kg", "unit:g"], "((2+3)kg>g)") &&
+        pressAndExpect(logger, v, ["equals"], "5000");
+}
+
+// History's step-by-step view collapses a conversion like a function call.
+(:test)
+function testConversionCollapsesInSolutionSteps(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    var got = v.engine.computeSolutionSteps("2*(5km>m)", null).toString();
+    if (!got.equals("[2*(5km>m), 2*5000, 10000]")) {
+        logger.debug("unexpected steps " + got);
+        return false;
+    }
+    return true;
+}
+
+(:test)
 function testNewUnitCategories(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
-    return pressAndExpect(logger, v, ["clear", "cat:area", "digit:1", "unit:ha", "unit:m2"], "10000") &&
-        pressAndExpect(logger, v, ["clear", "units", "cat:time", "digit:2", "unit:hr", "unit:min"], "120") &&
-        pressAndExpect(logger, v, ["clear", "units", "cat:temp", "digit:0", "unit:c", "unit:K"], "273.15");
+    return pressAndExpect(logger, v, ["clear", "cat:area", "digit:1", "unit:ha", "unit:m2", "equals"], "10000") &&
+        pressAndExpect(logger, v, ["clear", "units", "cat:time", "digit:2", "unit:hr", "unit:min", "equals"], "120") &&
+        pressAndExpect(logger, v, ["clear", "units", "cat:temp", "digit:0", "unit:c", "unit:K", "equals"], "273.15");
 }
 
-(:exclude_oldwidget)
+(:test)
 function testTapOutsideAnyButtonMisses(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -550,7 +567,7 @@ function testTapOutsideAnyButtonMisses(logger as Test.Logger) as Boolean {
     return true;
 }
 
-(:exclude_oldwidget)
+(:test)
 function testDigitButtonDispatchesToEngine(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -580,7 +597,7 @@ function testDigitButtonDispatchesToEngine(logger as Test.Logger) as Boolean {
 // Currency conversion uses fetched/stored rates rather than the static
 // unitFactor table; this pins the USD-based math (v / rate[from] *
 // rate[to]) against a known rate set, independent of Storage/network state.
-(:exclude_oldwidget)
+(:test)
 function testCurrencyConversionUsesInjectedRates(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -593,6 +610,11 @@ function testCurrencyConversionUsesInjectedRates(logger as Test.Logger) as Boole
     v.engine.appendDigit("0");
     v.activate(new CalcButton("USD", "unit:USD"));
     v.activate(new CalcButton("EUR", "unit:EUR"));
+    if (!v.engine.expr.equals("(10USD>EUR)")) {
+        logger.debug("expected the exercise (10USD>EUR), got " + v.engine.expr);
+        return false;
+    }
+    v.activate(new CalcButton("=", "equals"));
     var got = v.engine.displayText();
     if (!got.equals("5")) {
         logger.debug("10 USD at 0.5 EUR/USD should convert to 5, got " + got);
@@ -604,7 +626,7 @@ function testCurrencyConversionUsesInjectedRates(logger as Test.Logger) as Boole
 // The "OTHER" autocomplete flow (letter -> matching codes -> pick) must
 // preserve an in-progress FROM pick across screen changes, since goToScreen
 // (unlike switchScreen) is used precisely to avoid losing it.
-(:exclude_oldwidget)
+(:test)
 function testCurrencyAutocompletePreservesFromPick(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -623,6 +645,7 @@ function testCurrencyAutocompletePreservesFromPick(logger as Test.Logger) as Boo
         return false;
     }
     v.activate(new CalcButton("G", "curletter:G"));       // single match -> GBP auto-selected
+    v.activate(new CalcButton("=", "equals"));
     var got = v.engine.displayText();
     if (!got.equals("8")) {
         logger.debug("20 USD at 0.4 GBP/USD should convert to 8, got " + got);
@@ -638,7 +661,6 @@ function testCurrencyAutocompletePreservesFromPick(logger as Test.Logger) as Boo
     return true;
 }
 
-(:exclude_oldwidget)
 function checkAllButtonsTappable(logger as Test.Logger, round as Boolean, screen as Number) as Boolean {
     var v = new calc_for_garminView();
     if (screen != 0) {
@@ -674,7 +696,7 @@ function checkAllButtonsTappable(logger as Test.Logger, round as Boolean, screen
 // The letter screen used to call Array.sort(), which only exists from CIQ
 // 3.4.0 and crashed on 3.3 devices (vivoactive 4s). This pins both that the
 // screen builds at all and that the letters come out sorted.
-(:exclude_oldwidget)
+(:test)
 function testCurrencyLetterScreenIsSortedWithoutArraySort(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);
@@ -700,7 +722,7 @@ function testCurrencyLetterScreenIsSortedWithoutArraySort(logger as Test.Logger)
     return true;
 }
 
-(:exclude_oldwidget)
+(:test)
 function testEasterEggsWhenEnabledAndDisabled(logger as Test.Logger) as Boolean {
     var v = new calc_for_garminView();
     v.layoutForSize(260, 260, false);

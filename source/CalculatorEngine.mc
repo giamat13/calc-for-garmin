@@ -400,7 +400,6 @@ class CalculatorEngine {
     // raw expression with no answer at all. Since the real answer is
     // already known, always make sure it ends up as the last step even if
     // the walk itself couldn't get there.
-    (:exclude_oldwidget)
     function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
         var steps = [] as Array<String>;
         if (startExpr.length() == 0) {
@@ -462,7 +461,6 @@ class CalculatorEngine {
     // step still reads as a full equation (e.g. "5-4+X=30" -> "1+X=30").
     // Appends steps in place; stops once neither side has a collapsible
     // constant part left.
-    (:exclude_oldwidget)
     private function walkEquationConstants(steps as Array<String>, letter as String, lhsIn as String, rhsIn as String) as Void {
         var lhs = lhsIn;
         var rhs = rhsIn;
@@ -488,7 +486,6 @@ class CalculatorEngine {
     // those get resolved later by equationCollectStep()/
     // solveEquationForDisplay() instead. Returns null when the side fails
     // to parse or has nothing left to collapse.
-    (:exclude_oldwidget)
     private function collapseOnePureNode(sideExpr as String, letter as String) as String? {
         if (sideExpr.length() == 0) {
             return null;
@@ -510,7 +507,6 @@ class CalculatorEngine {
     // the unknown letter - it recurses past such nodes into their children
     // instead, looking for a pure-constant pocket to collapse first (e.g.
     // in "5-4+X", it steps past the root and into "5-4").
-    (:exclude_oldwidget)
     private function findFirstPureStepNode(n as StepNode, letter as String, text as String) as StepNode? {
         var span = text.substring(n.start, n.end) as String;
         if (!containsUnknownToken(span, letter)) {
@@ -538,7 +534,6 @@ class CalculatorEngine {
     // identifier (not as part of a longer word) - used to tell a
     // constants-only subexpression apart from one that still has the
     // unknown mixed into it.
-    (:exclude_oldwidget)
     private function containsUnknownToken(text as String, letter as String) as Boolean {
         var i = 0;
         while (i < text.length()) {
@@ -557,28 +552,6 @@ class CalculatorEngine {
             }
         }
         return false;
-    }
-
-    // Low-memory fallback for watches too small to fit StepSolver (see the
-    // pool comment at the top of SeedConfig.mc for that device list) - no
-    // order-of-operations walk, just the typed expression (and, for an
-    // equation, its solved form) plus the already-known final answer. The
-    // history detail screen still works, it just skips the intermediate
-    // stages.
-    (:oldwidget_only)
-    function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
-        var steps = [] as Array<String>;
-        if (startExpr.length() == 0) {
-            return steps;
-        }
-        steps.add(startExpr);
-        if (startExpr.find("=") != null) {
-            var solved = solveEquationForDisplay(startExpr);
-            if (solved != null) {
-                steps.add(solved as String);
-            }
-        }
-        return ensureFinalAnswer(steps, knownAnswer);
     }
 
     // Appends `knownAnswer` to `steps` unless it's empty/null or already the
@@ -678,7 +651,7 @@ class CalculatorEngine {
         return null;
     }
 
-    private function isAsciiLetter(c as String) as Boolean {
+    function isAsciiLetter(c as String) as Boolean {
         var code = (c.toCharArray()[0] as Char).toNumber();
         return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
     }

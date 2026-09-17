@@ -6,7 +6,6 @@ import Toybox.Math;
 // variable, or a value already fully resolved by sign/percent/brackets
 // wrapping a leaf) - anything else (a binary op or function call) is a
 // pending operation that computeSolutionSteps() can collapse one at a time.
-(:exclude_oldwidget)
 class StepNode {
     var kind as String; // "leaf", "bin", or "func"
     var start as Number;
@@ -28,7 +27,6 @@ class StepNode {
 // Returns the first (deepest, then highest-precedence, then left-most) node
 // still awaiting an operation - i.e. the next step of the solution - or
 // null if the whole tree is already a single leaf.
-(:exclude_oldwidget)
 function findFirstStepNode(n as StepNode) as StepNode? {
     if (n.kind.equals("leaf")) {
         return null;
@@ -51,7 +49,6 @@ function findFirstStepNode(n as StepNode) as StepNode? {
 // Same grammar/semantics as ExprParser, but building a span-tagged tree
 // instead of folding straight to a Double, so the engine can splice just
 // one sub-expression's result back into the displayed formula at a time.
-(:exclude_oldwidget)
 class StepSolver extends ExprParser {
 
     function initialize(str as String, xVal as Double, vars as Dictionary<String, Double>) {
@@ -169,6 +166,10 @@ class StepSolver extends ExprParser {
             return leaf(pos, pos, 0.0d);
         }
         if (c.equals("(") || c.equals("[") || c.equals("{")) {
+            var conv = convSplit();
+            if (conv != null) {
+                return parseConversionNode(conv);
+            }
             var closeCh = c.equals("[") ? "]" : (c.equals("{") ? "}" : ")");
             var openPos = pos;
             pos += 1;
@@ -232,6 +233,32 @@ class StepSolver extends ExprParser {
         }
         error = true;
         return leaf(pos, pos, 0.0d);
+    }
+
+    // "(5km>mi)" collapses like a function call on its value (see
+    // ExprParser.parseConversion()).
+    private function parseConversionNode(conv as Array) as StepNode {
+        var openPos = pos;
+        pos += 1;
+        var savedLen = len;
+        len = conv[0] as Number;
+        var inner = parseExprNode();
+        var ok = !error && pos == len;
+        len = savedLen;
+        pos = (conv[1] as Number) + 1;
+        if (!ok) {
+            error = true;
+            return inner;
+        }
+        if (!inner.kind.equals("leaf")) {
+            return new StepNode("func", openPos, pos, 0.0d, null, inner);
+        }
+        var r = (unitConverter as Method).invoke(conv[2], conv[3], inner.value);
+        if (r == null) {
+            error = true;
+            return inner;
+        }
+        return new StepNode("func", openPos, pos, r as Double, null, inner);
     }
 
     private function readNumberNode() as StepNode {
