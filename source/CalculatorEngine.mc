@@ -1,6 +1,6 @@
 import Toybox.Lang;
 import Toybox.Math;
-import Toybox.Application.Storage;
+import Toybox.Application;
 
 // Text-expression calculator: button presses build up a formula string
 // (so parentheses and arbitrary powers work naturally), evaluated by
@@ -38,14 +38,14 @@ class CalculatorEngine {
     ] as Array<String>;
 
     function initialize() {
-        var stored = Storage.getValue("calcVariables");
+        var stored = readStore("calcVariables");
         if (stored != null) {
             variables = stored as Dictionary<String, Double>;
         }
     }
 
     private function persistVariables() as Void {
-        Storage.setValue("calcVariables", variables);
+        writeStore("calcVariables", variables as Dictionary<PropertyKeyType, PropertyValueType>);
     }
 
     function clearVariables() as Void {
@@ -384,216 +384,6 @@ class CalculatorEngine {
         cursorPos = expr.length();
     }
 
-    // Replays the order-of-operations walk for an already-typed expression
-    // (as stored in history), returning every intermediate stage from the
-    // raw input through to the final result - e.g. "2+3*4" ->
-    // ["2+3*4", "2+12", "14"]. Used by the history detail screen so a past
-    // calculation can be shown solved one step at a time, each with its own
-    // paste button. Pure function of its argument - doesn't touch this
-    // engine's own expr/cursor/errorState.
-    //
-    // `knownAnswer` is the result already recorded in history for this
-    // expression (from the original evaluate() call). The symbolic walk
-    // below re-derives the same thing step by step, but on some devices it
-    // can bail out early (e.g. a StepSolver quirk on a particular
-    // expression shape) - when that happens we'd otherwise show just the
-    // raw expression with no answer at all. Since the real answer is
-    // already known, always make sure it ends up as the last step even if
-    // the walk itself couldn't get there.
-    (:exclude_oldwidget)
-    function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
-        var steps = [] as Array<String>;
-        if (startExpr.length() == 0) {
-            return steps;
-        }
-        steps.add(startExpr);
-        var eqIdxOrNull = startExpr.find("=");
-        if (eqIdxOrNull != null) {
-            // Equation-solving on top of an order-of-operations walk: first
-            // collapse whichever side is pure arithmetic (no unknown) one
-            // step at a time - e.g. "5+5*3=X" -> "5+15=X" -> "20=X" - then
-            // show the optional "collect terms" step (aX=C) when it adds
-            // real information, then the solved form.
-            var eqIdx = eqIdxOrNull as Number;
-            var lhsPart = closeUnmatchedParens(startExpr.substring(0, eqIdx) as String);
-            var rhsPart = closeUnmatchedParens(startExpr.substring(eqIdx + 1, startExpr.length()) as String);
-            var letter = findVariableLetter(lhsPart);
-            if (letter == null) {
-                letter = findVariableLetter(rhsPart);
-            }
-            if (letter != null) {
-                walkEquationConstants(steps, letter as String, lhsPart, rhsPart);
-            }
-            var collect = equationCollectStep(startExpr);
-            if (collect != null && !(collect as String).equals(startExpr) && !(collect as String).equals(steps[steps.size() - 1])) {
-                steps.add(collect as String);
-            }
-            var solved = solveEquationForDisplay(startExpr);
-            if (solved != null && !(solved as String).equals(steps[steps.size() - 1])) {
-                steps.add(solved as String);
-            }
-            return ensureFinalAnswer(steps, knownAnswer);
-        }
-        var current = startExpr;
-        // One collapse per iteration, same order-of-operations walk -
-        // capped so a pathological/unexpected input can't loop forever.
-        for (var guard = 0; guard < 64; guard++) {
-            var solver = new StepSolver(closeUnmatchedParens(current), 0.0d, variables);
-            var root = solver.buildTree();
-            if (solver.error || root == null) {
-                return ensureFinalAnswer(steps, knownAnswer);
-            }
-            var node = findFirstStepNode(root as StepNode);
-            if (node == null) {
-                break;
-            }
-            current = (current.substring(0, node.start) as String) + formatNumber(node.value) +
-                (current.substring(node.end, current.length()) as String);
-            steps.add(current);
-        }
-        return ensureFinalAnswer(steps, knownAnswer);
-    }
-
-    // Order-of-operations walk for both sides of an equation, but constants
-    // only - any subtree that has the unknown letter inside it is left
-    // untouched, so a mixed side like "5-4+X" collapses to "1+X" instead of
-    // jumping straight past it. Each iteration collapses one pure-constant
-    // node (lhs first, then rhs) and re-glues both sides with "=" so every
-    // step still reads as a full equation (e.g. "5-4+X=30" -> "1+X=30").
-    // Appends steps in place; stops once neither side has a collapsible
-    // constant part left.
-    (:exclude_oldwidget)
-    private function walkEquationConstants(steps as Array<String>, letter as String, lhsIn as String, rhsIn as String) as Void {
-        var lhs = lhsIn;
-        var rhs = rhsIn;
-        for (var guard = 0; guard < 64; guard++) {
-            var collapsedLhs = collapseOnePureNode(lhs, letter);
-            if (collapsedLhs != null) {
-                lhs = collapsedLhs as String;
-                steps.add(lhs + "=" + rhs);
-                continue;
-            }
-            var collapsedRhs = collapseOnePureNode(rhs, letter);
-            if (collapsedRhs != null) {
-                rhs = collapsedRhs as String;
-                steps.add(lhs + "=" + rhs);
-                continue;
-            }
-            break;
-        }
-    }
-
-    // Collapses the first (deepest, leftmost) constants-only node in
-    // `sideExpr`, skipping any subtree that contains the unknown letter -
-    // those get resolved later by equationCollectStep()/
-    // solveEquationForDisplay() instead. Returns null when the side fails
-    // to parse or has nothing left to collapse.
-    (:exclude_oldwidget)
-    private function collapseOnePureNode(sideExpr as String, letter as String) as String? {
-        if (sideExpr.length() == 0) {
-            return null;
-        }
-        var solver = new StepSolver(closeUnmatchedParens(sideExpr), 0.0d, variables);
-        var root = solver.buildTree();
-        if (solver.error || root == null) {
-            return null;
-        }
-        var node = findFirstPureStepNode(root as StepNode, letter, sideExpr);
-        if (node == null) {
-            return null;
-        }
-        return (sideExpr.substring(0, node.start) as String) + formatNumber(node.value) +
-            (sideExpr.substring(node.end, sideExpr.length()) as String);
-    }
-
-    // Like findFirstStepNode(), but won't return a node whose span contains
-    // the unknown letter - it recurses past such nodes into their children
-    // instead, looking for a pure-constant pocket to collapse first (e.g.
-    // in "5-4+X", it steps past the root and into "5-4").
-    (:exclude_oldwidget)
-    private function findFirstPureStepNode(n as StepNode, letter as String, text as String) as StepNode? {
-        var span = text.substring(n.start, n.end) as String;
-        if (!containsUnknownToken(span, letter)) {
-            if (n.kind.equals("leaf")) {
-                return null;
-            }
-            return findFirstStepNode(n);
-        }
-        if (n.left != null) {
-            var fromLeft = findFirstPureStepNode(n.left as StepNode, letter, text);
-            if (fromLeft != null) {
-                return fromLeft;
-            }
-        }
-        if (n.right != null) {
-            var fromRight = findFirstPureStepNode(n.right as StepNode, letter, text);
-            if (fromRight != null) {
-                return fromRight;
-            }
-        }
-        return null;
-    }
-
-    // True if `letter` occurs in `text` as its own single-character
-    // identifier (not as part of a longer word) - used to tell a
-    // constants-only subexpression apart from one that still has the
-    // unknown mixed into it.
-    (:exclude_oldwidget)
-    private function containsUnknownToken(text as String, letter as String) as Boolean {
-        var i = 0;
-        while (i < text.length()) {
-            var c = text.substring(i, i + 1) as String;
-            if (isAsciiLetter(c)) {
-                var start = i;
-                while (i < text.length() && isAsciiLetter(text.substring(i, i + 1) as String)) {
-                    i += 1;
-                }
-                var ident = text.substring(start, i) as String;
-                if (ident.length() == 1 && ident.equals(letter)) {
-                    return true;
-                }
-            } else {
-                i += 1;
-            }
-        }
-        return false;
-    }
-
-    // Low-memory fallback for watches too small to fit StepSolver (see the
-    // pool comment at the top of SeedConfig.mc for that device list) - no
-    // order-of-operations walk, just the typed expression (and, for an
-    // equation, its solved form) plus the already-known final answer. The
-    // history detail screen still works, it just skips the intermediate
-    // stages.
-    (:oldwidget_only)
-    function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
-        var steps = [] as Array<String>;
-        if (startExpr.length() == 0) {
-            return steps;
-        }
-        steps.add(startExpr);
-        if (startExpr.find("=") != null) {
-            var solved = solveEquationForDisplay(startExpr);
-            if (solved != null) {
-                steps.add(solved as String);
-            }
-        }
-        return ensureFinalAnswer(steps, knownAnswer);
-    }
-
-    // Appends `knownAnswer` to `steps` unless it's empty/null or already the
-    // last entry - see computeSolutionSteps().
-    private function ensureFinalAnswer(steps as Array<String>, knownAnswer as String?) as Array<String> {
-        if (knownAnswer == null || (knownAnswer as String).length() == 0) {
-            return steps;
-        }
-        if (steps.size() > 0 && (steps[steps.size() - 1] as String).equals(knownAnswer as String)) {
-            return steps;
-        }
-        steps.add(knownAnswer as String);
-        return steps;
-    }
-
     // Flips the just-shown "=" result between decimal and a/b fraction
     // form. A second press flips it back - it doesn't affect anything
     // else, so typing after it (or a fresh "=") always starts decimal.
@@ -753,43 +543,6 @@ class CalculatorEngine {
             return null;
         }
         return letter + "=" + formatNumber(numeric as Double);
-    }
-
-    // "aX=C" collect-terms form shown as a step before the final "X=value"
-    // - only when the equation is affine in the unknown and there's
-    // actually a coefficient/constant to isolate; a==1 with C already equal
-    // to the solved value would just duplicate the final step, so that case
-    // returns null and computeSolutionSteps() shows the plain 2-step form.
-    private function equationCollectStep(equationExpr as String) as String? {
-        var eqIdxOrNull = equationExpr.find("=");
-        if (eqIdxOrNull == null) {
-            return null;
-        }
-        var eqIdx = eqIdxOrNull as Number;
-        var lhs = closeUnmatchedParens(equationExpr.substring(0, eqIdx) as String);
-        var rhs = closeUnmatchedParens(equationExpr.substring(eqIdx + 1, equationExpr.length()) as String);
-        if (lhs.length() == 0 || rhs.length() == 0) {
-            return null;
-        }
-        var letterOrNull = findVariableLetter(lhs);
-        if (letterOrNull == null) {
-            letterOrNull = findVariableLetter(rhs);
-        }
-        if (letterOrNull == null) {
-            return null;
-        }
-        var letter = letterOrNull as String;
-        var affine = solveAffine(letter, lhs, rhs);
-        if (affine == null) {
-            return null;
-        }
-        var a = (affine as Array<Double>)[1];
-        var b = (affine as Array<Double>)[2];
-        if (a == 1.0d) {
-            return null;
-        }
-        var coeff = a == -1.0d ? "-" + letter : formatNumber(a) + letter;
-        return coeff + "=" + formatNumber(-b);
     }
 
     // Fast, exact path: tries a few different trial triples (not just

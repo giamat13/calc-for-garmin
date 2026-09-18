@@ -1,5 +1,13 @@
 # calc-for-garmin
 
+## Branches
+
+The app ships as two separate store listings (different UUIDs in `manifest.xml`), one per branch - don't merge them into each other:
+- **`main`** - newer watches only (`minApiLevel` 3.2.0), the full-featured view. Signed with `developer_key_new.der`.
+- **`old-devices`** - older, memory-constrained watches (64KB widget cap, down to API 1.4 like fenix3/vivoactive), a lean view with no GRAPH/BASE/COLOR/COUNTER/FORMULAS/HISTORY/QR setup. Signed with `developer_key_old.der`. API 2.4+ calls (Storage/Properties) go through `readProp`/`readStore`/`writeStore` in `SeedConfig.mc`, which fall back to `AppBase.getProperty` there.
+
+`.vscode/settings.json` (tracked) points at the right key per branch; the key files themselves are gitignored.
+
 ## UI guidelines
 
 Every UI addition or change must work well for two very different users:

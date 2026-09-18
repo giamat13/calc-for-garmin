@@ -40,21 +40,6 @@ class SeedConfig {
     // alphabet, not a customizable slice of the pool (see
     // calc-for-garminView.VAR_LETTERS).
 
-    // Which built-in formula ids (calc-for-garminView.FORMULA_CATALOG) show
-    // directly on the FORMULAS screen - anything not listed still exists,
-    // just tucked behind its category's "MORE" button. A generated
-    // "customN" id (N = index into customFormulas) can appear here too.
-    // Independent of the P= pool - it's a variable-length subset pick, not
-    // a fixed-grid permutation - so it's its own field ("F=") and adding it
-    // needed no SEED version bump (see parseFormulas()). Lazy, same
-    // reasoning as the layout fields above.
-    private var _formulaSubset as Array<String>?;
-    // User-authored formulas from the setup page's custom-formula editor
-    // ("U="), each a {label, tpl} pair - tpl is inserted into the
-    // expression exactly like a built-in formula's template (see
-    // calc-for-garminView.activate()'s "formula:" handling). No device-side
-    // limit; the SEED string is the only practical ceiling.
-    var customFormulas as Array<Dictionary<String, String> >;
     var easterEggs as Boolean = false;
 
     private static var instance as SeedConfig?;
@@ -72,10 +57,6 @@ class SeedConfig {
     static const DEFAULT_MENU = "sci,units,tip,rnd,nav";
     // Wrapped in commas so a whole-item match is a single find(",item,").
     static const VALID_MENU_ITEMS = ",sci,units,tip,rnd,var,apct,date,nav,";
-
-    // Kept small on purpose - the rest of calc-for-garminView.FORMULA_CATALOG
-    // lives one tap away behind each category's "MORE" button.
-    static const DEFAULT_FORMULA_SUBSET = "circleArea,circleCircumference,pythagorean,rectangleArea,speedDistTime";
 
     static const BASIC_LEN = 20;
     static const SCI_LEN = 24;
@@ -97,7 +78,7 @@ class SeedConfig {
 
     static function get() as SeedConfig {
         if (instance == null) {
-            instance = new SeedConfig(Application.Properties.getValue("calcSeed") as String?);
+            instance = new SeedConfig(readProp("calcSeed") as String?);
         }
         return instance as SeedConfig;
     }
@@ -105,14 +86,13 @@ class SeedConfig {
     // Re-parses from Properties - call after the phone's Settings UI may
     // have changed them (App.onSettingsChanged).
     static function reload() as Void {
-        instance = new SeedConfig(Application.Properties.getValue("calcSeed") as String?);
+        instance = new SeedConfig(readProp("calcSeed") as String?);
     }
 
     function initialize(seed as String?) {
         colors = DEFAULT_COLORS;
-        customFormulas = [] as Array<Dictionary<String, String> >;
         try {
-            var ee = Application.Properties.getValue("easterEggs");
+            var ee = readProp("easterEggs");
             if (ee != null && ee instanceof Lang.Boolean) {
                 easterEggs = ee as Boolean;
             }
@@ -145,10 +125,6 @@ class SeedConfig {
                     _advLayout = sliceArr(p, offset, ADV_LEN); offset += ADV_LEN;
                     _unitsLayout = sliceArr(p, offset, UNITS_LEN);
                 }
-            } else if (f.length() >= 2 && f.substring(0, 2).equals("F=")) {
-                _formulaSubset = parseFormulas(f.substring(2, f.length()));
-            } else if (f.length() >= 2 && f.substring(0, 2).equals("U=")) {
-                customFormulas = parseCustomFormulas(f.substring(2, f.length()));
             }
         }
     }
@@ -158,13 +134,6 @@ class SeedConfig {
             _menuItems = splitStr(DEFAULT_MENU, ",");
         }
         return _menuItems as Array<String>;
-    }
-
-    function formulaSubset() as Array<String> {
-        if (_formulaSubset == null) {
-            _formulaSubset = splitStr(DEFAULT_FORMULA_SUBSET, ",");
-        }
-        return _formulaSubset as Array<String>;
     }
 
     // Each screen's layout is only split from its default the first time
@@ -254,53 +223,6 @@ class SeedConfig {
         return out;
     }
 
-    // Unlike parseMenu(), there's no fixed whitelist to check against here
-    // - the valid id set is built-in formulas PLUS however many custom
-    // ones this same seed defines via "U=", which calc-for-garminView
-    // resolves at render time. An id that doesn't resolve to anything is
-    // just silently skipped when the FORMULAS screen is built - same
-    // "ignore what you don't recognize" tolerance as the rest of this
-    // parser - so this only needs to dedupe and drop empties.
-    private function parseFormulas(s as String) as Array<String> {
-        var out = [] as Array<String>;
-        if (s.length() == 0) {
-            return out;
-        }
-        var parts = splitStr(s, ",");
-        for (var i = 0; i < parts.size(); i++) {
-            if (parts[i].length() > 0 && !containsStr(out, parts[i])) {
-                out.add(parts[i]);
-            }
-        }
-        return out;
-    }
-
-    // "label~template;label~template;..." - the setup page's custom-
-    // formula editor sanitizes both halves to strip "|", ";", and "~"
-    // before building the seed, so no escaping is needed here. A malformed
-    // entry (missing "~", or an empty half) is just dropped.
-    private function parseCustomFormulas(s as String) as Array<Dictionary<String, String> > {
-        var out = [] as Array<Dictionary<String, String> >;
-        if (s.length() == 0) {
-            return out;
-        }
-        var entries = splitStr(s, ";");
-        for (var i = 0; i < entries.size(); i++) {
-            var entry = entries[i];
-            var sepIdx = entry.find("~");
-            if (sepIdx == null) {
-                continue;
-            }
-            var label = entry.substring(0, sepIdx as Number) as String;
-            var tpl = entry.substring((sepIdx as Number) + 1, entry.length()) as String;
-            if (label.length() == 0 || tpl.length() == 0) {
-                continue;
-            }
-            out.add({"label" => label, "tpl" => tpl} as Dictionary<String, String>);
-        }
-        return out;
-    }
-
     // Must be exactly a permutation of requiredTokens (as a MULTISET - a
     // token repeated N times in requiredTokens, like "c" or "backMenu",
     // must appear exactly N times total, in any of the slots) - every
@@ -349,6 +271,31 @@ class SeedConfig {
         return indexOfStr(arr, s) != -1;
     }
 
+}
+
+// API < 2.4 watches (fenix3, fr230, vivoactive, ...) have neither
+// Application.Properties nor Application.Storage - both fall back to the
+// old AppBase property store there.
+function readProp(key as String) as PropertyValueType? {
+    if (Application has :Properties) {
+        return Application.Properties.getValue(key);
+    }
+    return Application.getApp().getProperty(key);
+}
+
+function readStore(key as String) as PropertyValueType? {
+    if (Application has :Storage) {
+        return Application.Storage.getValue(key);
+    }
+    return Application.getApp().getProperty(key);
+}
+
+function writeStore(key as String, value as PropertyValueType) as Void {
+    if (Application has :Storage) {
+        Application.Storage.setValue(key, value);
+    } else {
+        Application.getApp().setProperty(key, value);
+    }
 }
 
 // Monkey C's String has no built-in split().

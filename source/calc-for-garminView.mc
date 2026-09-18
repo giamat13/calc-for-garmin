@@ -2,8 +2,6 @@ import Toybox.Graphics;
 import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.System;
-import Toybox.Communications;
-import Toybox.Application.Storage;
 import Toybox.Math;
 import Toybox.Time;
 import Toybox.Time.Gregorian;
@@ -29,61 +27,51 @@ class CalcButton {
     }
 }
 
+
 const MODULE_TOKEN_SPEC = ",blank~~,c~C~clear,del~DEL~back,pct~%~op:%,div~/~op:/,mul~*~op:*,sub~-~op:-,add~+~op:+,dot~.~digit:.,eq~=~equals,menu~MENU~menu,sin~sin~func:sin,cos~cos~func:cos,tan~tan~func:tan,sqrt~sqrt~func:sqrt,log~log~func:log,ln~ln~func:ln,sqr~x2~sqr,x~x~const:X,open~(~open,close~)~close,pow~^~op:^,pi~pi~const:π,e~e~const:e,adv~ADV~adv,uc~UC~units,rnd~RND~random,tip~TIP~tip,eqIns~=~eq,ans~Ans~ans,curl~<~curLeft,curr~>~curRight,backMenu~BACK~menu,asin~asin~func:asin,acos~acos~func:acos,atan~atan~func:atan,fact~x!~fact,inv~1/x~inv,cbrt~cbrt~func:cbrt,absv~|x|~func:abs,mod~mod~op:mod,ee~EE~ee,cube~x3~cube,floor~floor~func:floor,ceil~ceil~func:ceil,pow10~10x~pow10,frac~a/b~frac,var~VAR~var,backSci~BACK~sci,clr~CLR~varClear,dist~DIST~cat:dist,wt~WT~cat:weight,temp~TEMP~cat:temp,spd~SPD~cat:speed,pace~PACE~cat:pace,vol~VOL~cat:vol,area~AREA~cat:area,time~TIME~cat:time,pres~PRES~cat:pres,enrg~ENRG~cat:energy,cur~CUR~cat:cur,";
 
-(:exclude_oldwidget)
-const MODULE_SWITCH_SPEC = ",sci~1,basic~0,menu~10,setup~11,adv~2,unitCatBack~3,var~9,formulas~22,formulasMore~24,formulaListBack~22,formulaMoreListBack~24,nav~15,history~16,randBack~10,tipBack~10,pctBack~14,dateBack~14,more~14,moreBack~1,graphBack~14,colorBack~3,";
-
-// No graph/formulas/color entries here - none of those screens are
-// reachable on these watches (see moreButtons()/drawGraph() etc.), so
-// their back-target rows would never be looked up.
-(:oldwidget_only)
 const MODULE_SWITCH_SPEC = ",sci~1,basic~0,menu~10,setup~11,adv~2,unitCatBack~3,var~9,nav~15,history~16,randBack~10,tipBack~10,pctBack~14,dateBack~14,more~14,moreBack~1,";
 
-// The full-featured view - every device except the ones too memory-
-// constrained to run it at all gets this one (see CalcLiteView.mc for the
-// lean alternative those devices get instead - everything here except
-// GRAPH/BASE/COLOR/COUNTER/FORMULAS/HISTORY/the QR setup page - and the
-// pool comment at the top of SeedConfig.mc for the device list).
-(:exclude_oldwidget)
+// Calculator view for older, memory-constrained watches (64KB widget cap).
+// Screen ids match main's full view numbering, so calc-for-garminDelegate.mc's
+// BACK_TARGET table works unchanged. No GRAPH/BASE/COLOR/COUNTER/FORMULAS/
+// HISTORY/QR setup here; a pasted SEED can still place those tokens, they're
+// just inert. Currency uses fixed starter rates (no live fetch).
 class calc_for_garminView extends WatchUi.View {
 
     const SCREEN_BASIC = 0;
     const SCREEN_SCIENTIFIC = 1;
     const SCREEN_ADVANCED = 2;
-    const SCREEN_UNITS = 3;       // category picker: weight / distance / temp / ...
-    const SCREEN_UNIT_PICK = 4;   // unit picker for the chosen category
-    const SCREEN_CUR_LETTER = 5;  // currency autocomplete: pick a first letter
-    const SCREEN_CUR_RESULTS = 6; // currency autocomplete: matching codes for that letter
-    const SCREEN_RANDOM = 7;      // random number generator: pick a range, then roll
-    const SCREEN_TIP = 8;         // tip & bill split: bill, tip %, people -> each
-    const SCREEN_VAR = 9;         // named variables: store/recall A/B/C/D
-    const SCREEN_MENU = 10;       // tool hub: jump straight to any advanced tool
-    const SCREEN_PERSONALIZE = 11; // QR code + link to the setup web page (theme/menu SEED)
-    const SCREEN_PCT = 12;         // advanced %: discount / markup / margin
-    const SCREEN_DATE = 13;        // date tool: days until a date, or exact age
-    const SCREEN_MORE = 14;        // overflow hub off the Scientific screen: VAR/PCT+/DATE
-    const SCREEN_NAV = 15;         // editing helpers off MENU: cursor arrows, Ans, brackets
-    const SCREEN_HISTORY = 16;     // last few "=" results: swipe up, or HIST off NAV
-    const SCREEN_HISTORY_DETAIL = 17; // step-by-step solution for one history entry
-    const SCREEN_GRAPH = 18;       // plots the typed expression over X, off MORE
-    const SCREEN_BASE = 19;        // dec/hex/oct/bin view + bitwise ops, off MORE
-    const SCREEN_COLOR = 20;       // R/G/B entry -> swatch + #HEX, off the RGB corner button on UNITS
-    const SCREEN_COUNTER = 21;     // tally counter: +1/-1, plus a settable bulk step, off MORE
-    const SCREEN_FORMULAS = 22;          // formulas: category picker for the default-visible set
-    const SCREEN_FORMULA_LIST = 23;      // formulas in one category, from the default-visible set
-    const SCREEN_FORMULAS_MORE = 24;     // formulas: category picker for everything NOT default-visible
-    const SCREEN_FORMULA_MORE_LIST = 25; // formulas in one category, from the "more" set
+    const SCREEN_UNITS = 3;
+    const SCREEN_UNIT_PICK = 4;
+    const SCREEN_CUR_LETTER = 5;
+    const SCREEN_CUR_RESULTS = 6;
+    const SCREEN_RANDOM = 7;
+    const SCREEN_TIP = 8;
+    const SCREEN_VAR = 9;
+    const SCREEN_MENU = 10;
+    const SCREEN_PCT = 12;
+    const SCREEN_DATE = 13;
+    const SCREEN_MORE = 14;
+    const SCREEN_NAV = 15;
+    // Not real screens here - only exist so calc-for-garminDelegate.mc's
+    // shared goBack()/onSwipe() logic (written for the full view's 26
+    // screens) still compiles. `screen` never actually becomes one of
+    // these, so the branches that check for them never fire.
+    const SCREEN_BASE = 93;
+    const SCREEN_COUNTER = 94;
+    const SCREEN_HISTORY = 95;
 
-    const SETUP_URL = "https://giamat13.github.io/calc-for-garmin/";
+    const CURRENCY_KEYS = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD"] as Array<String>;
+    const DEFAULT_CURRENCY_RATES = {
+        "USD" => 1.0d, "EUR" => 0.92d, "GBP" => 0.79d, "JPY" => 149.5d, "CAD" => 1.36d, "AUD" => 1.52d,
+    } as Dictionary<String, Double>;
+    private var currencyRates as Dictionary<String, Double> = DEFAULT_CURRENCY_RATES;
+    private var unitCategory as String = "";
+    private var fromUnitKey as String? = null;
+    private var curMatches as Array<String> = [] as Array<String>;
 
-    // Random/tip/unit-conversion are "embedded flows": the expression being
-    // built (e.g. "1+") is stashed here while a temporary value is entered
-    // on a different screen, then the flow's result is spliced back in at
-    // the same cursor position - e.g. "1+" -> RND -> "1+7". Null when no
-    // such flow is in progress. See enterEmbeddedFlow()/exitEmbeddedFlow().
-    private var pendingExpr as String? = null;
-    private var pendingCursor as Number = 0;
+    private const VAR_LETTERS = "ABCDFGHIJKLMNOPQRSTUVWXYZ";
 
     var engine as CalculatorEngine = new CalculatorEngine();
     var screen as Number = SCREEN_BASIC;
@@ -123,78 +111,26 @@ class calc_for_garminView extends WatchUi.View {
         }
         WatchUi.requestUpdate();
     }
-    // Which category is showing on SCREEN_FORMULA_LIST/SCREEN_FORMULA_MORE_LIST.
-    private var formulaCategory as String = "";
     private var buttons as Array<CalcButton> = [] as Array<CalcButton>;
 
-    // Two-step unit conversion state: first tap picks the source unit
-    // (highlighted), second tap on a different unit performs the conversion.
-    private var unitCategory as String = "";
-    private var fromUnitKey as String? = null;
+    // Stashes the expression being built so a temporary value (random/tip/
+    // %/date result) can be typed on another screen without losing it -
+    // same trick as the full view's enterEmbeddedFlow()/exitEmbeddedFlow().
+    private var pendingExpr as String? = null;
+    private var pendingCursor as Number = 0;
 
-    // Currency conversion: rates are USD-based (1 USD = rate[code] units of
-    // that currency). Falls back to the last successfully fetched rates
-    // (persisted in Storage), or to this hardcoded table on first-ever use
-    // with no internet and no stored rates.
-    (:exclude_oldwidget)
-    const CURRENCY_KEYS = ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "BTC"] as Array<String>;
-    (:exclude_oldwidget)
-    const DEFAULT_CURRENCY_RATES = {
-        "USD" => 1.0d,
-        "EUR" => 0.92d,
-        "GBP" => 0.79d,
-        "JPY" => 149.5d,
-        "CAD" => 1.36d,
-        "AUD" => 1.52d,
-        // BTC isn't in the fiat-rate API below, so it's refreshed separately
-        // (see refreshBitcoinRate()); this is just a stale-but-sane seed.
-        "BTC" => 0.000009d,
-    } as Dictionary<String, Double>;
-
-    // Fewer currencies on these watches - still the majors, just without
-    // CAD/AUD/BTC's extra table weight (see the pool comment at the top of
-    // SeedConfig.mc for the device list this applies to).
-    (:oldwidget_only)
-    const CURRENCY_KEYS = ["USD", "EUR", "GBP", "JPY"] as Array<String>;
-    (:oldwidget_only)
-    const DEFAULT_CURRENCY_RATES = {
-        "USD" => 1.0d,
-        "EUR" => 0.92d,
-        "GBP" => 0.79d,
-        "JPY" => 149.5d,
-    } as Dictionary<String, Double>;
-
-    private var currencyRates as Dictionary<String, Double> = DEFAULT_CURRENCY_RATES;
-
-    // Currency autocomplete: after picking a first letter, the matching
-    // codes for it are shown as buttons on SCREEN_CUR_RESULTS.
-    private var curMatches as Array<String> = [] as Array<String>;
-
-    // Random number generator state. randStage: 0 = entering MIN, 1 =
-    // entering MAX. Bounds are stored as whatever was typed (via the
-    // engine's own expression parser, so "3+4" or "-5" work), then rounded
-    // to whole numbers when rolling. GEN immediately splices the roll back
-    // into the pending expression (see enterEmbeddedFlow()).
     private var randStage as Number = 0;
     private var randMin as Double = 0.0d;
     private var randMax as Double = 0.0d;
 
-    // Tip/split state. tipStage: 0 = BILL, 1 = TIP %, 2 = PEOPLE. GO
-    // immediately splices the per-person amount into the pending expression.
     private var tipStage as Number = 0;
     private var tipBill as Double = 0.0d;
     private var tipPct as Double = 0.0d;
 
-    // Advanced % state. pctStage: 0 = pick MODE, 1 = BASE, 2 = PERCENT.
-    // pctMode: 0 = discount, 1 = markup, 2 = margin.
     private var pctStage as Number = 0;
     private var pctMode as Number = 0;
     private var pctBase as Double = 0.0d;
 
-    // Date tool state. dateStage: 0 = pick MODE, then Y/M/D entry stages -
-    // 3 of them (1-3) for UNTIL/AGE's single date, 6 (1-6) for DIFF's two
-    // dates. dateMode: 0 = days until a future date, 1 = exact age from a
-    // birth date, 2 = days between two arbitrary dates.
     private var dateStage as Number = 0;
     private var dateMode as Number = 0;
     private var dateYear as Number = 0;
@@ -204,64 +140,16 @@ class calc_for_garminView extends WatchUi.View {
     private var dateMonth2 as Number = 0;
     private var dateDay2 as Number = 0;
 
-    // Last few "=" results, newest first, capped at HISTORY_MAX and
-    // persisted in Storage (see persistHistory()) so they survive leaving
-    // and returning to the app. The list scrolls (see layoutHistoryList())
-    // instead of being squeezed to fit, so it can hold more than a
-    // one-screen-tall grid ever could.
-    private const HISTORY_MAX = 30;
-    private var historyBefore as Array<String> = [] as Array<String>;
-    private var historyAfter as Array<String> = [] as Array<String>;
+    private var ACCENT_DIGIT = 0x23233A;
+    private var ACCENT_OP = 0xFFB020;
+    private var ACCENT_EQUALS = 0x00D68F;
+    private var ACCENT_DESTRUCTIVE = 0xFF5470;
+    private var ACCENT_NAV = 0x7C4DFF;
+    private var BG_TOP = 0x14141F;
+    private const ACCENT_FUNC = 0x00BBD3;
+    private const ACCENT_UTILITY = 0x4C6FFF;
+    private const ACCENT_SELECT_RING = 0x00E5FF;
 
-    // The step-by-step breakdown currently shown on SCREEN_HISTORY_DETAIL
-    // (see computeSolutionSteps()) - recomputed each time a history entry
-    // is opened, not persisted itself.
-    private var historySteps as Array<String> = [] as Array<String>;
-
-    // How far the current scrollable list (SCREEN_HISTORY or
-    // SCREEN_HISTORY_DETAIL) is scrolled - index of the first visible row.
-    private var scrollOffset as Number = 0;
-
-    // The expression captured off the keypad when GRAPH was tapped (see
-    // "graph" in activate()) - plotted over X on SCREEN_GRAPH. A fixed
-    // [-10,10] window keeps this simple; the value itself never contains X
-    // substituted in, only the raw formula text, so it's replotted fresh
-    // each frame with a swept X.
-    private var graphExpr as String = "";
-    private const GRAPH_MIN_X = -10.0d;
-    private const GRAPH_MAX_X = 10.0d;
-
-    // The integer being viewed/bit-twiddled on SCREEN_BASE - seeded from
-    // whatever's typed on the keypad when BASE is tapped (see "base" in
-    // activate()), then mutated in place by NOT/<</>> until USE splices it
-    // back in as a decimal, or BACK discards it.
-    private var baseValue as Number = 0;
-
-    // baseStage: 1 = the normal DEC/HEX/OCT/BIN/custom view (NOT/<</>>/USE/
-    // C/RDX/BACK buttons); 0 = typing a new custom radix (2-36), a nested
-    // embedded flow (see "baseRdx" in activate()) so typing digits here
-    // never touches the main expression being calculated on the keypad.
-    private var baseStage as Number = 1;
-    private var baseRadix as Number = 5;
-
-    // RGB tool state. colorStage: 0/1/2 = entering R/G/B (0-255 each), 3 =
-    // showing the resulting swatch + #HEX (see drawColorSwatch()).
-    private var colorStage as Number = 0;
-    private var colorR as Number = 0;
-    private var colorG as Number = 0;
-    private var colorB as Number = 0;
-
-    // Tally counter tool. counterStage: 1 = the normal +1/-1/RESET view,
-    // 0 = typing a new bulk step (1-100), a nested embedded flow like
-    // baseRdx (see "counterStep" in activate()). Long-pressing "-1"
-    // subtracts a whole counterStep instead of 1 (see onHold()).
-    private var counterValue as Number = 0;
-    private var counterStep as Number = 1;
-    private var counterStage as Number = 1;
-
-    // Safe content area: on round watches a full-width row near the top/bottom
-    // edge gets chopped off by the bezel, so content is confined to the
-    // largest square that is guaranteed to stay inside the circle.
     private var safeX as Number = 0;
     private var safeY as Number = 0;
     private var safeW as Number = 0;
@@ -269,160 +157,321 @@ class calc_for_garminView extends WatchUi.View {
 
     function initialize() {
         View.initialize();
-        var stored = Storage.getValue("currencyRates");
-        if (stored != null) {
-            currencyRates = stored as Dictionary<String, Double>;
-        }
-        var storedHistBefore = Storage.getValue("calcHistoryBefore");
-        var storedHistAfter = Storage.getValue("calcHistoryAfter");
-        if (storedHistBefore != null && storedHistAfter != null) {
-            historyBefore = storedHistBefore as Array<String>;
-            historyAfter = storedHistAfter as Array<String>;
-        }
         refreshTheme();
     }
 
-    // Best-effort background refresh; whatever's already in currencyRates
-    // (fetched-and-stored, or the hardcoded default) keeps being used for
-    // conversions until/unless this succeeds.
-    private function refreshCurrencyRates() as Void {
-        var options = {
-            :method => Communications.HTTP_REQUEST_METHOD_GET,
-            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON,
-        };
-        Communications.makeWebRequest("https://open.er-api.com/v6/latest/USD", null, options, method(:onCurrencyRatesResponse));
+    function refreshTheme() as Void {
+        var colors = SeedConfig.get().colors;
+        ACCENT_DIGIT = colors[0];
+        ACCENT_OP = colors[1];
+        ACCENT_EQUALS = colors[2];
+        ACCENT_DESTRUCTIVE = colors[3];
+        ACCENT_NAV = colors[4];
+        BG_TOP = colors[5];
     }
 
-    // BTC isn't a fiat currency, so open.er-api never returns it - it needs
-    // its own fetch. Merged into the same currencyRates dict (as "units of
-    // BTC per 1 USD") so convertValue()'s generic cur-category math handles
-    // it exactly like any other code, no special-casing there.
-    private function refreshBitcoinRate() as Void {
-        var options = {
-            :method => Communications.HTTP_REQUEST_METHOD_GET,
-            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON,
-        };
-        Communications.makeWebRequest(
-            "https://api.coingecko.com/api/v3/simple/price",
-            { "ids" => "bitcoin", "vs_currencies" => "usd" },
-            options,
-            method(:onBitcoinRateResponse)
-        );
-    }
-
-    function onBitcoinRateResponse(responseCode as Number, data as Dictionary?) as Void {
-        if (responseCode != 200 || data == null) {
-            return;
-        }
-        var btc = (data as Dictionary)["bitcoin"];
-        if (btc == null) {
-            return;
-        }
-        var usdPerBtc = (btc as Dictionary)["usd"];
-        if (usdPerBtc == null || (usdPerBtc as Numeric).toDouble() == 0.0d) {
-            return;
-        }
-        currencyRates["BTC"] = 1.0d / (usdPerBtc as Numeric).toDouble();
-        Storage.setValue("currencyRates", currencyRates);
+    function refreshLayout() as Void {
         layoutButtons();
-        WatchUi.requestUpdate();
     }
-
-    function onCurrencyRatesResponse(responseCode as Number, data as Dictionary?) as Void {
-        if (responseCode != 200 || data == null) {
-            return;
-        }
-        var body = data as Dictionary;
-        var rates = body["rates"];
-        if (rates == null) {
-            return;
-        }
-        rates = rates as Dictionary;
-        // Store every currency the API knows about, not just the quick-pick
-        // shortcuts, so "OTHER" autocomplete can reach any of them.
-        var rateKeys = (rates as Dictionary).keys();
-        var fresh = {} as Dictionary<String, Double>;
-        for (var i = 0; i < rateKeys.size(); i++) {
-            var key = rateKeys[i] as String;
-            var r = rates[key];
-            if (r != null) {
-                fresh[key] = (r as Numeric).toDouble();
-            }
-        }
-        if (fresh.size() == 0) {
-            return;
-        }
-        // Preserve any already-fetched BTC rate - it comes from a separate
-        // request (refreshBitcoinRate()) and isn't part of this response.
-        var existingBtc = currencyRates["BTC"];
-        if (existingBtc != null) {
-            fresh["BTC"] = existingBtc;
-        }
-        currencyRates = fresh;
-        Storage.setValue("currencyRates", fresh);
-        // Rebuild buttons too: a letter screen opened before the fetch landed
-        // would otherwise keep showing only the default codes' letters.
-        layoutButtons();
-        WatchUi.requestUpdate();
-    }
-
-    // Test-only hook to make currency conversion deterministic without
-    // depending on Storage or network state.
-    function setCurrencyRatesForTest(rates as Dictionary<String, Double>) as Void {
-        currencyRates = rates;
-    }
-
 
     function onLayout(dc as Dc) as Void {
         var isRound = System.getDeviceSettings().screenShape == System.SCREEN_SHAPE_ROUND;
-        layoutForSize(dc.getWidth(), dc.getHeight(), isRound);
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        if (isRound) {
+            var side = (w < h ? w : h) * 0.72;
+            safeW = side.toNumber();
+            safeH = safeW;
+            safeX = (w - safeW) / 2;
+            safeY = (h - safeH) / 2;
+        } else {
+            safeX = 0;
+            safeY = 0;
+            safeW = w;
+            safeH = h;
+        }
+        layoutButtons();
     }
 
     function onShow() as Void {
     }
 
-    // Split out from onLayout() so layout math can be unit-tested with
-    // plain numbers instead of a real Dc.
-    function layoutForSize(width as Number, height as Number, isRound as Boolean) as Void {
-        computeSafeArea(width, height, isRound);
+    function onHide() as Void {
+        dismissPopup();
+    }
+
+    function getButtons() as Array<CalcButton> {
+        return buttons;
+    }
+
+    function buttonAt(x as Number, y as Number) as Number? {
+        for (var i = 0; i < buttons.size(); i++) {
+            if (buttons[i].contains(x, y)) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    function isListScreen() as Boolean {
+        return false;
+    }
+
+    function scrollList(delta as Number) as Void {
+    }
+
+    function moveSelection(delta as Number) as Void {
+        if (buttons.size() == 0) {
+            return;
+        }
+        selectedIndex = (selectedIndex + delta + buttons.size()) % buttons.size();
+    }
+
+    private function enterEmbeddedFlow() as Void {
+        var expr = engine.expr;
+        if (endsMidExpression(expr)) {
+            pendingExpr = expr;
+            pendingCursor = engine.cursorPos;
+            engine.clear();
+        } else {
+            pendingExpr = "";
+            pendingCursor = 0;
+        }
+    }
+
+    private function endsMidExpression(expr as String) as Boolean {
+        if (expr.length() == 0) {
+            return true;
+        }
+        if (expr.length() >= 3 && expr.substring(expr.length() - 3, expr.length()).equals("mod")) {
+            return true;
+        }
+        var last = expr.substring(expr.length() - 1, expr.length());
+        return last.equals("+") || last.equals("-") || last.equals("*") || last.equals("/") ||
+            last.equals("^") || last.equals("(");
+    }
+
+    private function exitEmbeddedFlow(insertText as String?) as Void {
+        if (pendingExpr == null) {
+            return;
+        }
+        engine.expr = pendingExpr as String;
+        engine.cursorPos = pendingCursor;
+        if (insertText != null) {
+            engine.insertRaw(insertText as String);
+        }
+        pendingExpr = null;
+    }
+
+    // Anything that isn't one of the screens implemented here (e.g. the
+    // delegate's BACK_TARGET table sending a screen "back" to a real-app
+    // screen this build doesn't have) falls back to Basic - the nearest
+    // sensible "home" - rather than being ignored, so BACK/ESC always goes
+    // somewhere instead of doing nothing.
+    private function knownScreen(s as Number) as Boolean {
+        return s == SCREEN_BASIC || s == SCREEN_SCIENTIFIC || s == SCREEN_ADVANCED ||
+            s == SCREEN_UNITS || s == SCREEN_UNIT_PICK || s == SCREEN_CUR_LETTER || s == SCREEN_CUR_RESULTS ||
+            s == SCREEN_RANDOM || s == SCREEN_TIP || s == SCREEN_VAR || s == SCREEN_MENU ||
+            s == SCREEN_PCT || s == SCREEN_DATE || s == SCREEN_MORE || s == SCREEN_NAV;
+    }
+
+    function switchScreen(newScreen as Number) as Void {
+        if (pendingExpr != null && (newScreen == SCREEN_BASIC || newScreen == SCREEN_SCIENTIFIC || newScreen == SCREEN_ADVANCED)) {
+            exitEmbeddedFlow(null);
+        }
+        fromUnitKey = null;
+        goToScreen(newScreen);
+    }
+
+    function goToScreen(newScreen as Number) as Void {
+        screen = knownScreen(newScreen) ? newScreen : SCREEN_BASIC;
+        selectedIndex = 0;
         layoutButtons();
     }
 
-    private function computeSafeArea(width as Number, height as Number, isRound as Boolean) as Void {
-        if (isRound) {
-            var side = (width < height ? width : height) * 0.72;
-            safeW = side.toNumber();
-            safeH = safeW;
-            safeX = (width - safeW) / 2;
-            safeY = (height - safeH) / 2;
-        } else {
-            safeX = 0;
-            safeY = 0;
-            safeW = width;
-            safeH = height;
+    private function readEntry() as Double? {
+        if (engine.expr.length() == 0 && !engine.errorState) {
+            return 0.0d;
         }
+        return engine.evaluateToDouble();
     }
 
-    // Maps one SeedConfig.basicLayout token to the button it represents.
-    // Every button on every customizable screen (basic/sci/adv/var/units)
-    // comes from ONE shared token vocabulary, because SeedConfig treats
-    // all of them as a single pool a button can be moved between screens
-    // out of - a "sin" token from the scientific screen can just as well
-    // end up on the basic keypad, and this is the one place that needs to
-    // know what every token in that pool actually is. Every action here
-    // is self-contained (a plain screen switch, or an engine op that
-    // doesn't care what screen triggered it), so nothing breaks no matter
-    // which screen a given token is drawn on.
-    // ",token~label~action," rows (see specLookup() in SeedConfig.mc) - a
-    // table instead of an if/else chain to stay under older watches' 64KB
-    // widget memory limit. Tokens not listed ("0".."9") are digits.
+    private function goToRandomStage(stage as Number) as Void {
+        randStage = stage;
+        selectedIndex = 0;
+        layoutButtons();
+    }
 
-    private function tokenToButton(token as String) as CalcButton {
-        var f = specLookup(MODULE_TOKEN_SPEC, token);
-        if (f == null) {
-            return new CalcButton(token, "digit:" + token);
+    private function goToTipStage(stage as Number) as Void {
+        tipStage = stage;
+        selectedIndex = 0;
+        layoutButtons();
+    }
+
+    private function goToPctStage(stage as Number) as Void {
+        pctStage = stage;
+        selectedIndex = 0;
+        layoutButtons();
+    }
+
+    private function goToDateStage(stage as Number) as Void {
+        dateStage = stage;
+        selectedIndex = 0;
+        layoutButtons();
+    }
+
+    private function randomExpr() as String {
+        var lo = (Math.round(randMin) as Numeric).toNumber();
+        var hi = (Math.round(randMax) as Numeric).toNumber();
+        if (hi < lo) {
+            var tmp = lo;
+            lo = hi;
+            hi = tmp;
         }
-        return new CalcButton(f[0], f[1]);
+        return lo.toString() + "+rand(" + (hi - lo).toString() + ")";
+    }
+
+    private function pctExpr(mode as Number, base as Double, pct as Double) as String {
+        var baseStr = engine.formatNumber(base);
+        var pctStr = engine.formatNumber(pct);
+        if (mode == 0) {
+            return baseStr + "*(1-" + pctStr + "/100)";
+        } else if (mode == 1) {
+            return baseStr + "*(1+" + pctStr + "/100)";
+        }
+        return baseStr + "/(1-" + pctStr + "/100)";
+    }
+
+    private function clampRange(v as Number, lo as Number, hi as Number) as Number {
+        if (v < lo) { return lo; }
+        if (v > hi) { return hi; }
+        return v;
+    }
+
+    private function handleUnitTap(key as String) as Boolean {
+        if (fromUnitKey == null) {
+            fromUnitKey = key;
+            return false;
+        }
+        var from = fromUnitKey as String;
+        fromUnitKey = null;
+        if (from.equals(key)) {
+            return false;
+        }
+        var valOrNull = engine.evaluateToDouble();
+        if (valOrNull == null) {
+            return false;
+        }
+        var result = convertValue(unitCategory, from, key, valOrNull as Double);
+        if (key.equals("/km") || key.equals("/mi")) {
+            engine.setResultText(formatPace(result));
+        } else {
+            engine.setResult(result);
+        }
+        return true;
+    }
+
+    private function formatPace(minutes as Double) as String {
+        var total = (Math.round(minutes * 60.0d) as Numeric).toNumber();
+        var secs = total % 60;
+        return (total / 60).toString() + ":" + (secs < 10 ? "0" : "") + secs.toString();
+    }
+
+    private function convertValue(category as String, from as String, to as String, v as Double) as Double {
+        if (category.equals("temp")) {
+            return convertTemp(from, to, v);
+        }
+        if (category.equals("pace")) {
+            return convertPace(from, to, v);
+        }
+        if (category.equals("cur")) {
+            var rf = currencyRates[from];
+            var rt = currencyRates[to];
+            if (rf == null || rt == null) {
+                return v;
+            }
+            return v / (rf as Double) * (rt as Double);
+        }
+        var ffrom = unitFactor(category, from);
+        var fto = unitFactor(category, to);
+        if (ffrom == null || fto == null) {
+            return v;
+        }
+        return v * (ffrom as Double) / (fto as Double);
+    }
+
+    private function convertTemp(from as String, to as String, v as Double) as Double {
+        var c = v;
+        if (from.equals("f")) {
+            c = (v - 32.0d) * 5.0d / 9.0d;
+        } else if (from.equals("K")) {
+            c = v - 273.15d;
+        }
+        if (to.equals("f")) {
+            return c * 9.0d / 5.0d + 32.0d;
+        } else if (to.equals("K")) {
+            return c + 273.15d;
+        }
+        return c;
+    }
+
+    private function convertPace(from as String, to as String, v as Double) as Double {
+        var kph = v;
+        if (from.equals("/km") || from.equals("/mi")) {
+            if (v == 0.0d) {
+                return 0.0d;
+            }
+            kph = 60.0d / v * (from.equals("/mi") ? 1.60934d : 1.0d);
+        } else if (from.equals("mph")) {
+            kph = v * 1.60934d;
+        }
+        if (to.equals("/km") || to.equals("/mi")) {
+            if (kph == 0.0d) {
+                return 0.0d;
+            }
+            return 60.0d / kph * (to.equals("/mi") ? 1.60934d : 1.0d);
+        } else if (to.equals("mph")) {
+            return kph / 1.60934d;
+        }
+        return kph;
+    }
+
+    private function unitFactor(category as String, key as String) as Double? {
+        var f = specLookup(",dist.km~1000,dist.mi~1609.34,dist.m~1,dist.ft~0.3048,dist.cm~0.01,dist.in~0.0254,dist.yd~0.9144,dist.NM~1852,weight.kg~1,weight.g~0.001,weight.lb~0.453592,weight.oz~0.0283495,weight.st~6.35029,speed.kph~1,speed.mph~1.60934,speed.m/s~3.6,speed.kn~1.852,vol.l~1,vol.mL~0.001,vol.gal~3.78541,vol.cup~0.236588,vol.floz~0.0295735,area.m2~1,area.km2~1000000,area.ha~10000,area.acre~4046.86,area.ft2~0.092903,area.mi2~2589988,time.sec~1,time.min~60,time.hr~3600,time.day~86400,time.wk~604800,pres.bar~100000,pres.kPa~1000,pres.hPa~100,pres.psi~6894.76,pres.atm~101325,pres.mmHg~133.322,energy.kcal~4184,energy.kJ~1000,energy.kWh~3600000,", category + "." + key);
+        return f != null ? f[0].toDouble() : null;
+    }
+
+    private function daysUntil(year as Number, month as Number, day as Number) as Number {
+        var target = Gregorian.moment({
+            :year => year, :month => clampRange(month, 1, 12), :day => clampRange(day, 1, 31),
+            :hour => 0, :minute => 0, :second => 0
+        });
+        var diffSeconds = target.value() - Time.now().value();
+        return (diffSeconds / 86400.0d).toNumber();
+    }
+
+    private function ageInYears(year as Number, month as Number, day as Number) as Number {
+        var today = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+        var m = clampRange(month, 1, 12);
+        var d = clampRange(day, 1, 31);
+        var age = today.year - year;
+        if (today.month < m || (today.month == m && today.day < d)) {
+            age -= 1;
+        }
+        return age < 0 ? 0 : age;
+    }
+
+    private function daysBetween(y1 as Number, m1 as Number, d1 as Number, y2 as Number, m2 as Number, d2 as Number) as Number {
+        var a = Gregorian.moment({
+            :year => y1, :month => clampRange(m1, 1, 12), :day => clampRange(d1, 1, 31),
+            :hour => 0, :minute => 0, :second => 0
+        });
+        var b = Gregorian.moment({
+            :year => y2, :month => clampRange(m2, 1, 12), :day => clampRange(d2, 1, 31),
+            :hour => 0, :minute => 0, :second => 0
+        });
+        var diff = ((b.value() - a.value()) / 86400.0d).toNumber();
+        return diff < 0 ? -diff : diff;
     }
 
     // "label~action,label~action" -> buttons, for fixed button sets.
@@ -436,100 +485,133 @@ class calc_for_garminView extends WatchUi.View {
         return defs;
     }
 
-    private function buttonsFromTokens(tokens as Array<String>) as Array<CalcButton> {
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < tokens.size(); i++) {
-            defs.add(tokenToButton(tokens[i]));
-        }
+    private function keypadButtons(backAction as String, nextLabel as String, nextAction as String) as Array<CalcButton> {
+        var defs = btns("7~digit:7,8~digit:8,9~digit:9,DEL~back,4~digit:4,5~digit:5,6~digit:6,C~clear,1~digit:1,2~digit:2,3~digit:3,-~op:-,0~digit:0,.~digit:.");
+        defs.add(new CalcButton("BACK", backAction));
+        defs.add(new CalcButton(nextLabel, nextAction));
         return defs;
     }
 
-    // Home screen: a plain, familiar 4-function calculator - digits, the
-    // four operators, %, C/DEL and "=". No cursor arrows, parens, Ans or
-    // variables here; those live one tap away on the Scientific screen via
-    // MENU, so someone who only ever wants basic arithmetic never sees them.
-    // Which button sits in which of the 20 cells comes from SeedConfig
-    // (set via the setup web page's SEED code). 4 cols x 5 rows.
     private function basicButtons() as Array<CalcButton> {
         return buttonsFromTokens(SeedConfig.get().basicLayout());
     }
 
-    // Tool hub: every advanced tool is one tap away from here instead of
-    // paged through in sequence. Which tools appear and in what order
-    // comes from SeedConfig (set via the setup web page's SEED code);
-    // "BACK" is always appended. Setup is NOT one of these - it's a small
-    // corner button laid out separately (see layoutButtons()) so it never
-    // competes for attention with the actual tools. 2 cols x 4 rows.
-    (:exclude_oldwidget)
-    private function menuButtons() as Array<CalcButton> {
-        var items = SeedConfig.get().menuItems();
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < items.size(); i++) {
-            var f = specLookup(",sci~fx~sci,units~Units~units,tip~Tip~tip,rnd~RND~random,var~VAR~var,apct~PCT+~apct,date~DATE~date,nav~NAV~nav,", items[i]);
-            if (f != null) {
-                defs.add(new CalcButton(f[0], f[1]));
-            }
-        }
-        // Fixed - not part of SeedConfig.menuItems/VALID_MENU_ITEMS, so a
-        // pasted SEED can neither hide nor reorder it (per the request:
-        // "a fixed MENU button, not part of the customizable pool"). Which
-        // formulas show once you're on that screen is still customizable,
-        // via the separate "F="/"U=" fields (see formulaCategoryButtons()).
-        defs.add(new CalcButton("FORM", "formulas"));
-        defs.add(new CalcButton("BACK", "basic"));
-        return defs;
-    }
-
-    // FORM is dropped on these watches (see FORMULA_CATALOG below - it's
-    // empty there, so there'd be nothing to show) - no dead button leading
-    // to an empty formulas screen.
-    (:oldwidget_only)
-    private function menuButtons() as Array<CalcButton> {
-        var items = SeedConfig.get().menuItems();
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < items.size(); i++) {
-            var f = specLookup(",sci~fx~sci,units~Units~units,tip~Tip~tip,rnd~RND~random,var~VAR~var,apct~PCT+~apct,date~DATE~date,nav~NAV~nav,", items[i]);
-            if (f != null) {
-                defs.add(new CalcButton(f[0], f[1]));
-            }
-        }
-        defs.add(new CalcButton("BACK", "basic"));
-        return defs;
-    }
-
-    // QR code + "open on phone" link to the setup web page where colors
-    // and the MENU item order are customized into a SEED code, pasted
-    // back into this app's Connect IQ settings. 2 cols x 1 row.
-    private function personalizeButtons() as Array<CalcButton> {
-        return btns("OPEN~setupOpen,BACK~menu");
-    }
-
-    // Scientific screen: functions, parentheses, general powers, cursor
-    // movement and Ans (relocated here from the old basic screen), plus EQ
-    // for building equations. BACK is just another token in the pool now
-    // (not pinned), so it can be moved like anything else. 4 cols x 6 rows.
     private function scientificButtons() as Array<CalcButton> {
         return buttonsFromTokens(SeedConfig.get().sciLayout());
     }
 
-    // Advanced screen: inverse trig, roots, integer/rounding ops and the
-    // ×10^x shortcut for entering numbers in scientific notation. 4 cols x 5 rows.
     private function advancedButtons() as Array<CalcButton> {
         return buttonsFromTokens(SeedConfig.get().advLayout());
     }
 
-    // Every letter usable as an algebraic unknown, e.g. tapping X then
-    // building "2X+3=10" and hitting "=" on the basic screen solves for X
-    // (CalculatorEngine.solveEquation). Fixed, not seed-customizable - a
-    // shuffled alphabet has no benefit, unlike the other 4 screens. E is
-    // omitted - it's always Euler's constant to the parser
-    // (ExprParser.mc), never an unknown to solve for. The rest (including
-    // S/C/T/L/A/F/M, each the first letter of a real function name like
-    // sin/cos/tan/log/asin/floor/mod) are all safe to offer:
-    // CalculatorEngine.appendConstant() inserts an explicit "*" whenever a
-    // letter would otherwise land directly against another letter, so two
-    // variables typed back-to-back never concatenate into a function name.
-    private const VAR_LETTERS = "ABCDFGHIJKLMNOPQRSTUVWXYZ";
+    private function unitCategoryButtons() as Array<CalcButton> {
+        return buttonsFromTokens(SeedConfig.get().unitsLayout());
+    }
+
+    private function unitKeysFor(category as String) as Array<String> {
+        if (category.equals("cur")) {
+            return CURRENCY_KEYS;
+        }
+        var keys = specLookup(",dist~km~mi~m~ft~cm~in~yd~NM,weight~kg~g~lb~oz~st,temp~c~f~K,speed~kph~mph~m/s~kn,pace~/km~/mi~kph~mph,vol~l~mL~gal~cup~floz,area~m2~km2~ha~acre~ft2~mi2,time~sec~min~hr~day~wk,pres~bar~kPa~hPa~psi~atm~mmHg,energy~kcal~kJ~kWh,", category);
+        return keys != null ? keys : [] as Array<String>;
+    }
+
+    private function unitLabel(key as String) as String {
+        var f = specLookup(",c~°C,f~°F,l~L,", key);
+        return f != null ? f[0] : key;
+    }
+
+    private function unitPickButtons() as Array<CalcButton> {
+        var keys = unitKeysFor(unitCategory);
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < keys.size(); i++) {
+            defs.add(new CalcButton(unitLabel(keys[i]), "unit:" + keys[i]));
+        }
+        if (unitCategory.equals("cur")) {
+            defs.add(new CalcButton("OTHER", "curOther"));
+        }
+        defs.add(new CalcButton("C", "clear"));
+        defs.add(new CalcButton("BACK", "unitCatBack"));
+        return defs;
+    }
+
+    // Array.sort() is CIQ 3.4.0+; some of these devices cap lower - same
+    // insertion sort the full view uses.
+    private function sortStrings(arr as Array<String>) as Array<String> {
+        for (var i = 1; i < arr.size(); i++) {
+            var v = arr[i];
+            var j = i - 1;
+            while (j >= 0 && stringLess(v, arr[j])) {
+                arr[j + 1] = arr[j];
+                j--;
+            }
+            arr[j + 1] = v;
+        }
+        return arr;
+    }
+
+    private function stringLess(a as String, b as String) as Boolean {
+        var ca = a.toCharArray();
+        var cb = b.toCharArray();
+        var n = ca.size() < cb.size() ? ca.size() : cb.size();
+        for (var i = 0; i < n; i++) {
+            var da = ca[i].toNumber();
+            var db = cb[i].toNumber();
+            if (da != db) {
+                return da < db;
+            }
+        }
+        return ca.size() < cb.size();
+    }
+
+    private function currencyLetters() as Array<String> {
+        var seen = {} as Dictionary<String, Boolean>;
+        var letters = [] as Array<String>;
+        var keys = currencyRates.keys();
+        for (var i = 0; i < keys.size(); i++) {
+            var k = keys[i] as String;
+            if (k.length() == 0) {
+                continue;
+            }
+            var letter = k.substring(0, 1) as String;
+            if (!seen.hasKey(letter)) {
+                seen[letter] = true;
+                letters.add(letter);
+            }
+        }
+        return sortStrings(letters);
+    }
+
+    private function curLetterButtons() as Array<CalcButton> {
+        var letters = currencyLetters();
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < letters.size(); i++) {
+            defs.add(new CalcButton(letters[i], "curletter:" + letters[i]));
+        }
+        defs.add(new CalcButton("BACK", "curLetterBack"));
+        return defs;
+    }
+
+    private function currencyCodesStartingWith(prefix as String) as Array<String> {
+        var out = [] as Array<String>;
+        var keys = currencyRates.keys();
+        for (var i = 0; i < keys.size(); i++) {
+            var k = keys[i] as String;
+            if (k.find(prefix) == 0) {
+                out.add(k);
+            }
+        }
+        return sortStrings(out);
+    }
+
+    private function curResultButtons() as Array<CalcButton> {
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < curMatches.size(); i++) {
+            defs.add(new CalcButton(curMatches[i], "unit:" + curMatches[i]));
+        }
+        defs.add(new CalcButton("BACK", "curResultsBack"));
+        return defs;
+    }
 
     private function varButtons() as Array<CalcButton> {
         var defs = [] as Array<CalcButton>;
@@ -541,163 +623,413 @@ class calc_for_garminView extends WatchUi.View {
         return defs;
     }
 
-    // Built-in formula catalog for the FORMULAS screen (SCREEN_FORMULAS/
-    // SCREEN_FORMULAS_MORE). Fixed, not seed-reorderable - SeedConfig's
-    // "F=" only picks a SUBSET of these ids to show by default (everything
-    // else lives behind each category's "MORE" button); it never changes
-    // this catalog itself. Each entry's "tpl" is spliced into the
-    // expression exactly as written (CalculatorEngine.appendRaw) and
-    // "back" is how many characters to move the cursor left afterward so
-    // it lands right after the template's first fill-in letter (e.g. "R"
-    // for radius) - a labeled placeholder rather than a blank "()", so it
-    // reads clearly on a small screen. Any additional placeholder letters
-    // in a template (e.g. Pythagorean's B, after its A) are reached with
-    // the cursor arrows like any other mid-expression edit.
-    // "|id~label~cat~tpl~back|" rows (see specLookup() in SeedConfig.mc;
-    // "|"-separated because labels contain commas).
-    (:exclude_oldwidget)
-    private const FORMULA_CATALOG = "|circleArea~Circle Area (πR²)~geom~π*R^2~2|circleCircumference~Circle Circumference (2πR)~geom~2*π*R~0|pythagorean~Pythagorean Theorem~geom~sqrt(A^2+B^2)~7|rectangleArea~Rectangle Area (L×W)~geom~L*W~2|triangleArea~Triangle Area (½B×H)~geom~0.5*B*H~2|trapezoidArea~Trapezoid Area (½(A+B)×H)~geom~0.5*(A+B)*H~5|parallelogramArea~Parallelogram Area (B×H)~geom~B*H~2|rectanglePerimeter~Rectangle Perimeter (2(L+W))~geom~2*(L+W)~3|sphereVolume~Sphere Volume~geom~(4/3)*π*R^3~2|sphereSurfaceArea~Sphere Surface Area (4πR²)~geom~4*π*R^2~2|cubeVolume~Cube Volume (S³)~geom~S^3~2|cylinderVolume~Cylinder Volume~geom~π*R^2*H~4|cylinderSurfaceArea~Cylinder Surface Area~geom~2*π*R*(R+H)~6|coneVolume~Cone Volume~geom~(1/3)*π*R^2*H~4|distanceBetweenPoints~Distance (A,B)-(C,D)~geom~sqrt((C-A)^2+(D-B)^2)~14|speedDistTime~Speed (D÷T)~phys~D/T~2|force~Force (F=M×A)~phys~M*A~2|kineticEnergy~Kinetic Energy (½MV²)~phys~0.5*M*V^2~4|unitConv~Unit Conversion~tools~~0|tipSplit~Tip Split ((B×(1+P/100))/N)~tools~(B*(1+P/100))/N~13|pctDecrease~Percent Decrease (B×(1-P/100))~tools~B*(1-P/100)~10|pctIncrease~Percent Increase (B×(1+P/100))~tools~B*(1+P/100)~10|pctReverse~Reverse Percent (B÷(1-P/100))~tools~B/(1-P/100)~10|randomRange~Random (A+rand(B))~tools~A+rand(B)~8|";
-
-    // FORMULAS isn't reachable on these watches at all (see menuButtons()
-    // above - no FORM button there), so an empty catalog/category set is
-    // never actually shown to anyone - it just has to exist so the
-    // (still-compiled, unreachable) formula* functions below have
-    // something to look up.
-    (:oldwidget_only)
-    private const FORMULA_CATALOG = "|";
-
-    (:exclude_oldwidget)
-    private const FORMULA_CATEGORY_ORDER = ["geom", "phys", "tools", "custom"] as Array<String>;
-    (:oldwidget_only)
-    private const FORMULA_CATEGORY_ORDER = [] as Array<String>;
-
-    (:exclude_oldwidget)
-    private const FORMULA_CATEGORY_LABELS = {
-        "geom" => "Geometry", "phys" => "Physics", "tools" => "Tools", "custom" => "Custom"
-    } as Dictionary<String, String>;
-    (:oldwidget_only)
-    private const FORMULA_CATEGORY_LABELS = {} as Dictionary<String, String>;
-
-    // Resolves a formula id to its {label,cat,tpl,back} entry. Built-in ids
-    // come straight from FORMULA_CATALOG; a "customN" id (N = index into
-    // SeedConfig.customFormulas) is resolved from the user's own SEED-
-    // defined formulas, always shown under the "custom" category with the
-    // cursor simply left at the end of the inserted text (there's no way
-    // to know which part of a free-typed template the user most wants to
-    // fill in first). Null if the id doesn't - or no longer, e.g. a stale
-    // "F=" entry after the custom list shrank - resolve to anything;
-    // callers just skip it, the same tolerance as the rest of the SEED
-    // format.
-    private function formulaEntry(id as String) as Dictionary? {
-        var f = specLookup(FORMULA_CATALOG, id);
-        if (f != null) {
-            return { "label" => f[0], "cat" => f[1], "tpl" => f[2], "back" => f[3].toNumber() } as Dictionary;
-        }
-        if (id.length() > 6 && id.substring(0, 6).equals("custom")) {
-            var idx = (id.substring(6, id.length()) as String).toNumber();
-            var custom = SeedConfig.get().customFormulas;
-            if (idx != null && idx >= 0 && idx < custom.size()) {
-                var c = custom[idx] as Dictionary<String, String>;
-                return { "label" => c["label"], "cat" => "custom", "tpl" => c["tpl"], "back" => 0 } as Dictionary;
-            }
-        }
-        return null;
+    private function randomButtons() as Array<CalcButton> {
+        return keypadButtons("randBack", randStage == 0 ? "NEXT" : "GEN", randStage == 0 ? "randNext" : "randGen");
     }
 
-    private function allFormulaIds() as Array<String> {
-        var out = [] as Array<String>;
-        var rows = splitStr(FORMULA_CATALOG.substring(1, FORMULA_CATALOG.length() - 1) as String, "|");
-        for (var i = 0; i < rows.size(); i++) {
-            out.add(rows[i].substring(0, rows[i].find("~") as Number) as String);
-        }
-        var custom = SeedConfig.get().customFormulas;
-        for (var i = 0; i < custom.size(); i++) {
-            out.add("custom" + i);
-        }
-        return out;
+    private function tipButtons() as Array<CalcButton> {
+        return keypadButtons("tipBack", tipStage == 2 ? "GO" : "NEXT", tipStage == 2 ? "tipGo" : "tipNext");
     }
 
-    private function formulaContainsStr(arr as Array<String>, s as String) as Boolean {
-        for (var i = 0; i < arr.size(); i++) {
-            if ((arr[i] as String).equals(s)) {
-                return true;
-            }
+    private function pctButtons() as Array<CalcButton> {
+        if (pctStage == 0) {
+            return btns("DISCOUNT~pctMode:0,MARKUP~pctMode:1,MARGIN~pctMode:2,BACK~pctBack");
         }
-        return false;
+        return keypadButtons("pctBack", pctStage == 2 ? "GO" : "NEXT", pctStage == 2 ? "pctGo" : "pctNext");
     }
 
-    private function formulaIdsInCategory(cat as String, wanted as Array<String>) as Array<String> {
-        var out = [] as Array<String>;
-        for (var i = 0; i < wanted.size(); i++) {
-            var entry = formulaEntry(wanted[i]);
-            if (entry != null && (entry["cat"] as String).equals(cat)) {
-                out.add(wanted[i]);
-            }
+    private function dateButtons() as Array<CalcButton> {
+        if (dateStage == 0) {
+            return btns("UNTIL~dateMode:0,AGE~dateMode:1,DIFF~dateMode:2,BACK~dateBack");
         }
-        return out;
+        var lastStage = dateMode == 2 ? 6 : 3;
+        return keypadButtons("dateBack", dateStage == lastStage ? "GO" : "NEXT", dateStage == lastStage ? "dateGo" : "dateNext");
     }
 
-    private function formulasNotIn(wanted as Array<String>) as Array<String> {
-        var all = allFormulaIds();
-        var out = [] as Array<String>;
-        for (var i = 0; i < all.size(); i++) {
-            if (!formulaContainsStr(wanted, all[i])) {
-                out.add(all[i]);
-            }
-        }
-        return out;
+    private function moreButtons() as Array<CalcButton> {
+        return btns("PCT+~apct,DATE~date,VAR~var,BACK~moreBack");
     }
 
-    private function formulaCategoryButtons() as Array<CalcButton> {
-        var subset = SeedConfig.get().formulaSubset();
+    private function menuButtons() as Array<CalcButton> {
+        var items = SeedConfig.get().menuItems();
         var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < FORMULA_CATEGORY_ORDER.size(); i++) {
-            var cat = FORMULA_CATEGORY_ORDER[i] as String;
-            if (formulaIdsInCategory(cat, subset).size() > 0) {
-                defs.add(new CalcButton(FORMULA_CATEGORY_LABELS[cat] as String, "formulaCat:" + cat));
+        for (var i = 0; i < items.size(); i++) {
+            var f = specLookup(",sci~fx~sci,units~Units~units,tip~Tip~tip,rnd~RND~random,var~VAR~var,apct~PCT+~apct,date~DATE~date,nav~NAV~nav,", items[i]);
+            if (f != null) {
+                defs.add(new CalcButton(f[0], f[1]));
             }
         }
-        if (formulasNotIn(subset).size() > 0) {
-            defs.add(new CalcButton("MORE", "formulasMore"));
-        }
-        defs.add(new CalcButton("BACK", "menu"));
+        defs.add(new CalcButton("BACK", "basic"));
         return defs;
     }
 
-    private function formulaMoreCategoryButtons() as Array<CalcButton> {
-        var notSubset = formulasNotIn(SeedConfig.get().formulaSubset());
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < FORMULA_CATEGORY_ORDER.size(); i++) {
-            var cat = FORMULA_CATEGORY_ORDER[i] as String;
-            if (formulaIdsInCategory(cat, notSubset).size() > 0) {
-                defs.add(new CalcButton(FORMULA_CATEGORY_LABELS[cat] as String, "formulaCatMore:" + cat));
-            }
+    private function navButtons() as Array<CalcButton> {
+        return btns("<~curLeft,>~curRight,Ans~ans,(~open,)~close,a/b~frac,BACK~menu");
+    }
+
+    private function tokenToButton(token as String) as CalcButton {
+        var f = specLookup(MODULE_TOKEN_SPEC, token);
+        if (f == null) {
+            return new CalcButton(token, "digit:" + token);
         }
-        defs.add(new CalcButton("BACK", "formulas"));
+        return new CalcButton(f[0], f[1]);
+    }
+
+    private function buttonsFromTokens(tokens as Array<String>) as Array<CalcButton> {
+        var defs = [] as Array<CalcButton>;
+        for (var i = 0; i < tokens.size(); i++) {
+            defs.add(tokenToButton(tokens[i]));
+        }
         return defs;
     }
 
-    // Step 1 of the unit converter: pick WHAT to measure. 3 cols x 4 rows.
-    private function unitCategoryButtons() as Array<CalcButton> {
-        return buttonsFromTokens(SeedConfig.get().unitsLayout());
-    }
-
-    // The unit keys that belong to each measurement category, in display order.
-    private function unitKeysFor(category as String) as Array<String> {
-        if (category.equals("cur")) {
-            return CURRENCY_KEYS;
+    private function layoutButtons() as Void {
+        var defs = [] as Array<CalcButton>;
+        var cols = 4;
+        if (screen == SCREEN_SCIENTIFIC) {
+            defs = scientificButtons();
+        } else if (screen == SCREEN_ADVANCED) {
+            defs = advancedButtons();
+        } else if (screen == SCREEN_UNITS) {
+            defs = unitCategoryButtons();
+            cols = 3;
+        } else if (screen == SCREEN_UNIT_PICK) {
+            defs = unitPickButtons();
+            cols = defs.size() > 8 ? 3 : 2;
+        } else if (screen == SCREEN_CUR_LETTER) {
+            defs = curLetterButtons();
+            cols = 5;
+        } else if (screen == SCREEN_CUR_RESULTS) {
+            defs = curResultButtons();
+            cols = 2;
+        } else if (screen == SCREEN_RANDOM) {
+            defs = randomButtons();
+        } else if (screen == SCREEN_TIP) {
+            defs = tipButtons();
+        } else if (screen == SCREEN_PCT) {
+            defs = pctButtons();
+            cols = pctStage == 0 ? 2 : 4;
+        } else if (screen == SCREEN_DATE) {
+            defs = dateButtons();
+            cols = dateStage == 0 ? 2 : 4;
+        } else if (screen == SCREEN_MORE) {
+            defs = moreButtons();
+            cols = 2;
+        } else if (screen == SCREEN_NAV) {
+            defs = navButtons();
+            cols = 3;
+        } else if (screen == SCREEN_VAR) {
+            defs = varButtons();
+            cols = 5;
+        } else if (screen == SCREEN_MENU) {
+            defs = menuButtons();
+            cols = 2;
+        } else {
+            defs = basicButtons();
         }
-        var keys = specLookup(",dist~km~mi~m~ft~cm~in~yd~NM,weight~kg~g~lb~oz~st,temp~c~f~K,speed~kph~mph~m/s~kn," +
-            "pace~/km~/mi~kph~mph,vol~l~mL~gal~cup~floz,area~m2~km2~ha~acre~ft2~mi2,time~sec~min~hr~day~wk," +
-            "pres~bar~kPa~hPa~psi~atm~mmHg,energy~kcal~kJ~kWh,", category);
-        return keys != null ? keys : [] as Array<String>;
+        var rows = (defs.size() + cols - 1) / cols;
+        var headerH = (safeH * 0.24).toNumber();
+        var gridTop = safeY + headerH;
+        var gridH = safeH - headerH;
+        var cellW = safeW / cols;
+        var cellH = gridH / rows;
+        var others = [] as Array<CalcButton>;
+        // BACK is a normal pool token on basic/sci/adv (can be moved), but
+        // pinned to the bottom-right corner everywhere else, same rule as
+        // the full view.
+        var customizableScreen = screen == SCREEN_BASIC || screen == SCREEN_SCIENTIFIC || screen == SCREEN_ADVANCED || screen == SCREEN_UNITS;
+        var backBtn = null as CalcButton?;
+        if (customizableScreen) {
+            others = defs;
+        } else {
+            for (var oi = 0; oi < defs.size(); oi++) {
+                if (backBtn == null && defs[oi].label.equals("BACK")) {
+                    backBtn = defs[oi];
+                } else {
+                    others.add(defs[oi]);
+                }
+            }
+        }
+        for (var i = 0; i < others.size(); i++) {
+            var row = i / cols;
+            var col = i % cols;
+            var b = others[i];
+            b.x = safeX + col * cellW;
+            b.y = gridTop + row * cellH;
+            b.w = cellW;
+            b.h = cellH;
+            var iconId = iconFor(b.action, b.label);
+            if (iconId != null) {
+                b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
+            }
+        }
+        if (backBtn != null) {
+            var b = backBtn as CalcButton;
+            b.x = safeX + (cols - 1) * cellW;
+            b.y = gridTop + (rows - 1) * cellH;
+            b.w = cellW;
+            b.h = cellH;
+            var iconId = iconFor(b.action, b.label);
+            if (iconId != null) {
+                b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
+            }
+            others.add(b);
+        }
+        if (screen == SCREEN_SCIENTIFIC) {
+            var moreSize = (headerH * 0.5).toNumber();
+            var moreBtn = new CalcButton("MORE", "more");
+            moreBtn.x = safeX + safeW - moreSize - 4;
+            moreBtn.y = safeY + 4;
+            moreBtn.w = moreSize;
+            moreBtn.h = moreSize;
+            others.add(moreBtn);
+        }
+        buttons = others;
     }
 
-    // Compact integer display for the random screen's MIN/MAX hints.
-    // Digit-grouping for on-screen numbers only (never touches engine.expr
-    // itself, which stays comma-free so ExprParser keeps working). Groups
-    // every run of digits not immediately preceded by '.' or 'e'/'E', so
-    // decimal fractions and exponents are left alone.
+    // "menu"/"backSci" toggle Basic<->Scientific and MENU takes over as the
+    // real hub once reached - see menuButtons()/moreButtons(). Anything the
+    // full app would send to a screen that doesn't exist on this build
+    // (units, history, ...) is simply ignored - the button still shows (a
+    // pasted SEED can still place it), it just does nothing when tapped.
+    function activate(b as CalcButton) as Void {
+        var action = b.action;
+        var target = specLookup(",sci~1,basic~0,menu~10,adv~2,var~9,nav~15,unitCatBack~3,randBack~10,tipBack~10,pctBack~14,dateBack~14,more~14,moreBack~1,backSci~1,", action);
+        if (target != null) {
+            switchScreen(target[0].toNumber() as Number);
+            return;
+        }
+        if (action.equals("clear")) {
+            engine.clear();
+            fromUnitKey = null;
+        } else if (action.equals("back")) {
+            engine.backspace();
+        } else if (action.equals("equals")) {
+            var exprBefore = engine.expr;
+            if (SeedConfig.get().easterEggs) {
+                if (exprBefore.equals("+6%+")) {
+                    showPopup("hebrew_profit");
+                    engine.clear();
+                    return;
+                } else if (exprBefore.equals("42")) {
+                    showPopup("answer_to_life");
+                    engine.evaluate();
+                    return;
+                }
+            }
+            engine.evaluate();
+        } else if (action.equals("curLeft")) {
+            engine.moveCursorLeft();
+        } else if (action.equals("curRight")) {
+            engine.moveCursorRight();
+        } else if (action.equals("ans")) {
+            engine.insertAns();
+        } else if (action.equals("eq")) {
+            engine.insertEquals();
+        } else if (action.equals("varClear")) {
+            engine.clearVariables();
+        } else if (action.equals("open")) {
+            engine.openParen();
+        } else if (action.equals("close")) {
+            engine.closeParen();
+        } else if (action.equals("sqr")) {
+            engine.wrapSquare();
+        } else if (action.equals("cube")) {
+            engine.wrapCube();
+        } else if (action.equals("inv")) {
+            engine.wrapInverse();
+        } else if (action.equals("pow10")) {
+            engine.wrapPow10();
+        } else if (action.equals("frac")) {
+            engine.toggleFraction();
+        } else if (action.equals("fact")) {
+            engine.wrapFactorial();
+        } else if (action.equals("ee")) {
+            engine.appendRaw("*10^");
+        } else if (action.equals("units")) {
+            enterEmbeddedFlow();
+            switchScreen(SCREEN_UNITS);
+        } else if (action.equals("curOther")) {
+            goToScreen(SCREEN_CUR_LETTER);
+        } else if (action.equals("curLetterBack")) {
+            goToScreen(SCREEN_UNIT_PICK);
+        } else if (action.equals("curResultsBack")) {
+            goToScreen(SCREEN_CUR_LETTER);
+        } else if (action.equals("random")) {
+            enterEmbeddedFlow();
+            randStage = 0;
+            randMin = 0.0d;
+            randMax = 0.0d;
+            switchScreen(SCREEN_RANDOM);
+        } else if (action.equals("randNext")) {
+            var minOrNull = readEntry();
+            if (minOrNull != null) {
+                randMin = minOrNull as Double;
+                engine.clear();
+                goToRandomStage(1);
+            }
+        } else if (action.equals("randGen")) {
+            var maxOrNull = readEntry();
+            if (maxOrNull != null) {
+                randMax = maxOrNull as Double;
+                exitEmbeddedFlow(randomExpr());
+                switchScreen(SCREEN_BASIC);
+            }
+        } else if (action.equals("tip")) {
+            enterEmbeddedFlow();
+            tipStage = 0;
+            switchScreen(SCREEN_TIP);
+        } else if (action.equals("tipNext")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull != null) {
+                if (tipStage == 0) {
+                    tipBill = entryOrNull as Double;
+                } else {
+                    tipPct = entryOrNull as Double;
+                }
+                engine.clear();
+                goToTipStage(tipStage + 1);
+            }
+        } else if (action.equals("tipGo")) {
+            var pplOrNull = readEntry();
+            if (pplOrNull != null) {
+                var ppl = (Math.round(pplOrNull as Double) as Numeric).toNumber();
+                if (ppl < 1) {
+                    ppl = 1;
+                }
+                var tipExpr = "(" + engine.formatNumber(tipBill) + "*(1+" + engine.formatNumber(tipPct) + "/100))/" + ppl.toString();
+                exitEmbeddedFlow(tipExpr);
+                switchScreen(SCREEN_BASIC);
+            }
+        } else if (action.equals("apct")) {
+            enterEmbeddedFlow();
+            pctStage = 0;
+            switchScreen(SCREEN_PCT);
+        } else if (action.equals("pctNext")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull != null) {
+                pctBase = entryOrNull as Double;
+                engine.clear();
+                goToPctStage(2);
+            }
+        } else if (action.equals("pctGo")) {
+            var pctOrNull = readEntry();
+            if (pctOrNull != null) {
+                exitEmbeddedFlow(pctExpr(pctMode, pctBase, pctOrNull as Double));
+                switchScreen(SCREEN_BASIC);
+            }
+        } else if (action.equals("date")) {
+            enterEmbeddedFlow();
+            dateStage = 0;
+            switchScreen(SCREEN_DATE);
+        } else if (action.equals("dateNext")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull != null) {
+                var whole = (Math.round(entryOrNull as Double) as Numeric).toNumber();
+                if (dateStage == 1) {
+                    dateYear = whole;
+                } else if (dateStage == 2) {
+                    dateMonth = whole;
+                } else if (dateStage == 3) {
+                    dateDay = whole;
+                } else if (dateStage == 4) {
+                    dateYear2 = whole;
+                } else {
+                    dateMonth2 = whole;
+                }
+                engine.clear();
+                goToDateStage(dateStage + 1);
+            }
+        } else if (action.equals("dateGo")) {
+            var entryOrNull = readEntry();
+            if (entryOrNull != null) {
+                var whole = (Math.round(entryOrNull as Double) as Numeric).toNumber();
+                if (dateMode == 0) {
+                    dateDay = whole;
+                    engine.setResult(daysUntil(dateYear, dateMonth, dateDay).toDouble());
+                } else if (dateMode == 1) {
+                    dateDay = whole;
+                    engine.setResult(ageInYears(dateYear, dateMonth, dateDay).toDouble());
+                } else {
+                    dateDay2 = whole;
+                    engine.setResult(daysBetween(dateYear, dateMonth, dateDay, dateYear2, dateMonth2, dateDay2).toDouble());
+                }
+                exitEmbeddedFlow(engine.expr);
+                switchScreen(SCREEN_BASIC);
+            }
+        } else {
+            var idxOrNull = action.find(":");
+            if (idxOrNull == null) {
+                return;
+            }
+            var idx = idxOrNull as Number;
+            var prefix = action.substring(0, idx) as String;
+            var value = action.substring(idx + 1, action.length()) as String;
+            if (prefix.equals("digit")) {
+                engine.appendDigit(value);
+            } else if (prefix.equals("op")) {
+                engine.appendOperator(value);
+            } else if (prefix.equals("func")) {
+                engine.appendFunction(value);
+            } else if (prefix.equals("const")) {
+                engine.appendConstant(value);
+            } else if (prefix.equals("pctMode")) {
+                pctMode = value.toNumber() as Number;
+                engine.clear();
+                goToPctStage(1);
+            } else if (prefix.equals("dateMode")) {
+                dateMode = value.toNumber() as Number;
+                engine.clear();
+                goToDateStage(1);
+            } else if (prefix.equals("cat")) {
+                unitCategory = value;
+                switchScreen(SCREEN_UNIT_PICK);
+            } else if (prefix.equals("unit")) {
+                if (handleUnitTap(value)) {
+                    exitEmbeddedFlow(engine.expr);
+                    switchScreen(SCREEN_BASIC);
+                } else if (screen != SCREEN_UNIT_PICK) {
+                    goToScreen(SCREEN_UNIT_PICK);
+                }
+            } else if (prefix.equals("curletter")) {
+                curMatches = currencyCodesStartingWith(value);
+                if (curMatches.size() == 1) {
+                    if (handleUnitTap(curMatches[0])) {
+                        exitEmbeddedFlow(engine.expr);
+                        switchScreen(SCREEN_BASIC);
+                    } else {
+                        goToScreen(SCREEN_UNIT_PICK);
+                    }
+                } else if (curMatches.size() == 0) {
+                    goToScreen(SCREEN_UNIT_PICK);
+                } else {
+                    goToScreen(SCREEN_CUR_RESULTS);
+                }
+            }
+        }
+    }
+
+    private function buttonColor(action as String) as Number {
+        if (action.equals("")) {
+            return BG_TOP;
+        } else if (action.equals("equals") || action.equals("eq")) {
+            return ACCENT_EQUALS;
+        } else if (action.equals("clear") || action.equals("back") || action.equals("varClear")) {
+            return ACCENT_DESTRUCTIVE;
+        } else if (action.equals("menu") || action.find("Back") != null || action.equals("basic")) {
+            return ACCENT_NAV;
+        } else if (action.find("digit:") == 0) {
+            return ACCENT_DIGIT;
+        } else if (action.find("op:") == 0) {
+            return ACCENT_OP;
+        } else if (action.find("func:") == 0 || action.find("const:") == 0 || action.equals("sqr") ||
+            action.equals("open") || action.equals("close") || action.equals("frac")) {
+            return ACCENT_FUNC;
+        } else {
+            return ACCENT_UTILITY;
+        }
+    }
+
     private function groupThousands(s as String) as String {
         var out = "";
         var i = 0;
@@ -739,1755 +1071,58 @@ class calc_for_garminView extends WatchUi.View {
         return ((Math.round(v) as Numeric).toNumber()).toString();
     }
 
-    private function unitLabel(key as String) as String {
-        var f = specLookup(",c~°C,f~°F,l~L,", key);
-        return f != null ? f[0] : key;
-    }
-
-    // Step 2 of the unit converter: pick the source unit, then the target
-    // unit (handled two-tap in activate()/handleUnitTap()). 2 cols, rows
-    // sized to whatever the category needs.
-    private function unitPickButtons() as Array<CalcButton> {
-        var keys = unitKeysFor(unitCategory);
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < keys.size(); i++) {
-            defs.add(new CalcButton(unitLabel(keys[i]), "unit:" + keys[i]));
-        }
-        // Currency has far more codes than fit on screen at once, so beyond
-        // the quick-pick shortcuts, OTHER opens a letter-narrowed search
-        // over every code the last successful rate fetch returned.
-        if (unitCategory.equals("cur")) {
-            defs.add(new CalcButton("OTHER", "curOther"));
-        }
-        defs.add(new CalcButton("C", "clear"));
-        defs.add(new CalcButton("BACK", "unitCatBack"));
-        return defs;
-    }
-
-    // Array.sort() is CIQ 3.4.0+; vivoactive 4s and friends cap at 3.3, so
-    // sorting there throws Symbol Not Found. Insertion sort over char codes
-    // instead - the lists here are letters and currency codes, tens of items.
-    private function sortStrings(arr as Array<String>) as Array<String> {
-        for (var i = 1; i < arr.size(); i++) {
-            var v = arr[i];
-            var j = i - 1;
-            while (j >= 0 && stringLess(v, arr[j])) {
-                arr[j + 1] = arr[j];
-                j--;
-            }
-            arr[j + 1] = v;
-        }
-        return arr;
-    }
-
-    private function stringLess(a as String, b as String) as Boolean {
-        var ca = a.toCharArray();
-        var cb = b.toCharArray();
-        var n = ca.size() < cb.size() ? ca.size() : cb.size();
-        for (var i = 0; i < n; i++) {
-            var da = ca[i].toNumber();
-            var db = cb[i].toNumber();
-            if (da != db) {
-                return da < db;
-            }
-        }
-        return ca.size() < cb.size();
-    }
-
-    // First letters of every known currency code, sorted, for the
-    // autocomplete letter screen.
-    private function currencyLetters() as Array<String> {
-        var seen = {} as Dictionary<String, Boolean>;
-        var letters = [] as Array<String>;
-        var keys = currencyRates.keys();
-        for (var i = 0; i < keys.size(); i++) {
-            var k = keys[i] as String;
-            if (k.length() == 0) {
-                continue;
-            }
-            var letter = k.substring(0, 1) as String;
-            if (!seen.hasKey(letter)) {
-                seen[letter] = true;
-                letters.add(letter);
-            }
-        }
-        return sortStrings(letters);
-    }
-
-    private function curLetterButtons() as Array<CalcButton> {
-        var letters = currencyLetters();
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < letters.size(); i++) {
-            defs.add(new CalcButton(letters[i], "curletter:" + letters[i]));
-        }
-        defs.add(new CalcButton("BACK", "curLetterBack"));
-        return defs;
-    }
-
-    // Currency codes starting with the chosen letter; reuses the same
-    // "unit:" action as the quick-pick buttons, so selecting one feeds
-    // straight back into handleUnitTap()'s two-step FROM/TO flow.
-    private function currencyCodesStartingWith(prefix as String) as Array<String> {
-        var out = [] as Array<String>;
-        var keys = currencyRates.keys();
-        for (var i = 0; i < keys.size(); i++) {
-            var k = keys[i] as String;
-            if (k.find(prefix) == 0) {
-                out.add(k);
-            }
-        }
-        return sortStrings(out);
-    }
-
-    private function curResultButtons() as Array<CalcButton> {
-        var defs = [] as Array<CalcButton>;
-        for (var i = 0; i < curMatches.size(); i++) {
-            defs.add(new CalcButton(curMatches[i], "unit:" + curMatches[i]));
-        }
-        defs.add(new CalcButton("BACK", "curResultsBack"));
-        return defs;
-    }
-
-    // Random screen: a compact numeric keypad for typing MIN then MAX
-    // (reuses the same "digit:"/"op:-"/"back"/"clear" actions the main
-    // keypad already handles). GEN splices the roll straight into whatever
-    // expression was being built and returns to it - see enterEmbeddedFlow().
-    private function randomButtons() as Array<CalcButton> {
-        return keypadButtons("randBack", randStage == 0 ? "NEXT" : "GEN", randStage == 0 ? "randNext" : "randGen");
-    }
-
-    // Tip screen: same keypad for BILL / TIP % / PEOPLE. GO splices the
-    // per-person amount back into the pending expression.
-    private function tipButtons() as Array<CalcButton> {
-        return keypadButtons("tipBack", tipStage == 2 ? "GO" : "NEXT", tipStage == 2 ? "tipGo" : "tipNext");
-    }
-
-    // Advanced % screen: pick DISCOUNT/MARKUP/MARGIN, then reuse the same
-    // keypad for BASE and PERCENT. GO splices the computed price back into
-    // the pending expression.
-    private function pctButtons() as Array<CalcButton> {
-        if (pctStage == 0) {
-            return btns("DISCOUNT~pctMode:0,MARKUP~pctMode:1,MARGIN~pctMode:2,BACK~pctBack");
-        }
-        return keypadButtons("pctBack", pctStage == 2 ? "GO" : "NEXT", pctStage == 2 ? "pctGo" : "pctNext");
-    }
-
-    // Date screen: pick UNTIL (days remaining to a future date), AGE (exact
-    // age from a birth date), or DIFF (days between two arbitrary dates),
-    // then the same keypad for Y/M/D - twice, for DIFF's two dates.
-    private function dateButtons() as Array<CalcButton> {
-        if (dateStage == 0) {
-            return btns("UNTIL~dateMode:0,AGE~dateMode:1,DIFF~dateMode:2,BACK~dateBack");
-        }
-        var lastStage = dateMode == 2 ? 6 : 3;
-        return keypadButtons("dateBack", dateStage == lastStage ? "GO" : "NEXT", dateStage == lastStage ? "dateGo" : "dateNext");
-    }
-
-    // Overflow hub, one tap off the Scientific screen's "MORE" corner
-    // button: the less-everyday tools that got moved off the default MENU.
-    (:exclude_oldwidget)
-    private function moreButtons() as Array<CalcButton> {
-        return btns("PCT+~apct,DATE~date,VAR~var,GRAPH~graph,BASE~base,COUNT~counter,BACK~moreBack");
-    }
-
-    // GRAPH/BASE/COUNT are dropped on these watches (see drawGraph(),
-    // drawBaseView(), drawCounterView() above) - no dead buttons pointing
-    // at screens with nothing to show.
-    (:oldwidget_only)
-    private function moreButtons() as Array<CalcButton> {
-        return btns("PCT+~apct,DATE~date,VAR~var,BACK~moreBack");
-    }
-
-    // Tally counter: +1/-1 tally. "+N" opens a keypad to type an amount
-    // (1-100) which is added once and remembered as counterStep, reused by
-    // long-pressing -1 to subtract a whole step at once (see onHold() in
-    // the delegate). RESET zeros the tally, BACK returns to MORE.
-    private function counterButtons() as Array<CalcButton> {
-        if (counterStage == 0) {
-            return keypadButtons("counterBack", "ADD", "counterMultiAdd");
-        }
-        return btns("+1~counterInc,-1~counterDec,+N~counterMulti,RESET~counterReset,BACK~counterBack");
-    }
-
-    // Graph screen's only real control - BACK returns to MORE, the same
-    // hub GRAPH is tapped from. The plot itself is drawn in onUpdate() over
-    // the (enlarged, see headerFraction()) header area, not as buttons.
-    private function graphButtons() as Array<CalcButton> {
-        return [new CalcButton("BACK", "graphBack")] as Array<CalcButton>;
-    }
-
-    // Base/bitwise tool: NOT/<</>> mutate baseValue in place (see
-    // drawBaseView() for where dec/hex/oct/bin/custom actually get shown),
-    // RDX opens the radix-entry keypad below, USE splices baseValue back
-    // into the main expression as a decimal, C resets it to 0, BACK
-    // discards it and returns to MORE.
-    private function baseButtons() as Array<CalcButton> {
-        if (baseStage == 0) {
-            return keypadButtons("baseBack", "SET", "baseRdxSet");
-        }
-        return btns("NOT~baseNot,<<~baseShl,>>~baseShr,RDX~baseRdx,USE~baseUse,C~baseClear,BACK~baseBack");
-    }
-
-    // RGB tool: same 4x4 numeric keypad as random/tip/pct/date for the
-    // three 0-255 entries, then a swatch-only BACK once colorStage hits 3.
-    private function colorButtons() as Array<CalcButton> {
-        if (colorStage < 3) {
-            return keypadButtons("colorBack", colorStage == 2 ? "SHOW" : "NEXT", colorStage == 2 ? "colorShow" : "colorNext");
-        }
-        return [new CalcButton("BACK", "colorBack")] as Array<CalcButton>;
-    }
-
-    // Editing-helper screen off MENU: cursor arrows, Ans and the smart
-    // brackets, split out on their own page instead of only living on the
-    // Scientific screen. Fixed, not seed-customizable, same as VAR.
-    private function navButtons() as Array<CalcButton> {
-        return btns("<~curLeft,>~curRight,Ans~ans,(~open,)~close,a/b~frac,HIST~history,BACK~menu");
-    }
-
-    // The compact preview label for history row `i` - just the exercise and
-    // its answer, no solving steps (those live on SCREEN_HISTORY_DETAIL,
-    // opened by tapping this row). Split onto two lines so a long
-    // expression gets its own full-width line instead of being squeezed
-    // next to "=answer" in the same line.
-    private function historyRowLabel(i as Number) as String {
-        var before = historyBefore[i];
-        var after = historyAfter[i];
-        if (before.find("=") != null) {
-            // An equation's own solved form ("X=5") already reads fine on
-            // its own - "2X+3=7=X=2" would be nonsense.
-            return after;
-        }
-        return before + "\n=" + after;
-    }
-
-    // Records a completed "=" (or solved equation) into the history list,
-    // most recent first, and persists it. `before` is what was typed,
-    // `afterExpr` is what evaluate() turned it into ("5" for a plain calc,
-    // "X=5" for an equation).
-    private function recordHistory(before as String, afterExpr as String) as Void {
-        var newBefore = [before] as Array<String>;
-        var newAfter = [afterExpr] as Array<String>;
-        for (var i = 0; i < historyBefore.size() && newBefore.size() < HISTORY_MAX; i++) {
-            newBefore.add(historyBefore[i]);
-            newAfter.add(historyAfter[i]);
-        }
-        historyBefore = newBefore;
-        historyAfter = newAfter;
-        persistHistory();
-    }
-
-    private function persistHistory() as Void {
-        Storage.setValue("calcHistoryBefore", historyBefore);
-        Storage.setValue("calcHistoryAfter", historyAfter);
-    }
-
-    // Compact 4x4 numeric keypad shared by the random and tip screens.
-    private function keypadButtons(backAction as String, nextLabel as String, nextAction as String) as Array<CalcButton> {
-        var defs = btns("7~digit:7,8~digit:8,9~digit:9,DEL~back,4~digit:4,5~digit:5,6~digit:6,C~clear," +
-            "1~digit:1,2~digit:2,3~digit:3,-~op:-,0~digit:0,.~digit:.");
-        defs.add(new CalcButton("BACK", backAction));
-        defs.add(new CalcButton(nextLabel, nextAction));
-        return defs;
-    }
-
-    private function layoutButtons() as Void {
-        if (isListScreen()) {
-            layoutHistoryList();
-            return;
-        }
-        var defs = basicButtons();
-        var cols = 4;
-        if (screen == SCREEN_SCIENTIFIC) {
-            defs = scientificButtons();
-            cols = 4;
-        } else if (screen == SCREEN_ADVANCED) {
-            defs = advancedButtons();
-            cols = 4;
-        } else if (screen == SCREEN_UNITS) {
-            defs = unitCategoryButtons();
-            cols = 3;
-        } else if (screen == SCREEN_UNIT_PICK) {
-            defs = unitPickButtons();
-            // Big categories (distance, currency) would need 5+ rows of 2.
-            cols = defs.size() > 8 ? 3 : 2;
-        } else if (screen == SCREEN_CUR_LETTER) {
-            defs = curLetterButtons();
-            cols = 5;
-        } else if (screen == SCREEN_CUR_RESULTS) {
-            defs = curResultButtons();
-            cols = 2;
-        } else if (screen == SCREEN_RANDOM) {
-            defs = randomButtons();
-            cols = 4;
-        } else if (screen == SCREEN_TIP) {
-            defs = tipButtons();
-            cols = 4;
-        } else if (screen == SCREEN_PCT) {
-            defs = pctButtons();
-            cols = pctStage == 0 ? 2 : 4;
-        } else if (screen == SCREEN_DATE) {
-            defs = dateButtons();
-            cols = dateStage == 0 ? 2 : 4;
-        } else if (screen == SCREEN_MORE) {
-            defs = moreButtons();
-            cols = 2;
-        } else if (screen == SCREEN_NAV) {
-            defs = navButtons();
-            cols = 3;
-        } else if (screen == SCREEN_VAR) {
-            defs = varButtons();
-            cols = 5;
-        } else if (screen == SCREEN_MENU) {
-            defs = menuButtons();
-            cols = 2;
-        } else if (screen == SCREEN_PERSONALIZE) {
-            defs = personalizeButtons();
-            cols = 2;
-        } else if (screen == SCREEN_GRAPH) {
-            defs = graphButtons();
-            cols = 1;
-        } else if (screen == SCREEN_BASE) {
-            defs = baseButtons();
-            cols = baseStage == 0 ? 4 : 3;
-        } else if (screen == SCREEN_COLOR) {
-            defs = colorButtons();
-            cols = colorStage < 3 ? 4 : 1;
-        } else if (screen == SCREEN_COUNTER) {
-            defs = counterButtons();
-            cols = counterStage == 0 ? 4 : 2;
-        } else if (screen == SCREEN_FORMULAS) {
-            defs = formulaCategoryButtons();
-            cols = 2;
-        } else if (screen == SCREEN_FORMULAS_MORE) {
-            defs = formulaMoreCategoryButtons();
-            cols = 2;
-        }
-        // Fixed-size screens (basic 20, sci 24, adv 18, units 12 tokens, ...)
-        // come out to the same row counts this way as the dynamic ones.
-        var rows = (defs.size() + cols - 1) / cols;
-
-        // BACK lands in the grid's bottom-right corner on every screen
-        // EXCEPT the fully customizable ones (basic/sci/adv/units), where
-        // BACK is just another token in SeedConfig's pool and can be moved
-        // anywhere like any other button - otherwise a user-chosen BACK
-        // position would be silently overridden right back to the corner.
-        // Elsewhere it's still pinned so it doesn't shift from screen to
-        // screen, which is what made it confusing to find. VAR's letters
-        // are fixed (not in the pool), so it's pinned too.
-        var customizableScreen = screen == SCREEN_BASIC || screen == SCREEN_SCIENTIFIC ||
-            screen == SCREEN_ADVANCED || screen == SCREEN_UNITS;
-        var backBtn = null as CalcButton?;
-        var others = [] as Array<CalcButton>;
-        if (customizableScreen) {
-            others = defs;
-        } else {
-            for (var oi = 0; oi < defs.size(); oi++) {
-                if (backBtn == null && defs[oi].label.equals("BACK")) {
-                    backBtn = defs[oi];
-                } else {
-                    others.add(defs[oi]);
-                }
-            }
-        }
-
-        var headerH = (safeH * headerFraction()).toNumber();
-        var gridTop = safeY + headerH;
-        var gridH = safeH - headerH;
-        var cellW = safeW / cols;
-        var cellH = gridH / rows;
-
-        for (var i = 0; i < others.size(); i++) {
-            var row = i / cols;
-            var col = i % cols;
-            var b = others[i];
-            b.x = safeX + col * cellW;
-            b.y = gridTop + row * cellH;
-            b.w = cellW;
-            b.h = cellH;
-            var iconId = iconFor(b.action, b.label);
-            if (iconId != null) {
-                b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
-            }
-        }
-        if (backBtn != null) {
-            var b = backBtn as CalcButton;
-            b.x = safeX + (cols - 1) * cellW;
-            b.y = gridTop + (rows - 1) * cellH;
-            b.w = cellW;
-            b.h = cellH;
-            var iconId = iconFor(b.action, b.label);
-            if (iconId != null) {
-                b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
-            }
-            others.add(b);
-        }
-        // Setup is a small, deliberately out-of-the-way corner button on
-        // the MENU screen (not a grid cell) so it never reads as one of
-        // the actual tools.
-        if (screen == SCREEN_MENU) {
-            var setupSize = (headerH * 0.5).toNumber();
-            var setupBtn = new CalcButton("SET", "setup");
-            setupBtn.x = safeX + 4;
-            setupBtn.y = safeY + 4;
-            setupBtn.w = setupSize;
-            setupBtn.h = setupSize;
-            others.add(setupBtn);
-        }
-        // MORE is the door to the overflow tools (VAR/PCT+/DATE) that got
-        // moved off the default MENU - lives in the header corner, same
-        // trick as SET above, so it doesn't eat a slot in the sci grid.
-        if (screen == SCREEN_SCIENTIFIC) {
-            var moreSize = (headerH * 0.5).toNumber();
-            var moreBtn = new CalcButton("MORE", "more");
-            moreBtn.x = safeX + safeW - moreSize - 4;
-            moreBtn.y = safeY + 4;
-            moreBtn.w = moreSize;
-            moreBtn.h = moreSize;
-            others.add(moreBtn);
-        }
-        // COLOR is one more converter, right alongside distance/weight/etc,
-        // but RGB isn't a real "unit" with a from/to pair the way those are
-        // (no second unit to convert INTO) - so instead of forcing it into
-        // that seed-editable category pool (which would mean resizing it
-        // and bumping the SEED format version just for this), it's a fixed
-        // corner shortcut on the same screen, same trick as SET/MORE above.
-        if (screen == SCREEN_UNITS) {
-            var colorSize = (headerH * 0.5).toNumber();
-            var colorBtn = new CalcButton("RGB", "color");
-            colorBtn.x = safeX + safeW - colorSize - 4;
-            colorBtn.y = safeY + 4;
-            colorBtn.w = colorSize;
-            colorBtn.h = colorSize;
-            others.add(colorBtn);
-        }
-        buttons = others;
-        if (selectedIndex >= buttons.size()) {
-            selectedIndex = 0;
-        }
-    }
-
-    // Below this, a list row would be too short to read comfortably - so
-    // rather than always cramming every entry into the screen (shrinking
-    // rows without limit as the list grows), only this many rows' worth of
-    // height is ever shown at once and the rest scrolls (see scrollOffset).
-    private const HISTORY_MIN_ROW_H = 44;
-
-    // Screens laid out by layoutHistoryList() instead of a fixed grid - a
-    // scrollable single-column list, so they share swipe/hardware up-down
-    // scrolling (see calc-for-garminDelegate.mc's onSwipe/onKey).
-    function isListScreen() as Boolean {
-        return screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL ||
-            screen == SCREEN_FORMULA_LIST || screen == SCREEN_FORMULA_MORE_LIST;
-    }
-
-    // Custom layout for SCREEN_HISTORY (past results), SCREEN_HISTORY_DETAIL
-    // (one entry's step-by-step solution), and SCREEN_FORMULA_LIST/
-    // SCREEN_FORMULA_MORE_LIST (the formulas in one category): a fixed
-    // footer row under a scrollable single-column list, sized so each
-    // visible row keeps a comfortable minimum height no matter how long the
-    // list gets. Scrolls via swipe up/down or the hardware up/down keys
-    // (see calc-for-garminDelegate.mc).
-    private function layoutHistoryList() as Void {
-        var items = [] as Array<CalcButton>;
-        var footer = [] as Array<CalcButton>;
-        if (screen == SCREEN_HISTORY) {
-            for (var i = 0; i < historyBefore.size(); i++) {
-                items.add(new CalcButton(historyRowLabel(i), "histOpen:" + i));
-            }
-            footer.add(new CalcButton("CLR", "histClear"));
-            footer.add(new CalcButton("BACK", "basic"));
-        } else if (screen == SCREEN_HISTORY_DETAIL) {
-            for (var i = 0; i < historySteps.size(); i++) {
-                items.add(new CalcButton(historySteps[i], "histStep:" + i));
-            }
-            footer.add(new CalcButton("BACK", "history"));
-        } else if (screen == SCREEN_FORMULA_LIST) {
-            var ids = formulaIdsInCategory(formulaCategory, SeedConfig.get().formulaSubset());
-            for (var i = 0; i < ids.size(); i++) {
-                var entry = formulaEntry(ids[i]);
-                items.add(new CalcButton(entry != null ? entry["label"] as String : ids[i], "formula:" + ids[i]));
-            }
-            footer.add(new CalcButton("BACK", "formulaListBack"));
-        } else {
-            var moreIds = formulaIdsInCategory(formulaCategory, formulasNotIn(SeedConfig.get().formulaSubset()));
-            for (var i = 0; i < moreIds.size(); i++) {
-                var entry2 = formulaEntry(moreIds[i]);
-                items.add(new CalcButton(entry2 != null ? entry2["label"] as String : moreIds[i], "formula:" + moreIds[i]));
-            }
-            footer.add(new CalcButton("BACK", "formulaMoreListBack"));
-        }
-
-        var headerH = (safeH * headerFraction()).toNumber();
-        var gridTop = safeY + headerH;
-        var gridH = safeH - headerH;
-
-        // Capped by screen size: a flat 44px left a 218px screen
-        // (vivoactive 4S) room for just one row, hiding every step after it.
-        var minRowH = safeH / 6 < HISTORY_MIN_ROW_H ? safeH / 6 : HISTORY_MIN_ROW_H;
-        var totalRows = gridH / minRowH;
-        if (totalRows < 2) {
-            totalRows = 2; // always room for at least one entry plus the footer
-        }
-        var visibleRows = totalRows - 1;
-        if (items.size() > 0 && visibleRows > items.size()) {
-            visibleRows = items.size();
-        }
-        if (visibleRows < 1) {
-            visibleRows = 1;
-        }
-        var maxOffset = items.size() > visibleRows ? items.size() - visibleRows : 0;
-        if (scrollOffset > maxOffset) {
-            scrollOffset = maxOffset;
-        }
-        if (scrollOffset < 0) {
-            scrollOffset = 0;
-        }
-        var rowsShown = items.size() > 0 ? visibleRows : 0;
-        var listRowH = rowsShown > 0 ? gridH / (rowsShown + 1) : gridH;
-        var footerY = gridTop + rowsShown * listRowH;
-        var footerH = gridH - rowsShown * listRowH;
-
-        var others = [] as Array<CalcButton>;
-        for (var i = 0; i < rowsShown; i++) {
-            var b = items[scrollOffset + i];
-            b.x = safeX;
-            b.y = gridTop + i * listRowH;
-            b.w = safeW;
-            b.h = listRowH;
-            others.add(b);
-        }
-        var footCellW = safeW / footer.size();
-        for (var i = 0; i < footer.size(); i++) {
-            var b = footer[i];
-            b.x = safeX + i * footCellW;
-            b.y = footerY;
-            b.w = footCellW;
-            b.h = footerH;
-            var iconId = iconFor(b.action, b.label);
-            if (iconId != null) {
-                b.icon = WatchUi.loadResource(iconId) as WatchUi.BitmapResource;
-            }
-            others.add(b);
-        }
-        buttons = others;
-        if (selectedIndex >= buttons.size()) {
-            selectedIndex = 0;
-        }
-    }
-
-    // Scrolls the current history/history-detail list by `delta` rows -
-    // clamped to valid range inside layoutHistoryList(). No-op on any other
-    // screen (nothing reads scrollOffset there).
-    function scrollList(delta as Number) as Void {
-        scrollOffset += delta;
-        layoutButtons();
-    }
-
-    // The personalize screen shows a QR code, and the graph screen its
-    // plot, instead of the expression - both get most of the screen instead
-    // of the usual thin header band.
-    private function headerFraction() as Float {
-        if (screen == SCREEN_PERSONALIZE) { return 0.62; }
-        if (screen == SCREEN_GRAPH) { return 0.82; }
-        if (screen == SCREEN_BASE && baseStage == 1) { return 0.62; }
-        if (screen == SCREEN_COLOR && colorStage == 3) { return 0.7; }
-        return 0.24;
-    }
-
-    // Public wrapper so App.onSettingsChanged() can rebuild the button grid
-    // (e.g. the MENU screen's item list) after a new SEED is pasted in,
-    // without needing the raw screen dimensions again.
-    function refreshLayout() as Void {
-        layoutButtons();
-    }
-
-    function getButtons() as Array<CalcButton> {
-        return buttons;
-    }
-
-    // Index of the button under (x,y), or null if the tap missed every button.
-    function buttonAt(x as Number, y as Number) as Number? {
-        for (var i = 0; i < buttons.size(); i++) {
-            if (buttons[i].contains(x, y)) {
-                return i;
-            }
-        }
-        return null;
-    }
-
-    function switchScreen(newScreen as Number) as Void {
-        // Leaving to a "real" calculator screen exits any embedded flow
-        // (random/tip/unit conversion) still in progress; a successful
-        // completion already called exitEmbeddedFlow() itself before
-        // getting here, so this is then a no-op (pendingExpr is null).
-        if (pendingExpr != null && (newScreen == SCREEN_BASIC || newScreen == SCREEN_SCIENTIFIC || newScreen == SCREEN_ADVANCED)) {
-            exitEmbeddedFlow(null);
-        }
-        screen = newScreen;
-        selectedIndex = 0;
-        scrollOffset = 0;
-        fromUnitKey = null;
-        layoutButtons();
-    }
-
-    // Stashes the expression being built so a temporary value can be typed
-    // on another screen (random range, tip inputs, a value to convert)
-    // without losing it; see exitEmbeddedFlow(). If what's already typed
-    // is itself a complete, usable value (e.g. "50" before tapping Units)
-    // rather than an unfinished prefix (e.g. "1+"), that value is kept as
-    // the flow's starting value instead of being wiped and forcing a
-    // retype - only an unfinished prefix needs the flow's result spliced
-    // back into it later.
-    private function enterEmbeddedFlow() as Void {
-        var expr = engine.expr;
-        if (endsMidExpression(expr)) {
-            pendingExpr = expr;
-            pendingCursor = engine.cursorPos;
-            engine.clear();
-        } else {
-            pendingExpr = "";
-            pendingCursor = 0;
-        }
-    }
-
-    // True if expr doesn't yet hold a complete value - empty, or ending in
-    // an operator/open-paren that still needs an operand after it.
-    private function endsMidExpression(expr as String) as Boolean {
-        if (expr.length() == 0) {
-            return true;
-        }
-        if (expr.length() >= 3 && expr.substring(expr.length() - 3, expr.length()).equals("mod")) {
-            return true;
-        }
-        var last = expr.substring(expr.length() - 1, expr.length());
-        return last.equals("+") || last.equals("-") || last.equals("*") || last.equals("/") ||
-            last.equals("^") || last.equals("(");
-    }
-
-    // Restores the expression stashed by enterEmbeddedFlow(), optionally
-    // splicing text in at the point where the flow was entered. A no-op if
-    // no flow is in progress (so it's safe to call unconditionally on any
-    // "exit" action).
-    private function exitEmbeddedFlow(insertText as String?) as Void {
-        if (pendingExpr == null) {
-            return;
-        }
-        engine.expr = pendingExpr as String;
-        engine.cursorPos = pendingCursor;
-        if (insertText != null) {
-            engine.insertRaw(insertText as String);
-        }
-        pendingExpr = null;
-    }
-
-    // Like switchScreen, but keeps fromUnitKey/unitCategory - used to
-    // navigate within the currency autocomplete flow (letter -> results ->
-    // back to the unit picker) without losing an in-progress FROM/TO pick.
-    function goToScreen(newScreen as Number) as Void {
-        screen = newScreen;
-        selectedIndex = 0;
-        scrollOffset = 0;
-        layoutButtons();
-    }
-
-    function moveSelection(delta as Number) as Void {
-        if (buttons.size() == 0) {
-            return;
-        }
-        selectedIndex = (selectedIndex + delta + buttons.size()) % buttons.size();
-    }
-
-    // Actions that only switch screens, as ",action~SCREEN_* id," rows -
-    // a table instead of if/else branches to stay under older watches'
-    // 64KB widget limit.
-
-    function activate(b as CalcButton) as Void {
-        var action = b.action;
-        var target = specLookup(MODULE_SWITCH_SPEC, action);
-        if (target != null) {
-            switchScreen(target[0].toNumber() as Number);
-            return;
-        }
-        if (action.equals("clear")) {
-            engine.clear();
-            fromUnitKey = null;
-            return;
-        } else if (action.equals("back")) {
-            engine.backspace();
-            return;
-        } else if (action.equals("equals")) {
-            var exprBefore = engine.expr;
-            if (SeedConfig.get().easterEggs) {
-                if (exprBefore.equals("+6%+")) {
-                    showPopup("hebrew_profit");
-                    engine.clear();
-                    return;
-                } else if (exprBefore.equals("42")) {
-                    showPopup("answer_to_life");
-                    engine.evaluate();
-                    if (!engine.errorState) {
-                        recordHistory(exprBefore, engine.expr);
-                    }
-                    return;
-                }
-            }
-            engine.evaluate();
-            if (!engine.errorState) {
-                recordHistory(exprBefore, engine.expr);
-            }
-            return;
-        } else if (action.equals("setupOpen")) {
-            Communications.openWebPage(SETUP_URL, null, null);
-            return;
-        } else if (action.equals("units")) {
-            enterEmbeddedFlow();
-            switchScreen(SCREEN_UNITS);
-            return;
-        } else if (action.equals("curLeft")) {
-            engine.moveCursorLeft();
-            return;
-        } else if (action.equals("curRight")) {
-            engine.moveCursorRight();
-            return;
-        } else if (action.equals("ans")) {
-            engine.insertAns();
-            return;
-        } else if (action.equals("eq")) {
-            engine.insertEquals();
-            return;
-        } else if (action.equals("histClear")) {
-            historyBefore = [] as Array<String>;
-            historyAfter = [] as Array<String>;
-            persistHistory();
-            scrollOffset = 0;
-            layoutButtons();
-            return;
-        } else if (action.equals("varClear")) {
-            engine.clearVariables();
-            return;
-        } else if (action.equals("open")) {
-            engine.openParen();
-            return;
-        } else if (action.equals("close")) {
-            engine.closeParen();
-            return;
-        } else if (action.equals("sqr")) {
-            engine.wrapSquare();
-            return;
-        } else if (action.equals("cube")) {
-            engine.wrapCube();
-            return;
-        } else if (action.equals("inv")) {
-            engine.wrapInverse();
-            return;
-        } else if (action.equals("pow10")) {
-            engine.wrapPow10();
-            return;
-        } else if (action.equals("frac")) {
-            engine.toggleFraction();
-            return;
-        } else if (action.equals("fact")) {
-            engine.wrapFactorial();
-            return;
-        } else if (action.equals("ee")) {
-            engine.appendRaw("*10^");
-            return;
-        } else if (action.equals("curOther")) {
-            goToScreen(SCREEN_CUR_LETTER);
-            return;
-        } else if (action.equals("curLetterBack")) {
-            goToScreen(SCREEN_UNIT_PICK);
-            return;
-        } else if (action.equals("curResultsBack")) {
-            goToScreen(SCREEN_CUR_LETTER);
-            return;
-        } else if (action.equals("random")) {
-            enterEmbeddedFlow();
-            randStage = 0;
-            randMin = 0.0d;
-            randMax = 0.0d;
-            switchScreen(SCREEN_RANDOM);
-            return;
-        } else if (action.equals("randNext")) {
-            var minOrNull = readEntry();
-            if (minOrNull == null) {
-                return;
-            }
-            randMin = minOrNull as Double;
-            engine.clear();
-            goToRandomStage(1);
-            return;
-        } else if (action.equals("randGen")) {
-            var maxOrNull = readEntry();
-            if (maxOrNull == null) {
-                return;
-            }
-            randMax = maxOrNull as Double;
-            exitEmbeddedFlow(randomExpr());
-            switchScreen(SCREEN_BASIC);
-            return;
-        } else if (action.equals("tip")) {
-            enterEmbeddedFlow();
-            tipStage = 0;
-            switchScreen(SCREEN_TIP);
-            return;
-        } else if (action.equals("tipNext")) {
-            var entryOrNull = readEntry();
-            if (entryOrNull == null) {
-                return;
-            }
-            if (tipStage == 0) {
-                tipBill = entryOrNull as Double;
-            } else {
-                tipPct = entryOrNull as Double;
-            }
-            engine.clear();
-            goToTipStage(tipStage + 1);
-            return;
-        } else if (action.equals("tipGo")) {
-            var pplOrNull = readEntry();
-            if (pplOrNull == null) {
-                return;
-            }
-            var ppl = (Math.round(pplOrNull as Double) as Numeric).toNumber();
-            if (ppl < 1) {
-                ppl = 1;
-            }
-            var tipExpr = "(" + engine.formatNumber(tipBill) + "*(1+" + engine.formatNumber(tipPct) + "/100))/" + ppl.toString();
-            exitEmbeddedFlow(tipExpr);
-            switchScreen(SCREEN_BASIC);
-            return;
-        } else if (action.equals("apct")) {
-            enterEmbeddedFlow();
-            pctStage = 0;
-            switchScreen(SCREEN_PCT);
-            return;
-        } else if (action.equals("pctNext")) {
-            var entryOrNull = readEntry();
-            if (entryOrNull == null) {
-                return;
-            }
-            pctBase = entryOrNull as Double;
-            engine.clear();
-            goToPctStage(2);
-            return;
-        } else if (action.equals("pctGo")) {
-            var pctOrNull = readEntry();
-            if (pctOrNull == null) {
-                return;
-            }
-            exitEmbeddedFlow(pctExpr(pctMode, pctBase, pctOrNull as Double));
-            switchScreen(SCREEN_BASIC);
-            return;
-        } else if (action.equals("date")) {
-            enterEmbeddedFlow();
-            dateStage = 0;
-            switchScreen(SCREEN_DATE);
-            return;
-        } else if (action.equals("dateNext")) {
-            var entryOrNull = readEntry();
-            if (entryOrNull == null) {
-                return;
-            }
-            var whole = (Math.round(entryOrNull as Double) as Numeric).toNumber();
-            if (dateStage == 1) {
-                dateYear = whole;
-            } else if (dateStage == 2) {
-                dateMonth = whole;
-            } else if (dateStage == 3) {
-                dateDay = whole;
-            } else if (dateStage == 4) {
-                dateYear2 = whole;
-            } else {
-                dateMonth2 = whole;
-            }
-            engine.clear();
-            goToDateStage(dateStage + 1);
-            return;
-        } else if (action.equals("dateGo")) {
-            var entryOrNull = readEntry();
-            if (entryOrNull == null) {
-                return;
-            }
-            var whole = (Math.round(entryOrNull as Double) as Numeric).toNumber();
-            if (dateMode == 0) {
-                dateDay = whole;
-                engine.setResult(daysUntil(dateYear, dateMonth, dateDay).toDouble());
-            } else if (dateMode == 1) {
-                dateDay = whole;
-                engine.setResult(ageInYears(dateYear, dateMonth, dateDay).toDouble());
-            } else {
-                dateDay2 = whole;
-                engine.setResult(daysBetween(dateYear, dateMonth, dateDay, dateYear2, dateMonth2, dateDay2).toDouble());
-            }
-            exitEmbeddedFlow(engine.expr);
-            switchScreen(SCREEN_BASIC);
-            return;
-        } else if (action.equals("graph")) {
-            // Whatever's currently typed (e.g. "X^2-3") becomes the plotted
-            // formula; an empty/errored expression has nothing to plot, so
-            // just stay put rather than opening a blank graph.
-            if (engine.expr.length() > 0 && !engine.errorState) {
-                graphExpr = engine.expr;
-                computeGraphSamples();
-                switchScreen(SCREEN_GRAPH);
-            }
-            return;
-        } else if (action.equals("base")) {
-            var vOrNull = readEntry();
-            baseValue = vOrNull != null ? (Math.round(vOrNull as Double) as Numeric).toNumber() : 0;
-            baseStage = 1;
-            switchScreen(SCREEN_BASE);
-            return;
-        } else if (action.equals("baseNot")) {
-            baseValue = ~baseValue;
-            return;
-        } else if (action.equals("baseShl")) {
-            baseValue = baseValue << 1;
-            return;
-        } else if (action.equals("baseShr")) {
-            baseValue = baseValue >> 1;
-            return;
-        } else if (action.equals("baseClear")) {
-            baseValue = 0;
-            return;
-        } else if (action.equals("baseUse")) {
-            engine.setResult(baseValue.toDouble());
-            switchScreen(SCREEN_BASIC);
-            return;
-        } else if (action.equals("baseRdx")) {
-            // Nested embedded flow: the main expression (whatever's typed
-            // on the real keypad, untouched since entering BASE) is stashed
-            // again so this sub-keypad can type the new radix on a blank
-            // slate without corrupting it - see enterEmbeddedFlow().
-            enterEmbeddedFlow();
-            baseStage = 0;
-            selectedIndex = 0;
-            layoutButtons();
-            return;
-        } else if (action.equals("baseRdxSet")) {
-            var rOrNull = readEntry();
-            var r = rOrNull != null ? (Math.round(rOrNull as Double) as Numeric).toNumber() : baseRadix;
-            baseRadix = clampRange(r, 2, 36);
-            exitEmbeddedFlow(null);
-            baseStage = 1;
-            selectedIndex = 0;
-            layoutButtons();
-            return;
-        } else if (action.equals("baseBack")) {
-            if (baseStage == 0) {
-                exitEmbeddedFlow(null);
-                baseStage = 1;
-                selectedIndex = 0;
-                layoutButtons();
-            } else {
-                switchScreen(SCREEN_MORE);
-            }
-            return;
-        } else if (action.equals("counter")) {
-            counterStage = 1;
-            switchScreen(SCREEN_COUNTER);
-            return;
-        } else if (action.equals("counterInc")) {
-            counterValue += 1;
-            return;
-        } else if (action.equals("counterDec")) {
-            counterValue -= 1;
-            return;
-        } else if (action.equals("counterDecMulti")) {
-            counterValue -= counterStep;
-            return;
-        } else if (action.equals("counterReset")) {
-            counterValue = 0;
-            return;
-        } else if (action.equals("counterMulti")) {
-            // Nested embedded flow, same as baseRdx: types the bulk amount
-            // on a blank keypad without touching the main expression.
-            enterEmbeddedFlow();
-            counterStage = 0;
-            selectedIndex = 0;
-            layoutButtons();
-            return;
-        } else if (action.equals("counterMultiAdd")) {
-            var nOrNull = readEntry();
-            var n = nOrNull != null ? (Math.round(nOrNull as Double) as Numeric).toNumber() : counterStep;
-            counterStep = clampRange(n, 1, 100);
-            counterValue += counterStep;
-            exitEmbeddedFlow(null);
-            counterStage = 1;
-            selectedIndex = 0;
-            layoutButtons();
-            return;
-        } else if (action.equals("counterBack")) {
-            if (counterStage == 0) {
-                exitEmbeddedFlow(null);
-                counterStage = 1;
-                selectedIndex = 0;
-                layoutButtons();
-            } else {
-                switchScreen(SCREEN_MORE);
-            }
-            return;
-        } else if (action.equals("color")) {
-            // No enterEmbeddedFlow() here - COLOR only ever opens from the
-            // RGB corner button on SCREEN_UNITS, which already stashed the
-            // real expression when UC was tapped (see "units" above).
-            // Re-stashing here would overwrite that with this screen's
-            // already-blank scratch value and lose it for good.
-            engine.clear();
-            colorStage = 0;
-            colorR = 0;
-            colorG = 0;
-            colorB = 0;
-            switchScreen(SCREEN_COLOR);
-            return;
-        } else if (action.equals("colorNext")) {
-            var entryOrNull = readEntry();
-            if (entryOrNull == null) {
-                return;
-            }
-            var whole = clampRange((Math.round(entryOrNull as Double) as Numeric).toNumber(), 0, 255);
-            if (colorStage == 0) {
-                colorR = whole;
-            } else {
-                colorG = whole;
-            }
-            engine.clear();
-            colorStage += 1;
-            selectedIndex = 0;
-            layoutButtons();
-            return;
-        } else if (action.equals("colorShow")) {
-            var entryOrNull = readEntry();
-            if (entryOrNull == null) {
-                return;
-            }
-            colorB = clampRange((Math.round(entryOrNull as Double) as Numeric).toNumber(), 0, 255);
-            colorStage = 3;
-            selectedIndex = 0;
-            layoutButtons();
-            return;
-        }
-
-        var idxOrNull = action.find(":");
-        if (idxOrNull == null) {
-            return;
-        }
-        var idx = idxOrNull as Number;
-        var prefix = action.substring(0, idx) as String;
-        var value = action.substring(idx + 1, action.length()) as String;
-        if (prefix.equals("digit")) {
-            engine.appendDigit(value);
-        } else if (prefix.equals("op")) {
-            engine.appendOperator(value);
-        } else if (prefix.equals("func")) {
-            engine.appendFunction(value);
-        } else if (prefix.equals("const")) {
-            engine.appendConstant(value);
-        } else if (prefix.equals("cat")) {
-            unitCategory = value;
-            switchScreen(SCREEN_UNIT_PICK);
-            if (value.equals("cur")) {
-                refreshCurrencyRates();
-                refreshBitcoinRate();
-            }
-        } else if (prefix.equals("formulaCat")) {
-            formulaCategory = value;
-            switchScreen(SCREEN_FORMULA_LIST);
-        } else if (prefix.equals("formulaCatMore")) {
-            formulaCategory = value;
-            switchScreen(SCREEN_FORMULA_MORE_LIST);
-        } else if (prefix.equals("formula")) {
-            var formulaEntryOrNull = formulaEntry(value);
-            if (formulaEntryOrNull == null) {
-                switchScreen(SCREEN_BASIC);
-            } else if (value.equals("unitConv")) {
-                enterEmbeddedFlow();
-                switchScreen(SCREEN_UNITS);
-            } else {
-                var fEntry = formulaEntryOrNull as Dictionary;
-                engine.appendRaw(fEntry["tpl"] as String);
-                var back = fEntry["back"] as Number;
-                for (var bi = 0; bi < back; bi++) {
-                    engine.moveCursorLeft();
-                }
-                switchScreen(SCREEN_BASIC);
-            }
-        } else if (prefix.equals("unit")) {
-            if (handleUnitTap(value)) {
-                exitEmbeddedFlow(engine.expr);
-                switchScreen(SCREEN_BASIC);
-            } else if (screen != SCREEN_UNIT_PICK) {
-                goToScreen(SCREEN_UNIT_PICK);
-            }
-        } else if (prefix.equals("curletter")) {
-            curMatches = currencyCodesStartingWith(value);
-            if (curMatches.size() == 1) {
-                if (handleUnitTap(curMatches[0])) {
-                    exitEmbeddedFlow(engine.expr);
-                    switchScreen(SCREEN_BASIC);
-                } else {
-                    goToScreen(SCREEN_UNIT_PICK);
-                }
-            } else if (curMatches.size() == 0) {
-                goToScreen(SCREEN_UNIT_PICK);
-            } else {
-                goToScreen(SCREEN_CUR_RESULTS);
-            }
-        } else if (prefix.equals("histOpen")) {
-            // Tapping a history entry no longer pastes it straight away -
-            // it opens the step-by-step solution, where every stage
-            // (including the original exercise and the final answer) has
-            // its own paste action.
-            var hoIdx = value.toNumber() as Number;
-            historySteps = (hoIdx >= 0 && hoIdx < historyBefore.size()) ?
-                engine.computeSolutionSteps(historyBefore[hoIdx], historyAfter[hoIdx]) : ([] as Array<String>);
-            switchScreen(SCREEN_HISTORY_DETAIL);
-        } else if (prefix.equals("histStep")) {
-            var hsIdx = value.toNumber() as Number;
-            if (hsIdx >= 0 && hsIdx < historySteps.size()) {
-                var stepText = historySteps[hsIdx];
-                // Wrap a negative step in parens before splicing it into an
-                // existing expression, same as insertValue() does for Ans -
-                // otherwise e.g. "5-" + "-4" would misparse as "5--4".
-                engine.appendRaw(stepText.substring(0, 1).equals("-") ? "(" + stepText + ")" : stepText);
-            }
-            switchScreen(SCREEN_BASIC);
-        } else if (prefix.equals("sto")) {
-            engine.storeVar(value);
-        } else if (prefix.equals("rcl")) {
-            engine.recallVar(value);
-        } else if (prefix.equals("pctMode")) {
-            pctMode = value.toNumber() as Number;
-            engine.clear();
-            goToPctStage(1);
-        } else if (prefix.equals("dateMode")) {
-            dateMode = value.toNumber() as Number;
-            engine.clear();
-            goToDateStage(1);
-        }
-    }
-
-    // First tap on the unit-pick screen records the source unit (and is
-    // highlighted in onUpdate); the second tap on a *different* unit
-    // evaluates the engine's current expression and converts it. Tapping
-    // the same unit again cancels the selection. Returns true once a
-    // conversion has actually been computed (the caller then exits the
-    // embedded flow and splices the result back into the real expression).
-    private function handleUnitTap(key as String) as Boolean {
-        if (fromUnitKey == null) {
-            fromUnitKey = key;
-            return false;
-        }
-        var from = fromUnitKey as String;
-        fromUnitKey = null;
-        if (from.equals(key)) {
-            return false;
-        }
-        var valOrNull = engine.evaluateToDouble();
-        if (valOrNull == null) {
-            return false;
-        }
-        var result = convertValue(unitCategory, from, key, valOrNull as Double);
-        if (key.equals("/km") || key.equals("/mi")) {
-            // Runners read pace as m:ss; ExprParser reads "m:ss" back, so the
-            // result can still be converted again.
-            engine.setResultText(formatPace(result));
-        } else {
-            engine.setResult(result);
-        }
-        return true;
-    }
-
-    private function formatPace(minutes as Double) as String {
-        var total = (Math.round(minutes * 60.0d) as Numeric).toNumber();
-        var secs = total % 60;
-        return (total / 60).toString() + ":" + (secs < 10 ? "0" : "") + secs.toString();
-    }
-
-    // Reads whatever's been typed on the random screen as a number. An
-    // untouched keypad (nothing typed yet) counts as 0 rather than an
-    // error, so pressing NEXT/GEN without typing anything just rolls with
-    // that bound as 0 instead of silently doing nothing.
-    private function readEntry() as Double? {
-        if (engine.expr.length() == 0 && !engine.errorState) {
-            return 0.0d;
-        }
-        return engine.evaluateToDouble();
-    }
-
-    private function goToRandomStage(stage as Number) as Void {
-        randStage = stage;
-        selectedIndex = 0;
-        layoutButtons();
-    }
-
-    private function goToTipStage(stage as Number) as Void {
-        tipStage = stage;
-        selectedIndex = 0;
-        layoutButtons();
-    }
-
-    private function goToPctStage(stage as Number) as Void {
-        pctStage = stage;
-        selectedIndex = 0;
-        layoutButtons();
-    }
-
-    private function goToDateStage(stage as Number) as Void {
-        dateStage = stage;
-        selectedIndex = 0;
-        layoutButtons();
-    }
-
-    // Builds "lo+rand(hi-lo)" (bounds rounded and swapped if entered
-    // backwards) instead of rolling the number here - this leaves the
-    // RANDOM function itself sitting in the main expression, same as a
-    // formula, so pressing "=" re-rolls it fresh (and pressing "=" again
-    // later re-rolls again), rather than pasting in one fixed result.
-    private function randomExpr() as String {
-        var lo = (Math.round(randMin) as Numeric).toNumber();
-        var hi = (Math.round(randMax) as Numeric).toNumber();
-        if (hi < lo) {
-            var tmp = lo;
-            lo = hi;
-            hi = tmp;
-        }
-        return lo.toString() + "+rand(" + (hi - lo).toString() + ")";
-    }
-
-    // mode: 0 = discount (price after taking pct off base), 1 = markup
-    // (price after adding pct on top of base), 2 = margin (the price a
-    // cost of `base` must be sold at to hit a pct profit margin).
-    private function computePct(mode as Number, base as Double, pct as Double) as Double {
-        if (mode == 0) {
-            return base * (1.0d - pct / 100.0d);
-        } else if (mode == 1) {
-            return base * (1.0d + pct / 100.0d);
-        }
-        var denom = 1.0d - pct / 100.0d;
-        if (denom <= 0.0d) {
-            denom = 0.01d;
-        }
-        return base / denom;
-    }
-
-    // Same three modes as computePct(), but as an expression string to
-    // leave in the main calculator (like a formula) instead of a
-    // pre-computed number. Mode 2 (base/(1-pct/100)) skips computePct()'s
-    // divide-by-zero guard on purpose - the guard exists to protect a
-    // Double computed once here, but as a live expression the calculator's
-    // own evaluator already reports a divide-by-zero as an error state,
-    // which is the more honest outcome for a 100%-discount base.
-    private function pctExpr(mode as Number, base as Double, pct as Double) as String {
-        var baseStr = engine.formatNumber(base);
-        var pctStr = engine.formatNumber(pct);
-        if (mode == 0) {
-            return baseStr + "*(1-" + pctStr + "/100)";
-        } else if (mode == 1) {
-            return baseStr + "*(1+" + pctStr + "/100)";
-        }
-        return baseStr + "/(1-" + pctStr + "/100)";
-    }
-
-    // Whole days from today until the given date (negative if it's past).
-    private function daysUntil(year as Number, month as Number, day as Number) as Number {
-        var target = Gregorian.moment({
-            :year => year, :month => clampRange(month, 1, 12), :day => clampRange(day, 1, 31),
-            :hour => 0, :minute => 0, :second => 0
-        });
-        var diffSeconds = target.value() - Time.now().value();
-        return (diffSeconds / 86400.0d).toNumber();
-    }
-
-    // Whole years elapsed between the given date and today - standard
-    // "hasn't had this year's birthday yet" calendar age.
-    private function ageInYears(year as Number, month as Number, day as Number) as Number {
-        var today = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
-        var m = clampRange(month, 1, 12);
-        var d = clampRange(day, 1, 31);
-        var age = today.year - year;
-        if (today.month < m || (today.month == m && today.day < d)) {
-            age -= 1;
-        }
-        return age < 0 ? 0 : age;
-    }
-
-    // Whole days between two arbitrary dates, order-independent.
-    private function daysBetween(y1 as Number, m1 as Number, d1 as Number, y2 as Number, m2 as Number, d2 as Number) as Number {
-        var a = Gregorian.moment({
-            :year => y1, :month => clampRange(m1, 1, 12), :day => clampRange(d1, 1, 31),
-            :hour => 0, :minute => 0, :second => 0
-        });
-        var b = Gregorian.moment({
-            :year => y2, :month => clampRange(m2, 1, 12), :day => clampRange(d2, 1, 31),
-            :hour => 0, :minute => 0, :second => 0
-        });
-        var diff = ((b.value() - a.value()) / 86400.0d).toNumber();
-        return diff < 0 ? -diff : diff;
-    }
-
-    private function clampRange(v as Number, lo as Number, hi as Number) as Number {
-        if (v < lo) { return lo; }
-        if (v > hi) { return hi; }
-        return v;
-    }
-
-    private function convertValue(category as String, from as String, to as String, v as Double) as Double {
-        if (category.equals("temp")) {
-            return convertTemp(from, to, v);
-        }
-        if (category.equals("pace")) {
-            return convertPace(from, to, v);
-        }
-        if (category.equals("cur")) {
-            var rf = currencyRates[from];
-            var rt = currencyRates[to];
-            if (rf == null || rt == null) {
-                return v;
-            }
-            return v / (rf as Double) * (rt as Double);
-        }
-        var ffrom = unitFactor(category, from);
-        var fto = unitFactor(category, to);
-        if (ffrom == null || fto == null) {
-            return v;
-        }
-        // Every non-temperature unit's factor converts it to a common base
-        // unit (meters / kg / kph / liters), so from->to is a single ratio.
-        return v * (ffrom as Double) / (fto as Double);
-    }
-
-    // Via Celsius, so every pair of c/f/K works.
-    private function convertTemp(from as String, to as String, v as Double) as Double {
-        var c = v;
-        if (from.equals("f")) {
-            c = (v - 32.0d) * 5.0d / 9.0d;
-        } else if (from.equals("K")) {
-            c = v - 273.15d;
-        }
-        if (to.equals("f")) {
-            return c * 9.0d / 5.0d + 32.0d;
-        } else if (to.equals("K")) {
-            return c + 273.15d;
-        }
-        return c;
-    }
-
-    // Pace (minutes per km / mile) is the reciprocal of speed, so it can't
-    // use the single-ratio path; everything goes through kph. A zero pace or
-    // speed maps to 0 rather than dividing by zero.
-    private function convertPace(from as String, to as String, v as Double) as Double {
-        var kph = v;
-        if (from.equals("/km") || from.equals("/mi")) {
-            if (v == 0.0d) {
-                return 0.0d;
-            }
-            kph = 60.0d / v * (from.equals("/mi") ? 1.60934d : 1.0d);
-        } else if (from.equals("mph")) {
-            kph = v * 1.60934d;
-        }
-        if (to.equals("/km") || to.equals("/mi")) {
-            if (kph == 0.0d) {
-                return 0.0d;
-            }
-            return 60.0d / kph * (to.equals("/mi") ? 1.60934d : 1.0d);
-        } else if (to.equals("mph")) {
-            return kph / 1.60934d;
-        }
-        return kph;
-    }
-
-    // Factor to each category's base unit (meters / kg / kph / liters /
-    // m2 / seconds / pascals / joules), as ",category.unit~factor," rows.
-    private function unitFactor(category as String, key as String) as Double? {
-        var f = specLookup(",dist.km~1000,dist.mi~1609.34,dist.m~1,dist.ft~0.3048,dist.cm~0.01,dist.in~0.0254,dist.yd~0.9144,dist.NM~1852," +
-            "weight.kg~1,weight.g~0.001,weight.lb~0.453592,weight.oz~0.0283495,weight.st~6.35029," +
-            "speed.kph~1,speed.mph~1.60934,speed.m/s~3.6,speed.kn~1.852," +
-            "vol.l~1,vol.mL~0.001,vol.gal~3.78541,vol.cup~0.236588,vol.floz~0.0295735," +
-            "area.m2~1,area.km2~1000000,area.ha~10000,area.acre~4046.86,area.ft2~0.092903,area.mi2~2589988," +
-            "time.sec~1,time.min~60,time.hr~3600,time.day~86400,time.wk~604800," +
-            "pres.bar~100000,pres.kPa~1000,pres.hPa~100,pres.psi~6894.76,pres.atm~101325,pres.mmHg~133.322," +
-            "energy.kcal~4184,energy.kJ~1000,energy.kWh~3600000,", category + "." + key);
-        return f != null ? f[0].toDouble() : null;
-    }
-
-    // Modern flat-color-by-category palette (custom hex, not the stock
-    // 16-color Graphics.COLOR_* set) so a glance at a button's color tells
-    // you what kind of thing it does: digits are neutral, math operators
-    // amber, destructive actions coral, "=" green, navigation/menu purple,
-    // scientific functions teal, everything else utility blue.
-    // The 6 theme-able colors (digit/op/equals/destructive/nav/background)
-    // come from SeedConfig - the stock look until the setup web page's
-    // SEED code is pasted into this app's Connect IQ settings. See
-    // refreshTheme().
-    private var ACCENT_DIGIT = 0x23233A;
-    private var ACCENT_OP = 0xFFB020;
-    private var ACCENT_EQUALS = 0x00D68F;
-    private var ACCENT_DESTRUCTIVE = 0xFF5470;
-    private var ACCENT_NAV = 0x7C4DFF;
-    private var BG_TOP = 0x14141F;
-    private const ACCENT_FUNC = 0x00BBD3;
-    private const ACCENT_UTILITY = 0x4C6FFF;
-    private const ACCENT_SELECT_RING = 0x00E5FF;
-    private const ACCENT_FROM_UNIT = 0xFFD166;
-    // Setup is a secondary/admin action, not a tool - deliberately muted
-    // so it doesn't compete with the actual tools in the MENU screen.
-    private const ACCENT_SETUP = 0x2A2A38;
-
-    // Re-reads the 6 theme colors from SeedConfig; call on launch and
-    // whenever the phone's Settings UI may have changed the pasted SEED.
-    function refreshTheme() as Void {
-        var colors = SeedConfig.get().colors;
-        ACCENT_DIGIT = colors[0];
-        ACCENT_OP = colors[1];
-        ACCENT_EQUALS = colors[2];
-        ACCENT_DESTRUCTIVE = colors[3];
-        ACCENT_NAV = colors[4];
-        BG_TOP = colors[5];
-    }
-
-    private function buttonColor(action as String) as Number {
-        if (action.equals("")) {
-            // "blank" token - a button the user deliberately deleted via
-            // the setup page; blend it into the background instead of
-            // drawing an empty tile in a loud color.
-            return BG_TOP;
-        } else if (action.equals("equals") || action.equals("eq")) {
-            return ACCENT_EQUALS;
-        } else if (action.equals("clear") || action.equals("back") || action.equals("varClear")) {
-            return ACCENT_DESTRUCTIVE;
-        } else if (action.equals("setup")) {
-            return ACCENT_SETUP;
-        } else if (action.equals("menu") || action.find("Back") != null || action.equals("basic")) {
-            return ACCENT_NAV;
-        } else if (action.find("digit:") == 0) {
-            return ACCENT_DIGIT;
-        } else if (action.find("op:") == 0) {
-            return ACCENT_OP;
-        } else if (action.find("func:") == 0 || action.find("const:") == 0 || action.equals("sqr") ||
-            action.equals("open") || action.equals("close") || action.equals("frac")) {
-            return ACCENT_FUNC;
-        } else {
-            return ACCENT_UTILITY;
-        }
-    }
-
-    // Re-parsing graphExpr from scratch at every pixel column, on every
-    // redraw, is what tripped the watchdog on-device: onUpdate can fire
-    // many times a second, and a full recursive-descent parse (lots of
-    // String.substring() allocation) per column adds up to real seconds of
-    // work on watch-class hardware. So the expression is sampled exactly
-    // ONCE, right when GRAPH is entered (see computeGraphSamples(), called
-    // from the "graph" action) - onUpdate/drawGraph then only ever replays
-    // this small cached array, however often it's asked to redraw.
-    private const GRAPH_SAMPLES = 60;
-    private var graphYs as Array<Double?> = [] as Array<Double?>;
-    private var graphLo as Double = 0.0d;
-    private var graphHi as Double = 1.0d;
-    private var graphHasData as Boolean = false;
-
-    // Evaluates graphExpr at one X, or null if the parser errored there
-    // (e.g. "1/X" at X=0).
-    (:exclude_oldwidget)
-    private function sampleGraph(x as Double) as Double? {
-        var parser = new ExprParser(graphExpr, x, engine.variables);
-        var v = parser.parse();
-        return parser.error ? null : v;
-    }
-
-    (:exclude_oldwidget)
-    private function computeGraphSamples() as Void {
-        var ys = new [GRAPH_SAMPLES] as Array<Double?>;
-        var minY = null as Double?;
-        var maxY = null as Double?;
-        for (var i = 0; i < GRAPH_SAMPLES; i++) {
-            var x = GRAPH_MIN_X + (GRAPH_MAX_X - GRAPH_MIN_X) * i / (GRAPH_SAMPLES - 1);
-            var v = sampleGraph(x);
-            ys[i] = v;
-            if (v != null) {
-                if (minY == null || (v as Double) < (minY as Double)) { minY = v; }
-                if (maxY == null || (v as Double) > (maxY as Double)) { maxY = v; }
-            }
-        }
-        graphYs = ys;
-        graphHasData = minY != null;
-        var lo = minY == null ? 0.0d : minY as Double;
-        var hi = maxY == null ? 1.0d : maxY as Double;
-        if (hi - lo < 0.0001d) {
-            lo -= 1.0d;
-            hi += 1.0d;
-        }
-        graphLo = lo;
-        graphHi = hi;
-    }
-
-    // GRAPH isn't reachable at all on these watches (see moreButtons() -
-    // the low-memory variant drops the GRAPH button), but activate()'s
-    // "graph" branch is one shared if-chain compiled for every device, so
-    // the symbol still has to exist here - it just never runs.
-    (:oldwidget_only)
-    private function computeGraphSamples() as Void {
-    }
-
-    (:exclude_oldwidget)
-    private function drawGraph(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
-        if (w < 2) {
-            return;
-        }
-        if (!graphHasData) {
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(x0 + w / 2, y0 + h / 2, Graphics.FONT_TINY, "no plot", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            return;
-        }
-        var lo = graphLo;
-        var hi = graphHi;
-        if (lo <= 0.0d && hi >= 0.0d) {
-            var zeroY = y0 + h - ((0.0d - lo) / (hi - lo) * h).toNumber();
-            dc.setColor(0x444455, Graphics.COLOR_TRANSPARENT);
-            dc.drawLine(x0, zeroY, x0 + w, zeroY);
-        }
-        dc.setColor(ACCENT_EQUALS, Graphics.COLOR_TRANSPARENT);
-        var prevX = -1;
-        var prevY = -1;
-        for (var i = 0; i < graphYs.size(); i++) {
-            var v = graphYs[i];
-            if (v == null) {
-                prevX = -1;
-                continue;
-            }
-            var px = x0 + (w * i / (graphYs.size() - 1));
-            var py = y0 + h - (((v as Double) - lo) / (hi - lo) * h).toNumber();
-            if (prevX >= 0) {
-                dc.drawLine(prevX, prevY, px, py);
-            }
-            prevX = px;
-            prevY = py;
-        }
-    }
-
-    // See computeGraphSamples() above - GRAPH is unreachable on these
-    // watches, this stub only exists so onUpdate()'s shared SCREEN_GRAPH
-    // branch still compiles.
-    (:oldwidget_only)
-    private function drawGraph(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
-    }
-
-    // Digit-by-digit conversion of a signed Number into any base 2-36 via
-    // repeated division - the sign is peeled off first and reattached at
-    // the end, since Monkey C's %/ on a negative Number would otherwise
-    // produce a negative remainder mid-conversion.
-    (:exclude_oldwidget)
-    private function toBaseString(v as Number, radix as Number) as String {
-        if (v == 0) {
-            return "0";
-        }
-        var neg = v < 0;
-        var n = neg ? -v : v;
-        var digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        var s = "";
-        while (n > 0) {
-            var d = n % radix;
-            s = digits.substring(d, d + 1) + s;
-            n = n / radix;
-        }
-        return neg ? "-" + s : s;
-    }
-
-    // Test-only hook, same reasoning as colorHex(): the custom-radix line
-    // only ever gets pixel-compared on a real Dc, so tests assert on this
-    // string directly instead.
-    (:exclude_oldwidget)
-    function baseCustomString() as String {
-        return "R" + baseRadix.toString() + " " + toBaseString(baseValue, baseRadix);
-    }
-
-    // Test-only hook, same reasoning as baseCustomString(): the tally is
-    // only ever pixel-compared on a real Dc.
-    function counterValueString() as String {
-        return counterValue.toString();
-    }
-
-    (:exclude_oldwidget)
-    private function drawBaseView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
-        var lines = [
-            "DEC " + baseValue.toString(),
-            "HEX " + toBaseString(baseValue, 16),
-            "OCT " + toBaseString(baseValue, 8),
-            "BIN " + toBaseString(baseValue, 2),
-            "R" + baseRadix.toString() + " " + toBaseString(baseValue, baseRadix),
-        ] as Array<String>;
-        var rowH = h / lines.size();
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        for (var i = 0; i < lines.size(); i++) {
-            dc.drawText(x0 + w / 2, y0 + rowH * i + rowH / 2, Graphics.FONT_SMALL, lines[i],
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
-    }
-
-    // BASE isn't reachable on these watches (see moreButtons() below) -
-    // these stubs only exist so the shared activate()/onUpdate() branches
-    // that call them still compile; they're never actually invoked.
-    (:oldwidget_only)
-    function baseCustomString() as String {
-        return "";
-    }
-    (:oldwidget_only)
-    private function drawBaseView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
-    }
-
-    // Two hex digits for one 0-255 channel, zero-padded (unlike
-    // toBaseString(), a color hex code needs the leading zero - "00" not "").
-    (:exclude_oldwidget)
-    private function hexByte(v as Number) as String {
-        var digits = "0123456789ABCDEF";
-        return digits.substring((v / 16) % 16, (v / 16) % 16 + 1) + digits.substring(v % 16, v % 16 + 1);
-    }
-
-    // Test-only hook: the swatch itself only ever gets pixel-compared on a
-    // real Dc, so tests instead assert on this #HEX string directly.
-    (:exclude_oldwidget)
-    function colorHex() as String {
-        return "#" + hexByte(colorR) + hexByte(colorG) + hexByte(colorB);
-    }
-    // COLOR isn't reachable on these watches (see the RGB corner button in
-    // layoutButtons() below) - stub only so colorHex()'s callers compile.
-    (:oldwidget_only)
-    function colorHex() as String {
-        return "#000000";
-    }
-
-    private function drawCounterView(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(x0 + w / 2, y0 + h * 0.4, Graphics.FONT_LARGE, groupThousands(counterValue.toString()),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(x0 + w / 2, y0 + h * 0.8, Graphics.FONT_XTINY, "STEP " + counterStep.toString(),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-    }
-
-    (:exclude_oldwidget)
-    private function drawColorSwatch(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
-        var packed = (colorR << 16) | (colorG << 8) | colorB;
-        var swatchH = (h * 0.7).toNumber();
-        dc.setColor(packed, packed);
-        dc.fillRectangle(x0, y0, w, swatchH);
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(x0 + w / 2, y0 + swatchH + (h - swatchH) / 2, Graphics.FONT_SMALL,
-            colorHex(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-    }
-    (:oldwidget_only)
-    private function drawColorSwatch(dc as Dc, x0 as Number, y0 as Number, w as Number, h as Number) as Void {
-    }
-
     function onUpdate(dc as Dc) as Void {
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
 
-        var headerHBg = (safeH * headerFraction()).toNumber();
+        var headerH = (safeH * 0.24).toNumber();
         dc.setColor(BG_TOP, BG_TOP);
-        dc.fillRectangle(safeX, safeY, safeW, headerHBg);
+        dc.fillRectangle(safeX, safeY, safeW, headerH);
 
-        if (screen == SCREEN_PERSONALIZE) {
-            var qr = WatchUi.loadResource(Rez.Drawables.QrCode) as WatchUi.BitmapResource;
-            var qrX = safeX + (safeW - qr.getWidth()) / 2;
-            var qrY = safeY + 6;
-            dc.drawBitmap(qrX, qrY, qr);
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(safeX + safeW / 2, safeY + headerHBg - 16, Graphics.FONT_XTINY,
-                "Scan or tap OPEN", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        } else if (screen == SCREEN_GRAPH) {
-            drawGraph(dc, safeX, safeY, safeW, headerHBg);
-        } else if (screen == SCREEN_BASE && baseStage == 1) {
-            drawBaseView(dc, safeX, safeY, safeW, headerHBg);
-        } else if (screen == SCREEN_COLOR && colorStage == 3) {
-            drawColorSwatch(dc, safeX, safeY, safeW, headerHBg);
-        } else if (screen == SCREEN_COUNTER && counterStage == 1) {
-            drawCounterView(dc, safeX, safeY, safeW, headerHBg);
-        } else {
-            dc.setColor(Graphics.COLOR_WHITE, BG_TOP);
-            var text = engine.displayText();
-            // While picking the unit converter's target unit, show what's
-            // been picked so far instead of the raw expression, so the
-            // two-tap flow ("source unit, then target unit") is
-            // self-explanatory.
-            if ((screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS) && fromUnitKey != null) {
-                text = "FROM " + unitLabel(fromUnitKey as String) + "...";
-            } else if (screen == SCREEN_RANDOM) {
-                if (randStage == 0) {
-                    text = "MIN? " + text;
-                } else {
-                    text = "MIN " + formatWhole(randMin) + " MAX? " + text;
-                }
-            } else if (screen == SCREEN_TIP) {
-                if (tipStage == 0) {
-                    text = "BILL? " + text;
-                } else if (tipStage == 1) {
-                    text = "TIP%? " + text;
-                } else {
-                    text = "PPL? " + text;
-                }
-            } else if (screen == SCREEN_PCT) {
-                if (pctStage == 0) {
-                    text = "DISCOUNT / MARKUP / MARGIN?";
-                } else if (pctStage == 1) {
-                    text = "BASE? " + text;
-                } else {
-                    text = "PCT? " + text;
-                }
-            } else if (screen == SCREEN_DATE) {
-                if (dateStage == 0) {
-                    text = "UNTIL / AGE / DIFF?";
-                } else if (dateMode == 2) {
-                    if (dateStage == 1) {
-                        text = "DATE1 Y? " + text;
-                    } else if (dateStage == 2) {
-                        text = "DATE1 M? " + text;
-                    } else if (dateStage == 3) {
-                        text = "DATE1 D? " + text;
-                    } else if (dateStage == 4) {
-                        text = "DATE2 Y? " + text;
-                    } else if (dateStage == 5) {
-                        text = "DATE2 M? " + text;
-                    } else {
-                        text = "DATE2 D? " + text;
-                    }
-                } else if (dateStage == 1) {
-                    text = (dateMode == 0 ? "TARGET Y? " : "BIRTH Y? ") + text;
-                } else if (dateStage == 2) {
-                    text = "M? " + text;
-                } else {
-                    text = "D? " + text;
-                }
-            } else if (screen == SCREEN_COLOR) {
-                text = (colorStage == 0 ? "R (0-255)? " : colorStage == 1 ? "G (0-255)? " : "B (0-255)? ") + text;
-            } else if (screen == SCREEN_BASE) {
-                text = "RADIX (2-36)? " + text;
-            } else if (screen == SCREEN_COUNTER) {
-                text = "ADD (1-100)? " + text;
+        dc.setColor(Graphics.COLOR_WHITE, BG_TOP);
+        var text = engine.displayText();
+        if ((screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS) && fromUnitKey != null) {
+            text = "FROM " + unitLabel(fromUnitKey as String) + "...";
+        } else if (screen == SCREEN_RANDOM) {
+            text = randStage == 0 ? "MIN? " + text : "MIN " + formatWhole(randMin) + " MAX? " + text;
+        } else if (screen == SCREEN_TIP) {
+            text = (tipStage == 0 ? "BILL? " : tipStage == 1 ? "TIP%? " : "PPL? ") + text;
+        } else if (screen == SCREEN_PCT) {
+            if (pctStage == 0) {
+                text = "DISCOUNT / MARKUP / MARGIN?";
+            } else if (pctStage == 1) {
+                text = "BASE? " + text;
+            } else {
+                text = "PCT? " + text;
             }
-            // Regular text fonts, not FONT_NUMBER_*: the expression can
-            // contain letters and symbols (X, =, sin, etc.), and the
-            // digit-only number fonts have no glyphs for those.
-            text = groupThousands(text);
-            var font = text.length() > 10 ? Graphics.FONT_TINY : (text.length() > 6 ? Graphics.FONT_SMALL : Graphics.FONT_LARGE);
-            dc.drawText(safeX + safeW / 2, safeY + headerHBg / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            var setVars = "";
-            var varKeys = sortStrings(engine.variables.keys() as Array<String>);
-            for (var vi = 0; vi < varKeys.size(); vi++) {
-                setVars += varKeys[vi];
-            }
-            if (setVars.length() > 0) {
-                dc.drawText(safeX, safeY, Graphics.FONT_XTINY, setVars, Graphics.TEXT_JUSTIFY_LEFT);
+        } else if (screen == SCREEN_DATE) {
+            if (dateStage == 0) {
+                text = "UNTIL / AGE / DIFF?";
+            } else if (dateMode == 2) {
+                var labels = ["DATE1 Y? ", "DATE1 M? ", "DATE1 D? ", "DATE2 Y? ", "DATE2 M? ", "DATE2 D? "] as Array<String>;
+                text = labels[dateStage - 1] + text;
+            } else if (dateStage == 1) {
+                text = (dateMode == 0 ? "TARGET Y? " : "BIRTH Y? ") + text;
+            } else if (dateStage == 2) {
+                text = "M? " + text;
+            } else {
+                text = "D? " + text;
             }
         }
+        text = groupThousands(text);
+        var font = text.length() > 10 ? Graphics.FONT_TINY : (text.length() > 6 ? Graphics.FONT_SMALL : Graphics.FONT_LARGE);
+        dc.drawText(safeX + safeW / 2, safeY + headerH / 2, font, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        var setVars = "";
+        var varKeys = engine.variables.keys() as Array<String>;
+        for (var vi = 0; vi < varKeys.size(); vi++) {
+            setVars += varKeys[vi];
+        }
+        if (setVars.length() > 0) {
+            dc.drawText(safeX, safeY, Graphics.FONT_XTINY, setVars, Graphics.TEXT_JUSTIFY_LEFT);
+        }
 
-        // Small-cell screens (long labels like "asin"/"floor" packed 4x6, or
-        // narrow 2-col pickers) need FONT_TINY - FONT_SMALL overflows the
-        // cell and bleeds into neighboring buttons.
-        var isSmallCellScreen = screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER ||
-            screen == SCREEN_CUR_RESULTS || screen == SCREEN_VAR || screen == SCREEN_ADVANCED || screen == SCREEN_SCIENTIFIC ||
-            screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL ||
-            screen == SCREEN_FORMULA_LIST || screen == SCREEN_FORMULA_MORE_LIST;
+        var isSmallCellScreen = screen == SCREEN_VAR || screen == SCREEN_ADVANCED || screen == SCREEN_SCIENTIFIC ||
+            screen == SCREEN_UNITS || screen == SCREEN_UNIT_PICK || screen == SCREEN_CUR_LETTER || screen == SCREEN_CUR_RESULTS;
         var buttonFont = screen == SCREEN_BASIC ? Graphics.FONT_MEDIUM : (isSmallCellScreen ? Graphics.FONT_TINY : Graphics.FONT_SMALL);
         for (var i = 0; i < buttons.size(); i++) {
             var b = buttons[i];
@@ -2496,8 +1131,6 @@ class calc_for_garminView extends WatchUi.View {
             if (radius < 4) {
                 radius = 4;
             }
-            // A radius past half the shorter side makes the corner arcs
-            // overlap and pinch a notch into the middle of the edge - cap it.
             var maxRadius = ((minDim - 6) / 2).toNumber();
             if (radius > maxRadius) {
                 radius = maxRadius;
@@ -2506,13 +1139,7 @@ class calc_for_garminView extends WatchUi.View {
                 radius = 0;
             }
             var isSelected = i == selectedIndex;
-            var isFromUnit = screen == SCREEN_UNIT_PICK && fromUnitKey != null && b.action.equals("unit:" + (fromUnitKey as String));
-            var fill = isFromUnit ? ACCENT_FROM_UNIT : buttonColor(b.action);
-
-            // Selection is a ring drawn AS A SECOND, SLIGHTLY LARGER FILL
-            // underneath the button's own fill (not a stroked outline on
-            // top) - drawRoundedRectangle's stroke overlapped the fill's own
-            // corner arcs and left a black notch cut into the edge.
+            var fill = buttonColor(b.action);
             if (isSelected) {
                 dc.setColor(ACCENT_SELECT_RING, ACCENT_SELECT_RING);
                 dc.fillRoundedRectangle(b.x + 1, b.y + 1, b.w - 2, b.h - 2, radius);
@@ -2521,33 +1148,13 @@ class calc_for_garminView extends WatchUi.View {
             dc.fillRoundedRectangle(b.x + 3, b.y + 3, b.w - 6, b.h - 6, radius);
 
             var icon = b.icon;
-            var labelColor = (fill == ACCENT_FROM_UNIT || fill == ACCENT_OP) ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE;
+            var labelColor = fill == ACCENT_OP ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE;
             if (icon != null) {
                 dc.drawBitmap(b.x + (b.w - icon.getWidth()) / 2, b.y + (b.h - icon.getHeight()) / 2, icon);
             } else {
-                // Every other basic-screen button is a single character;
-                // "MENU" is the one long label there and needs its own
-                // smaller font so it doesn't overflow its cell.
-                var labelFont = (b.action.equals("setup") || (screen == SCREEN_BASIC && b.label.equals("MENU"))) ?
-                    Graphics.FONT_XTINY : buttonFont;
-                var nlIdx = b.label.find("\n");
-                if ((screen == SCREEN_HISTORY || screen == SCREEN_HISTORY_DETAIL) && nlIdx == null) {
-                    // A single-line row (a step, or an equation's "X=5"
-                    // preview) still shrinks further once it's long, since
-                    // these rows have no fixed short vocabulary like digits.
-                    labelFont = b.label.length() > 14 ? Graphics.FONT_XTINY : labelFont;
-                }
+                var labelFont = (screen == SCREEN_BASIC && b.label.equals("MENU")) ? Graphics.FONT_XTINY : buttonFont;
                 dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
-                if (nlIdx != null) {
-                    var nl = nlIdx as Number;
-                    var line1 = b.label.substring(0, nl) as String;
-                    var line2 = b.label.substring(nl + 1, b.label.length()) as String;
-                    var lineFont = (line1.length() > 14 || line2.length() > 14) ? Graphics.FONT_XTINY : labelFont;
-                    dc.drawText(b.x + b.w / 2, b.y + b.h / 2 - b.h / 5, lineFont, line1, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                    dc.drawText(b.x + b.w / 2, b.y + b.h / 2 + b.h / 5, lineFont, line2, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                } else {
-                    dc.drawText(b.x + b.w / 2, b.y + b.h / 2, labelFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                }
+                dc.drawText(b.x + b.w / 2, b.y + b.h / 2, labelFont, b.label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             }
         }
 
@@ -2591,9 +1198,4 @@ class calc_for_garminView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(screenW / 2, cy + ch - 10, Graphics.FONT_XTINY, "(tap to dismiss)", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
-
-    function onHide() as Void {
-        dismissPopup();
-    }
-
 }
