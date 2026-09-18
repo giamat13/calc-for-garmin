@@ -13,7 +13,11 @@ function iconFor(action as String, label as String) as ResourceId? {
     if (idx == null) {
         return null;
     }
-    return [
+    // Built once and cached: this used to allocate all 25 entries on every
+    // call - every button, every draw - just to read one of them.
+    var ids = _iconIds;
+    if (ids == null) {
+        ids = [
         Rez.Drawables.ic_del,
         Rez.Drawables.ic_back,
         Rez.Drawables.ic_adv,
@@ -39,5 +43,10 @@ function iconFor(action as String, label as String) as ResourceId? {
         Rez.Drawables.ic_larr,
         Rez.Drawables.ic_rarr,
         Rez.Drawables.ic_pi
-    ][idx[0].toNumber() as Number] as ResourceId;
+        ] as Array<ResourceId>;
+        _iconIds = ids;
+    }
+    return ids[idx[0].toNumber() as Number] as ResourceId;
 }
+
+var _iconIds as Array<ResourceId>? = null;

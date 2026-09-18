@@ -20,9 +20,6 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     }
 
     function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
-        if (view.dismissPopup()) {
-            return true;
-        }
         var coords = clickEvent.getCoordinates();
         return handleTapAt(coords[0], coords[1]);
     }
@@ -34,9 +31,6 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     // physical buttons have no hold/duration info via onKey, so there's no
     // equivalent gesture to wire up for them).
     function onHold(clickEvent as WatchUi.ClickEvent) as Boolean {
-        if (view.dismissPopup()) {
-            return true;
-        }
         var coords = clickEvent.getCoordinates();
         var idx = view.buttonAt(coords[0], coords[1]);
         if (idx != null && view.getButtons()[idx as Number].action.equals("counterDec")) {
@@ -53,9 +47,6 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     // button-only device has no touchscreen to swipe on, so onSwipe
     // simply never fires there.
     function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
-        if (view.dismissPopup()) {
-            return true;
-        }
         var dir = swipeEvent.getDirection();
         var onListScreen = view.isListScreen();
         if (onListScreen && dir == WatchUi.SWIPE_UP) {
@@ -76,9 +67,6 @@ class calc_for_garminDelegate extends WatchUi.InputDelegate {
     }
 
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
-        if (view.dismissPopup()) {
-            return true;
-        }
         var key = keyEvent.getKey();
         if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
             return pressSelected();

@@ -40,7 +40,6 @@ class SeedConfig {
     // alphabet, not a customizable slice of the pool (see
     // calc-for-garminView.VAR_LETTERS).
 
-    var easterEggs as Boolean = false;
 
     private static var instance as SeedConfig?;
 
@@ -91,14 +90,6 @@ class SeedConfig {
 
     function initialize(seed as String?) {
         colors = DEFAULT_COLORS;
-        try {
-            var ee = readProp("easterEggs");
-            if (ee != null && ee instanceof Lang.Boolean) {
-                easterEggs = ee as Boolean;
-            }
-        } catch (e) {
-            easterEggs = false;
-        }
         if (seed == null || seed.length() < 2 || !seed.substring(0, 2).equals("1|")) {
             return;
         }

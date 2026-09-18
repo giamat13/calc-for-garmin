@@ -76,41 +76,6 @@ class calc_for_garminView extends WatchUi.View {
     var engine as CalculatorEngine = new CalculatorEngine();
     var screen as Number = SCREEN_BASIC;
     var selectedIndex as Number = 0;
-    private var popupTimer as Timer.Timer? = null;
-    var popupKind as String? = null;
-
-    function showPopup(kind as String) as Void {
-        popupKind = kind;
-        if (popupTimer != null) {
-            popupTimer.stop();
-        } else {
-            popupTimer = new Timer.Timer();
-        }
-        popupTimer.start(method(:onPopupTimeout), 5000, false);
-        WatchUi.requestUpdate();
-    }
-
-    function dismissPopup() as Boolean {
-        if (popupKind != null) {
-            popupKind = null;
-            if (popupTimer != null) {
-                popupTimer.stop();
-                popupTimer = null;
-            }
-            WatchUi.requestUpdate();
-            return true;
-        }
-        return false;
-    }
-
-    function onPopupTimeout() as Void {
-        popupKind = null;
-        if (popupTimer != null) {
-            popupTimer.stop();
-            popupTimer = null;
-        }
-        WatchUi.requestUpdate();
-    }
     private var buttons as Array<CalcButton> = [] as Array<CalcButton>;
 
     // Stashes the expression being built so a temporary value (random/tip/
@@ -196,8 +161,7 @@ class calc_for_garminView extends WatchUi.View {
     function onShow() as Void {
     }
 
-    function onHide() as Void {
-        dismissPopup();
+    function onHide() as Void {
     }
 
     function getButtons() as Array<CalcButton> {
@@ -805,18 +769,6 @@ class calc_for_garminView extends WatchUi.View {
         } else if (action.equals("back")) {
             engine.backspace();
         } else if (action.equals("equals")) {
-            var exprBefore = engine.expr;
-            if (SeedConfig.get().easterEggs) {
-                if (exprBefore.equals("+6%+")) {
-                    showPopup("hebrew_profit");
-                    engine.clear();
-                    return;
-                } else if (exprBefore.equals("42")) {
-                    showPopup("answer_to_life");
-                    engine.evaluate();
-                    return;
-                }
-            }
             engine.evaluate();
         } else if (action.equals("curLeft")) {
             engine.moveCursorLeft();
@@ -1158,44 +1110,5 @@ class calc_for_garminView extends WatchUi.View {
             }
         }
 
-        if (popupKind != null) {
-            drawPopupOverlay(dc);
-        }
-    }
-
-    private function drawPopupOverlay(dc as Graphics.Dc) as Void {
-        var screenW = dc.getWidth();
-        var screenH = dc.getHeight();
-        var cw = (screenW * 0.90).toNumber();
-        var ch = (screenH * 0.54).toNumber();
-        var cx = (screenW - cw) / 2;
-        var cy = (screenH - ch) / 2;
-
-        // Dark modal card background with border
-        dc.setColor(0x141420, 0x141420);
-        dc.fillRoundedRectangle(cx, cy, cw, ch, 10);
-        dc.setColor(0x7C4DFF, Graphics.COLOR_TRANSPARENT);
-        dc.drawRoundedRectangle(cx, cy, cw, ch, 10);
-        dc.drawRoundedRectangle(cx + 1, cy + 1, cw - 2, ch - 2, 9);
-
-        if (popupKind.equals("hebrew_profit")) {
-            dc.setColor(0x00D68F, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(screenW / 2, cy + 12, Graphics.FONT_XTINY, "EASTER EGG", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            var bmp = WatchUi.loadResource(Rez.Drawables.HebrewProfit) as WatchUi.BitmapResource;
-            dc.drawBitmap(screenW / 2 - bmp.getWidth() / 2, cy + ch / 2 - bmp.getHeight() / 2 + 4, bmp);
-        } else if (popupKind.equals("answer_to_life")) {
-            dc.setColor(0xFFB020, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(screenW / 2, cy + 12, Graphics.FONT_XTINY, "EASTER EGG (42)", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            var font = screenW >= 360 ? Graphics.FONT_TINY : Graphics.FONT_XTINY;
-            var fh = dc.getFontHeight(font);
-            var lineGap = (fh * 1.35).toNumber();
-            var midY = cy + ch / 2 + 3;
-            dc.drawText(screenW / 2, midY - lineGap / 2, font, "The Answer to Life,", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(screenW / 2, midY + lineGap / 2, font, "Universe & Everything", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
-
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(screenW / 2, cy + ch - 10, Graphics.FONT_XTINY, "(tap to dismiss)", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 }
