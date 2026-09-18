@@ -15,7 +15,6 @@
         -->
         <iq:products>
             <iq:product id="approachs60"/>
-            <iq:product id="approachs62"/>
             <iq:product id="d2bravo"/>
             <iq:product id="d2bravo_titanium"/>
             <iq:product id="d2charlie"/>
@@ -34,7 +33,6 @@
             <iq:product id="fenix5"/>
             <iq:product id="fenix5s"/>
             <iq:product id="fenix5x"/>
-            <iq:product id="fenix6"/>
             <iq:product id="fenix6s"/>
             <iq:product id="fenixchronos"/>
             <iq:product id="fr230"/>
