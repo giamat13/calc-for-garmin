@@ -97,7 +97,7 @@ class SeedConfig {
 
     static function get() as SeedConfig {
         if (instance == null) {
-            instance = new SeedConfig(Application.Properties.getValue("calcSeed") as String?);
+            instance = new SeedConfig(readProp("calcSeed") as String?);
         }
         return instance as SeedConfig;
     }
@@ -105,14 +105,14 @@ class SeedConfig {
     // Re-parses from Properties - call after the phone's Settings UI may
     // have changed them (App.onSettingsChanged).
     static function reload() as Void {
-        instance = new SeedConfig(Application.Properties.getValue("calcSeed") as String?);
+        instance = new SeedConfig(readProp("calcSeed") as String?);
     }
 
     function initialize(seed as String?) {
         colors = DEFAULT_COLORS;
         customFormulas = [] as Array<Dictionary<String, String> >;
         try {
-            var ee = Application.Properties.getValue("easterEggs");
+            var ee = readProp("easterEggs");
             if (ee != null && ee instanceof Lang.Boolean) {
                 easterEggs = ee as Boolean;
             }
@@ -397,4 +397,32 @@ function specLookup(spec as String, key as String) as Array<String>? {
         j++;
     }
     return splitStr(spec.substring(start, j) as String, "~");
+}
+
+// Settings and persistent storage for both API generations. Application.
+// Properties and Application.Storage only exist from API 2.4 on; older
+// watches (fenix3, vivoactive3, ...) fall back to the app-level property
+// store, which is what the Settings UI writes to on those devices anyway.
+// Callers never touch Properties/Storage directly, so the same code runs on
+// every device.
+function readProp(key as String) as PropertyValueType? {
+    if (Application has :Properties) {
+        return Application.Properties.getValue(key);
+    }
+    return Application.getApp().getProperty(key);
+}
+
+function readStore(key as String) as PropertyValueType? {
+    if (Application has :Storage) {
+        return Application.Storage.getValue(key);
+    }
+    return Application.getApp().getProperty(key);
+}
+
+function writeStore(key as String, value as PropertyValueType) as Void {
+    if (Application has :Storage) {
+        Application.Storage.setValue(key, value);
+    } else {
+        Application.getApp().setProperty(key, value);
+    }
 }

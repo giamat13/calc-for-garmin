@@ -155,7 +155,29 @@ function testCircleAreaFormulaAsksRadiusThenInsertsExercise(logger as Test.Logge
         return false;
     }
     return pressAndExpect(logger, v, ["digit:3", "formulaNext"], "π*3^2") &&
-        pressAndExpect(logger, v, ["equals"], v.engine.formatNumber((Math.PI.toDouble() as Double) * 9.0d));
+        pressAndExpect(logger, v, ["equals"], v.engine.formatNumber(3.141592653589793d * 9.0d));
+}
+
+// π = shows truncated (never rounded up); > then reveals more digits, < hides
+// them again, and any other edit switches the stepping off.
+(:test)
+function testPiTruncatesAndStepsWithArrows(logger as Test.Logger) as Boolean {
+    var v = new calc_for_garminView();
+    v.layoutForSize(260, 260, false);
+    if (!(pressAndExpect(logger, v, ["clear", "const:π", "equals"], "3.141592") &&
+            pressAndExpect(logger, v, ["curRight", "curRight", "curRight"], "3.141592653") &&
+            pressAndExpect(logger, v, ["curLeft"], "3.14159265"))) {
+        return false;
+    }
+    for (var i = 0; i < 1100; i++) {
+        v.activate(new CalcButton("", "curRight"));
+    }
+    if (v.engine.expr.length() != 1002) {
+        logger.debug("expected 1000 decimals of pi (length 1002), got length " + v.engine.expr.length());
+        return false;
+    }
+    // Typing something else ends the stepping: > just moves the cursor.
+    return pressAndExpect(logger, v, ["clear", "const:π", "equals", "op:+", "curRight"], "3.141592+");
 }
 
 // Multi-letter formula: each letter asked once, in order; a negative value

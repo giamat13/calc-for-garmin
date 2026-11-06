@@ -1,5 +1,9 @@
 <properties xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
     <property id="calcSeed" type="string"></property>
     <property id="easterEggs" type="boolean">false</property>
+    <!-- 0 small, 1 normal (default, unchanged look), 2 large -->
+    <property id="buttonSize" type="number">1</property>
+    <!-- 0 basic keypad (default), 1 scientific, 2 advanced -->
+    <property id="startScreen" type="number">0</property>
 </properties>
 

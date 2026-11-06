@@ -1,6 +1,6 @@
 import Toybox.Lang;
 import Toybox.Math;
-import Toybox.Application.Storage;
+import Toybox.WatchUi;
 
 // Text-expression calculator: button presses build up a formula string
 // (so parentheses and arbitrary powers work naturally), evaluated by
@@ -28,6 +28,16 @@ class CalculatorEngine {
     // decimal - see toggleFraction().
     private var fractionMode as Boolean = false;
 
+    // Pi is shown truncated (never rounded up) as "3.141592"; while that is
+    // what's on screen with the cursor at its end, > reveals one more digit
+    // and < hides one, up to the 1000 decimals in the PiDigits resource.
+    // Set by evaluate() when the result is pi; the stepping also re-checks
+    // that expr really is a prefix of pi, so any other edit switches it off.
+    private var piMode as Boolean = false;
+    private const PI_START = 8;
+    private const PI_MAX_LEN = 1002;
+    private const PI_VALUE = 3.141592653589793d;
+
     // Every function name appendFunction() can insert as "name(" - used by
     // backspace() to delete a freshly-opened call in one press instead of
     // walking it out letter by letter. ("fact" has no button of its own -
@@ -38,14 +48,14 @@ class CalculatorEngine {
     ] as Array<String>;
 
     function initialize() {
-        var stored = Storage.getValue("calcVariables");
+        var stored = readStore("calcVariables");
         if (stored != null) {
             variables = stored as Dictionary<String, Double>;
         }
     }
 
     private function persistVariables() as Void {
-        Storage.setValue("calcVariables", variables);
+        writeStore("calcVariables", variables);
     }
 
     function clearVariables() as Void {
@@ -81,7 +91,41 @@ class CalculatorEngine {
         insertAtCursor(text);
     }
 
+    // The pi text is loaded only for the moment it's needed, and dropped
+    // again, rather than kept as a 1KB constant.
+    private function piDigits() as String {
+        return WatchUi.loadResource(Rez.Strings.PiDigits) as String;
+    }
+
+    // Cheap check, also used every frame by the view to pick the display.
+    function showingPi() as Boolean {
+        return piMode && cursorPos == expr.length() && expr.length() >= PI_START &&
+            (expr.substring(0, 4) as String).equals("3.14");
+    }
+
+    // Sets expr to the first n characters of pi - but only if what's
+    // there now really is pi's opening, so a hand-edited number is left alone.
+    private function stepPi(n as Number) as Boolean {
+        if (!showingPi()) {
+            return false;
+        }
+        var digits = piDigits();
+        if (!(digits.substring(0, expr.length()) as String).equals(expr)) {
+            piMode = false;
+            return false;
+        }
+        if (n >= PI_START && n <= PI_MAX_LEN) {
+            expr = digits.substring(0, n) as String;
+            cursorPos = n;
+        }
+        justEvaluated = false;
+        return true;
+    }
+
     function moveCursorLeft() as Void {
+        if (expr.length() > PI_START && stepPi(expr.length() - 1)) {
+            return;
+        }
         if (cursorPos > 0) {
             cursorPos -= 1;
         }
@@ -89,6 +133,9 @@ class CalculatorEngine {
     }
 
     function moveCursorRight() as Void {
+        if (stepPi(expr.length() + 1)) {
+            return;
+        }
         if (cursorPos < expr.length()) {
             cursorPos += 1;
         }
@@ -379,6 +426,11 @@ class CalculatorEngine {
         }
         lastAnswer = result;
         expr = formatNumber(result);
+        var piGap = result - PI_VALUE;
+        piMode = piGap < 1.0e-15d && piGap > -1.0e-15d;
+        if (piMode) {
+            expr = piDigits().substring(0, PI_START) as String;
+        }
         justEvaluated = true;
         fractionMode = false;
         cursorPos = expr.length();
@@ -400,6 +452,7 @@ class CalculatorEngine {
     // raw expression with no answer at all. Since the real answer is
     // already known, always make sure it ends up as the last step even if
     // the walk itself couldn't get there.
+    (:exclude_oldwidget)
     function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
         var steps = [] as Array<String>;
         if (startExpr.length() == 0) {
@@ -461,6 +514,7 @@ class CalculatorEngine {
     // step still reads as a full equation (e.g. "5-4+X=30" -> "1+X=30").
     // Appends steps in place; stops once neither side has a collapsible
     // constant part left.
+    (:exclude_oldwidget)
     private function walkEquationConstants(steps as Array<String>, letter as String, lhsIn as String, rhsIn as String) as Void {
         var lhs = lhsIn;
         var rhs = rhsIn;
@@ -486,6 +540,7 @@ class CalculatorEngine {
     // those get resolved later by equationCollectStep()/
     // solveEquationForDisplay() instead. Returns null when the side fails
     // to parse or has nothing left to collapse.
+    (:exclude_oldwidget)
     private function collapseOnePureNode(sideExpr as String, letter as String) as String? {
         if (sideExpr.length() == 0) {
             return null;
@@ -507,6 +562,7 @@ class CalculatorEngine {
     // the unknown letter - it recurses past such nodes into their children
     // instead, looking for a pure-constant pocket to collapse first (e.g.
     // in "5-4+X", it steps past the root and into "5-4").
+    (:exclude_oldwidget)
     private function findFirstPureStepNode(n as StepNode, letter as String, text as String) as StepNode? {
         var span = text.substring(n.start, n.end) as String;
         if (!containsUnknownToken(span, letter)) {
@@ -534,6 +590,7 @@ class CalculatorEngine {
     // identifier (not as part of a longer word) - used to tell a
     // constants-only subexpression apart from one that still has the
     // unknown mixed into it.
+    (:exclude_oldwidget)
     private function containsUnknownToken(text as String, letter as String) as Boolean {
         var i = 0;
         while (i < text.length()) {
@@ -552,6 +609,28 @@ class CalculatorEngine {
             }
         }
         return false;
+    }
+
+    // Low-memory fallback for watches too small to fit StepSolver (see the
+    // pool comment at the top of SeedConfig.mc for that device list) - no
+    // order-of-operations walk, just the typed expression (and, for an
+    // equation, its solved form) plus the already-known final answer. The
+    // history detail screen still works, it just skips the intermediate
+    // stages.
+    (:oldwidget_only)
+    function computeSolutionSteps(startExpr as String, knownAnswer as String?) as Array<String> {
+        var steps = [] as Array<String>;
+        if (startExpr.length() == 0) {
+            return steps;
+        }
+        steps.add(startExpr);
+        if (startExpr.find("=") != null) {
+            var solved = solveEquationForDisplay(startExpr);
+            if (solved != null) {
+                steps.add(solved as String);
+            }
+        }
+        return ensureFinalAnswer(steps, knownAnswer);
     }
 
     // Appends `knownAnswer` to `steps` unless it's empty/null or already the

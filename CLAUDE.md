@@ -2,11 +2,17 @@
 
 ## Branches
 
-The app ships as two separate store listings (different UUIDs in `manifest.xml`), one per branch - don't merge them into each other:
-- **`main`** - newer watches only (`minApiLevel` 3.2.0), the full-featured view. Signed with `developer_key_new.der`.
-- **`old-devices`** - older, memory-constrained watches (64KB widget cap, down to API 1.4 like fenix3/vivoactive), a lean view with no GRAPH/BASE/COLOR/COUNTER/FORMULAS/HISTORY/QR setup. Signed with `developer_key_old.der`. API 2.4+ calls (Storage/Properties) go through `readProp`/`readStore`/`writeStore` in `SeedConfig.mc`, which fall back to `AppBase.getProperty` there.
+There is one branch, `main`, and one store listing (`a6abb4e5-0f89-430e-990c-4b75cd2ad0da`, UUID in `manifest.xml`). The old `old-devices` branch and its listing (`3f93c3d9`) are retired; don't merge them back and don't delete them without asking.
 
-`.vscode/settings.json` (tracked) points at the right key per branch; the key files themselves are gitignored.
+One build covers every device in `manifest.xml` (`minApiLevel` 1.4.0), in two flavours chosen per device in `monkey.jungle`:
+- **Full build** - the default. Everything is compiled in.
+- **Lean build** - the 44 devices with the 64KB widget cap (the `<device>.excludeAnnotations` lines in `monkey.jungle`, e.g. fenix3, fenix5, vivoactive3, fr245, instinct2). Code marked `(:exclude_oldwidget)` is stripped and its `(:oldwidget_only)` stand-in is compiled instead. No GRAPH/BASE/COLOR/COUNTER/FORMULAS/HISTORY/QR setup.
+
+How it works: `base.excludeAnnotations = oldwidget_only` strips the lean stand-ins from every device; each lean device line sets `<device>.excludeAnnotations = exclude_oldwidget`, which strips the full-only code. Every annotated declaration exists in source once in full and once as a stand-in, so both builds always compile from the same files. When you add a feature that is heavy (graphs, extra screens, big formula tables), mark it `(:exclude_oldwidget)` and add a `(:oldwidget_only)` stand-in for any shared code that still calls it. Check the lean build for fenix3 and the full build for vivoactive4s after such a change.
+
+API 2.4+ calls (Storage/Properties) go through `readProp`/`readStore`/`writeStore` in `SeedConfig.mc`, which fall back to `AppBase.getProperty`/`setProperty` on older API levels.
+
+Signing: `.vscode/settings.json` (tracked) points at the developer key; the key files themselves are gitignored. Command-line builds use `developer_key_new.der` in the repo root.
 
 ## UI guidelines
 
@@ -39,4 +45,4 @@ In practice this usually means keeping the old parser path alongside the new one
 
 ## Old watches
 
-Memory-limit (64KB widget) build errors and anything for pre-3.2.0 / low-memory watches belong on the `old-devices` branch, not here - `main` only targets newer watches.
+Memory-limit (64KB widget) build errors are fixed with the lean-build annotations described under Branches, not with a separate branch. If a device hits the limit, add it to the lean device list in `monkey.jungle` and mark the heavy code it still pulls in. Keep the lean build's stand-ins working so old watches never show a blank or crashing screen.

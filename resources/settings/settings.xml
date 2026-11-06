@@ -5,4 +5,18 @@
     <setting propertyKey="@Properties.easterEggs" title="@Strings.EasterEggsTitle">
         <settingConfig type="boolean" />
     </setting>
+    <setting propertyKey="@Properties.buttonSize" title="@Strings.ButtonSizeTitle">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.ButtonSizeSmall</listEntry>
+            <listEntry value="1">@Strings.ButtonSizeNormal</listEntry>
+            <listEntry value="2">@Strings.ButtonSizeLarge</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.startScreen" title="@Strings.StartScreenTitle">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.StartBasic</listEntry>
+            <listEntry value="1">@Strings.StartScientific</listEntry>
+            <listEntry value="2">@Strings.StartAdvanced</listEntry>
+        </settingConfig>
+    </setting>
 </settings>

@@ -1,1 +1,55 @@
 project.manifest = manifest.xml
+
+# One build for every device. Devices with the 64KB widget memory cap
+# (the old-devices list, below) get the lean build: the code marked
+# (:exclude_oldwidget) is stripped and the (:oldwidget_only) stand-ins are
+# compiled in instead (no GRAPH/BASE/COLOR/COUNTER/FORMULAS/HISTORY/QR).
+# Everything else gets the full build.
+#
+# base.* applies to every device; each device line below overrides it.
+base.excludeAnnotations = oldwidget_only
+
+approachs60.excludeAnnotations = exclude_oldwidget
+d2bravo.excludeAnnotations = exclude_oldwidget
+d2bravo_titanium.excludeAnnotations = exclude_oldwidget
+d2charlie.excludeAnnotations = exclude_oldwidget
+d2delta.excludeAnnotations = exclude_oldwidget
+d2deltapx.excludeAnnotations = exclude_oldwidget
+d2deltas.excludeAnnotations = exclude_oldwidget
+descentg1.excludeAnnotations = exclude_oldwidget
+descentmk1.excludeAnnotations = exclude_oldwidget
+edge520plus.excludeAnnotations = exclude_oldwidget
+edge820.excludeAnnotations = exclude_oldwidget
+edge_1000.excludeAnnotations = exclude_oldwidget
+edge_520.excludeAnnotations = exclude_oldwidget
+edgeexplore.excludeAnnotations = exclude_oldwidget
+fenix3.excludeAnnotations = exclude_oldwidget
+fenix3_hr.excludeAnnotations = exclude_oldwidget
+fenix5.excludeAnnotations = exclude_oldwidget
+fenix5s.excludeAnnotations = exclude_oldwidget
+fenix5x.excludeAnnotations = exclude_oldwidget
+fenix6s.excludeAnnotations = exclude_oldwidget
+fenixchronos.excludeAnnotations = exclude_oldwidget
+fr230.excludeAnnotations = exclude_oldwidget
+fr235.excludeAnnotations = exclude_oldwidget
+fr245.excludeAnnotations = exclude_oldwidget
+fr55.excludeAnnotations = exclude_oldwidget
+fr630.excludeAnnotations = exclude_oldwidget
+fr645.excludeAnnotations = exclude_oldwidget
+fr735xt.excludeAnnotations = exclude_oldwidget
+fr920xt.excludeAnnotations = exclude_oldwidget
+fr935.excludeAnnotations = exclude_oldwidget
+gpsmap66.excludeAnnotations = exclude_oldwidget
+gpsmap86.excludeAnnotations = exclude_oldwidget
+instinct2.excludeAnnotations = exclude_oldwidget
+instinct2s.excludeAnnotations = exclude_oldwidget
+instinct2x.excludeAnnotations = exclude_oldwidget
+instinctcrossover.excludeAnnotations = exclude_oldwidget
+oregon7xx.excludeAnnotations = exclude_oldwidget
+rino7xx.excludeAnnotations = exclude_oldwidget
+venusq.excludeAnnotations = exclude_oldwidget
+vivoactive.excludeAnnotations = exclude_oldwidget
+vivoactive3.excludeAnnotations = exclude_oldwidget
+vivoactive3d.excludeAnnotations = exclude_oldwidget
+vivoactive3mlte.excludeAnnotations = exclude_oldwidget
+vivoactive_hr.excludeAnnotations = exclude_oldwidget

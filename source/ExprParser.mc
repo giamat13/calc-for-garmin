@@ -22,6 +22,8 @@ class ExprParser {
     var error as Boolean = false;
 
     hidden const E = 2.718281828459045d;
+    // Math.PI is a 32-bit Float (3.1415927), so use a full Double literal instead
+    hidden const PI = 3.141592653589793d;
 
     function initialize(str as String, xVal as Double, vars as Dictionary<String, Double>) {
         s = str;
@@ -175,7 +177,7 @@ class ExprParser {
         }
         if (c.equals("π")) {
             pos += 1;
-            return Math.PI.toDouble();
+            return PI;
         }
         if (isDigitLiteral(c) || c.equals(".")) {
             return readNumber();
@@ -304,11 +306,11 @@ class ExprParser {
 
     hidden function applyFunc(name as String, arg as Double) as Double {
         if (name.equals("sin")) {
-            return Math.sin(arg * Math.PI / 180.0d) as Double;
+            return Math.sin(arg * PI / 180.0d) as Double;
         } else if (name.equals("cos")) {
-            return Math.cos(arg * Math.PI / 180.0d) as Double;
+            return Math.cos(arg * PI / 180.0d) as Double;
         } else if (name.equals("tan")) {
-            return Math.tan(arg * Math.PI / 180.0d) as Double;
+            return Math.tan(arg * PI / 180.0d) as Double;
         } else if (name.equals("sqrt")) {
             if (arg < 0.0d) {
                 error = true;
@@ -332,15 +334,15 @@ class ExprParser {
                 error = true;
                 return 0.0d;
             }
-            return (Math.asin(arg) as Double) * 180.0d / Math.PI;
+            return (Math.asin(arg) as Double) * 180.0d / PI;
         } else if (name.equals("acos")) {
             if (arg < -1.0d || arg > 1.0d) {
                 error = true;
                 return 0.0d;
             }
-            return (Math.acos(arg) as Double) * 180.0d / Math.PI;
+            return (Math.acos(arg) as Double) * 180.0d / PI;
         } else if (name.equals("atan")) {
-            return (Math.atan(arg) as Double) * 180.0d / Math.PI;
+            return (Math.atan(arg) as Double) * 180.0d / PI;
         } else if (name.equals("cbrt")) {
             return arg < 0.0d ? -(Math.pow(-arg, 1.0d / 3.0d) as Double) : (Math.pow(arg, 1.0d / 3.0d) as Double);
         } else if (name.equals("abs")) {
